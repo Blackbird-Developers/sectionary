@@ -17,7 +17,7 @@ import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
  *
  * At rest the wall is only screenshots. Hovering or focusing a card brings up
  * three controls over it: the store's mark (to its profile), share, and Save.
- * They are always shown where there is no hover (touch).
+ * They never show at rest, on any screen.
  *
  * On the virtualised wall the height is already known (see lib/wall-layout.ts),
  * so it is passed in and the card fills it exactly rather than deriving its own
@@ -138,21 +138,25 @@ export function BlockCard({
             )}
           />
           {/* A light veil so the white controls read on a white screenshot. */}
-          <div className={cn("pointer-events-none absolute inset-0 bg-black/15", REVEAL)} aria-hidden />
+          <div
+            className="pointer-events-none absolute inset-0 bg-black/15 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-within:opacity-100"
+            aria-hidden
+          />
         </div>
       </button>
 
-      {/* The controls, above the open-the-block layer. Hidden at rest where a
-          pointer can hover; always there on touch, where nothing can. The
+      {/* The controls, above the open-the-block layer, shown only on hover or
+          keyboard focus. The
           store's mark goes to its profile (every page, full length), the
           arrow shares this block, Save files it on a board. */}
       <Link
         href={`/sites/${encodeURIComponent(block.host)}`}
         aria-label={`${block.host}: all pages`}
         title={`${block.host} · ${kind}`}
-        className={cn(CONTROL, "bottom-2 left-2 size-8 p-0.5", REVEAL)}
+        className={cn(CONTROL, "bottom-2 left-2 size-8 overflow-hidden", REVEAL)}
       >
-        <StoreIcon host={block.host} brand={block.host} size={24} className="rounded-full" />
+        {/* The mark at its normal size, with the circle tinted to its edge colour. */}
+        <StoreIcon host={block.host} brand={block.host} size={32} fill />
       </Link>
       <ShareControl block={block} kind={kind} className={cn("top-2 right-2", REVEAL)} />
       <div className={cn("absolute right-2 bottom-2 z-20", REVEAL)}>
@@ -162,9 +166,14 @@ export function BlockCard({
   );
 }
 
-/** Hidden until the card is hovered or holds focus; always shown on touch. */
+/**
+ * Hidden until the card is hovered or holds keyboard focus, at every width.
+ * While hidden they take no clicks either, so a tap on a phone opens the block
+ * instead of landing on a button nobody can see; Save and the store are in the
+ * block's own view there.
+ */
 const REVEAL =
-  "opacity-0 transition-[opacity,translate,scale] duration-200 group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100";
+  "pointer-events-none opacity-0 transition-[opacity,translate,scale] duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100";
 
 /** A round white control on the screenshot. */
 const CONTROL =
