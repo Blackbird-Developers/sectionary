@@ -28,8 +28,9 @@ export const dynamic = "force-dynamic";
  * GET /api/blocks · BlocksQuery in, BlocksResponse out, plus the wall's
  * additions (WallQuery and WallResponse in lib/block-source.ts): the `video`
  * and `color` filters, facets for every filter and `nearMiss`.
- * Without `q`, newest captures first. With `q`, ranked by relevance: full text,
- * typo tolerance and semantic search fused (see server/search.ts).
+ * Without `q`, stores are mixed (see below) unless the query names a store,
+ * which keeps page order. With `q`, ranked by relevance: full text, typo
+ * tolerance and semantic search fused (see server/search.ts).
  * Facets and near misses come with the first page only: they describe the
  * whole result set, so later pages would repeat them.
  *
@@ -83,12 +84,29 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
     return { body: { items: [], blocks: [], generatedAt: new Date().toISOString(), nextCursor: null, total: counts.total, facets: counts.facets, nearMiss: counts.nearMiss } };
   }
 
-  // Latest capture of each page only. Within a capture, page order, so one
+  // Latest capture of each page only.
+  //
+  // A query that names a store keeps page order within each capture, so that
   // store's blocks arrive ready for its page viewer and flow view.
+  //
+  // Any other query mixes the stores, so the wall is not a run of one store's
+  // sections followed by a run of the next. Each store's blocks are dealt in
+  // turns: every store's first, then every store's second, and so on. Which
+  // block is a store's first, and the order of stores within a turn, come from
+  // a hash of the ids: scattered, but the same on every request, so pages
+  // follow on from one another and the answer can be cached.
+  const rowsQuery = f.host?.length
+    ? sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
+      ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`
+    : sql`SELECT * FROM (
+        SELECT ${blockColumns(sql)},
+          row_number() OVER (PARTITION BY s.id ORDER BY md5(b.id::text)) AS turn,
+          md5(s.id::text) AS store_order
+        FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
+      ) mixed ORDER BY turn, store_order, id LIMIT ${limit} OFFSET ${offset}`;
   // Without facets the total is its own count, run alongside the page rather than after it.
   const [rows, counts, counted] = await Promise.all([
-    sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
-      ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`,
+    rowsQuery,
     first ? facetCounts(sql, f) : null,
     first ? null : sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`,
   ]);
