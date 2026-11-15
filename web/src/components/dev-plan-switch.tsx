@@ -42,7 +42,7 @@ export function DevPlanSwitch() {
     <div
       role="group"
       aria-label="Development: view as plan"
-      className="fixed right-3 bottom-3 z-50 flex items-center gap-0.5 rounded-lg border bg-popover/95 p-0.5 font-mono text-[11px] text-popover-foreground shadow-lg backdrop-blur"
+      className="fixed right-3 bottom-[4.5rem] z-50 md:bottom-3 flex items-center gap-0.5 rounded-lg border bg-popover/95 p-0.5 font-mono text-[11px] text-popover-foreground shadow-lg backdrop-blur"
     >
       <span className="px-1.5 text-muted-foreground">dev · view as</span>
       {OPTIONS.map((o) => (

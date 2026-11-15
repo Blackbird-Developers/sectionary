@@ -325,6 +325,39 @@
       transform: translateX(-4px);
     }
   }
+  /* The search palette (components/command-palette.tsx): the scrim fades, the
+     panel rises a few pixels into place. Opacity and transform only. */
+  /* The search trigger's hint: four phrases and the first again, stepping up
+     one line at a time. The last step lands on the copy of the first, so the
+     loop has no visible jump. */
+  .search-ticker {
+    animation: search-ticker 14s var(--ease-out-quint) infinite;
+  }
+  @keyframes search-ticker {
+    0%, 21% { translate: 0 0; }
+    25%, 46% { translate: 0 -20%; }
+    50%, 71% { translate: 0 -40%; }
+    75%, 96% { translate: 0 -60%; }
+    100% { translate: 0 -80%; }
+  }
+  .palette-fade {
+    animation: palette-fade 160ms var(--ease-out-expo) both;
+  }
+  .palette-in {
+    animation: palette-in 220ms var(--ease-out-expo) both;
+  }
+  @keyframes palette-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes palette-in {
+    from {
+      opacity: 0;
+      translate: -50% 8px;
+      scale: 0.98;
+    }
+  }
   @keyframes shimmer {
     from {
       background-position: 200% 0;
