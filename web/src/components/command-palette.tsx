@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CornerDownLeft, LayoutGrid, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { labelFor } from "@/lib/blocks";
+import { labelFor, namedOnly } from "@/lib/blocks";
 import { SEARCH_KEY } from "@/lib/filters";
 import { wallSource } from "@/lib/load-blocks";
 import { StoreIcon } from "@/components/store-icon";
@@ -113,7 +113,7 @@ export function CommandPalette() {
         (r) =>
           alive &&
           setDirectory({
-            blockTypes: (r.facets?.block ?? []).filter((b) => !b.value.endsWith("-part") && b.value !== "unknown").sort(byCount),
+            blockTypes: namedOnly(r.facets?.block ?? []).filter((b) => !b.value.endsWith("-part")).sort(byCount),
             stores: [...(r.facets?.host ?? [])].sort(byCount),
           }),
         () => alive && setFailed(true),

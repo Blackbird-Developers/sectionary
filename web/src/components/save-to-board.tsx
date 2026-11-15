@@ -14,8 +14,23 @@ import type { Block } from "@/lib/blocks";
  * to, or start a new one. `className` restyles the button; `up` opens the list
  * above it, for a button that sits at the bottom of the screen.
  */
-export function SaveToBoard({ block, className, up }: { block: Block; className?: string; up?: boolean }) {
-  const [open, setOpen] = useState(false);
+export function SaveToBoard({
+  block,
+  className,
+  up,
+  defaultOpen = false,
+  iconOnly = false,
+}: {
+  block: Block;
+  className?: string;
+  /** Open the list above the button: centred on it, or with "end" flush to its right edge (a button in a corner). */
+  up?: boolean | "end";
+  /** Mounted already open, for a button that only becomes this control when pressed (a wall card). */
+  defaultOpen?: boolean;
+  /** The bookmark alone, for a cell too narrow for the word. */
+  iconOnly?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   const [boards, setBoards] = useState<BoardSummary[] | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -88,10 +103,10 @@ export function SaveToBoard({ block, className, up }: { block: Block; className?
     <div ref={ref} className="relative">
       <Button variant={saved.length ? "secondary" : "default"} size="sm" className={className} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen((o) => !o)}>
         {locked ? <Lock /> : saved.length ? <BookmarkCheck /> : <Bookmark />}
-        {saved.length ? `Saved${saved.length > 1 ? ` · ${saved.length}` : ""}` : "Save"}
+        {iconOnly ? <span className="sr-only">{saved.length ? "Saved" : "Save"}</span> : saved.length ? `Saved${saved.length > 1 ? ` · ${saved.length}` : ""}` : "Save"}
       </Button>
       {open && (
-        <div role="dialog" aria-label="Save to board" className={cn("absolute z-10 w-64", up ? "bottom-full left-1/2 mb-2 -translate-x-1/2" : "top-full right-0 mt-1.5", "rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg")}>
+        <div role="dialog" aria-label="Save to board" className={cn("absolute z-10 w-64", up === "end" ? "right-0 bottom-full mb-2" : up ? "bottom-full left-1/2 mb-2 -translate-x-1/2" : "top-full right-0 mt-1.5", "rounded-lg border bg-popover p-1.5 text-popover-foreground shadow-lg")}>
           {locked ? (
             <div className="flex flex-col items-start gap-2 px-2 py-1.5">
               <p className="text-[12px] text-muted-foreground text-pretty">

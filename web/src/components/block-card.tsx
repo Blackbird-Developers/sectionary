@@ -1,10 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Monitor, Smartphone } from "lucide-react";
+import Link from "next/link";
+import { Bookmark, Check, Share } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { assetUrl } from "@/lib/data-source";
 import { blurOf, labelFor, thumbOf, type Block } from "@/lib/blocks";
+import { StoreIcon } from "@/components/store-icon";
+import { SaveToBoard } from "@/components/save-to-board";
 import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 
 /**
@@ -12,9 +15,9 @@ import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
  * paints its real background colour, so nothing shifts when the screenshot
  * arrives; the shimmer runs until then and the image fades in over 200 ms.
  *
- * The caption is an overlay, not a bar: at rest the wall is only screenshots.
- * It rises over a scrim when the pointer rests on the card or the card takes
- * keyboard focus, and it is always shown where there is no hover (touch).
+ * At rest the wall is only screenshots. Hovering or focusing a card brings up
+ * three controls over it: the store's mark (to its profile), share, and Save.
+ * They are always shown where there is no hover (touch).
  *
  * On the virtualised wall the height is already known (see lib/wall-layout.ts),
  * so it is passed in and the card fills it exactly rather than deriving its own
@@ -74,16 +77,18 @@ export function BlockCard({
   const fitClass = fit === "contain" ? "object-contain object-center" : "object-cover object-top";
   // A phone-width cell has no room for the host as well; the label and size stay.
   const narrow = width != null && width < 220;
+  const kind = labelFor(block.typeHint);
   return (
     <figure
       className={cn(
-        "group relative overflow-hidden rounded-lg border bg-card transition-colors duration-150 hover:border-primary/60",
+        // No overflow clip here: the Save menu opens out of the card. The screenshot's own frame clips it.
+        "group relative rounded-lg border bg-card transition-colors duration-150 hover:border-primary/60",
         fixed ? "flex h-full flex-col" : mobile && "mx-auto max-w-[300px]",
       )}
     >
-      {/* The button's ::after stretches over the whole card, caption included,
-          so a 26px-tall header block is still a full-size tap target. The
-          focus ring is drawn on that layer too, round the whole card. */}
+      {/* The button's ::after stretches over the whole card, so a 26px-tall
+          header block is still a full-size tap target. The focus ring is
+          drawn on that layer too, round the whole card. */}
       <button
         type="button"
         onClick={() => onOpen(block)}
@@ -92,10 +97,10 @@ export function BlockCard({
           "block w-full cursor-zoom-in outline-none after:absolute after:inset-0 after:z-10 after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset",
           fixed && "min-h-0 flex-1",
         )}
-        aria-label={`${labelFor(block.typeHint)} block from ${block.host}, ${block.viewport}`}
+        aria-label={`${kind} block from ${block.host}, ${block.viewport}, ${block.h} pixels tall`}
       >
         <div
-          className="relative h-full w-full overflow-hidden"
+          className="relative h-full w-full overflow-hidden rounded-[calc(var(--radius-lg)-1px)]"
           style={fixed ? { background: block.bg } : { aspectRatio: `${block.w} / ${block.h}`, background: block.bg }}
         >
           {/* The placeholder: a real blur when SEC-9 ships one, the captured
@@ -132,23 +137,91 @@ export function BlockCard({
               preview && PREVIEW_BLUR,
             )}
           />
+          {/* A light veil so the white controls read on a white screenshot. */}
+          <div className={cn("pointer-events-none absolute inset-0 bg-black/15", REVEAL)} aria-hidden />
         </div>
       </button>
-      <figcaption
-        className={cn(
-          "pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2.5 pt-8 pb-2 text-[11px] text-white/80",
-          "translate-y-1 opacity-0 transition-[opacity,translate] duration-200",
-          "group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 touch:translate-y-0 touch:opacity-100",
-        )}
+
+      {/* The controls, above the open-the-block layer. Hidden at rest where a
+          pointer can hover; always there on touch, where nothing can. The
+          store's mark goes to its profile (every page, full length), the
+          arrow shares this block, Save files it on a board. */}
+      <Link
+        href={`/sites/${encodeURIComponent(block.host)}`}
+        aria-label={`${block.host}: all pages`}
+        title={`${block.host} · ${kind}`}
+        className={cn(CONTROL, "bottom-2 left-2 size-8 p-0.5", REVEAL)}
       >
-        <span className="truncate font-medium text-white">{labelFor(block.typeHint)}</span>
-        {!narrow && <span className="truncate">{block.host}</span>}
-        <span className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono tabular-nums">
-          {mobile ? <Smartphone className="size-3" aria-label="Mobile" /> : <Monitor className="size-3" aria-label="Desktop" />}
-          {block.h}px
-        </span>
-      </figcaption>
+        <StoreIcon host={block.host} brand={block.host} size={24} className="rounded-full" />
+      </Link>
+      <ShareControl block={block} kind={kind} className={cn("top-2 right-2", REVEAL)} />
+      <div className={cn("absolute right-2 bottom-2 z-20", REVEAL)}>
+        <SaveControl block={block} compact={narrow} />
+      </div>
     </figure>
+  );
+}
+
+/** Hidden until the card is hovered or holds focus; always shown on touch. */
+const REVEAL =
+  "opacity-0 transition-[opacity,translate,scale] duration-200 group-hover:opacity-100 group-focus-within:opacity-100 touch:opacity-100";
+
+/** A round white control on the screenshot. */
+const CONTROL =
+  "absolute z-20 inline-flex items-center justify-center rounded-full bg-white text-neutral-900 shadow-[0_1px_2px_rgb(0_0_0/0.12),0_4px_12px_rgb(0_0_0/0.12)] outline-none hover:scale-105 focus-visible:ring-2 focus-visible:ring-ring active:scale-95";
+
+/** Share this block: the phone's share sheet where there is one, otherwise the link is copied. */
+function ShareControl({ block, kind, className }: { block: Block; kind: string; className?: string }) {
+  const [copied, setCopied] = useState(false);
+  const share = async () => {
+    const url = `${window.location.origin}/?open=${encodeURIComponent(block.id)}`;
+    try {
+      if (navigator.share && window.matchMedia("(pointer: coarse)").matches) {
+        await navigator.share({ title: `${kind} from ${block.host}`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Dismissed share sheet, or a clipboard the browser will not hand over: nothing to report.
+    }
+  };
+  return (
+    <button type="button" onClick={share} aria-label={copied ? "Link copied" : "Share this block"} title={copied ? "Link copied" : "Copy link"} className={cn(CONTROL, "size-8", className)}>
+      {copied ? <Check className="size-4 text-emerald-600" aria-hidden /> : <Share className="size-4" aria-hidden />}
+      <span className="sr-only" aria-live="polite">
+        {copied ? "Link copied" : ""}
+      </span>
+    </button>
+  );
+}
+
+/**
+ * Save on the card. The board list (SaveToBoard) asks the server for the
+ * visitor's boards as soon as it mounts, which on a wall of cards would be one
+ * request per card; so the card shows a plain button and mounts the real
+ * control, already open, only when it is pressed.
+ */
+function SaveControl({ block, compact }: { block: Block; compact: boolean }) {
+  const [armed, setArmed] = useState(false);
+  const pill = cn(
+    "h-8 rounded-full border-0 bg-white text-[12px] font-semibold text-neutral-900 shadow-[0_1px_2px_rgb(0_0_0/0.12),0_4px_12px_rgb(0_0_0/0.12)] hover:bg-white hover:scale-105 active:scale-95",
+    compact ? "w-8 px-0" : "px-3.5",
+  );
+  if (armed) return <SaveToBoard block={block} up="end" defaultOpen className={pill} iconOnly={compact} />;
+  return (
+    <button
+      type="button"
+      onClick={() => setArmed(true)}
+      aria-haspopup="dialog"
+      aria-label="Save to a board"
+      className={cn("inline-flex items-center justify-center gap-1.5 outline-none transition-[scale] duration-150 focus-visible:ring-2 focus-visible:ring-ring", pill)}
+    >
+      {/* The same bookmark and word the real control shows, so nothing shifts when it takes over. */}
+      <Bookmark className="size-4" aria-hidden />
+      {!compact && "Save"}
+    </button>
   );
 }
 

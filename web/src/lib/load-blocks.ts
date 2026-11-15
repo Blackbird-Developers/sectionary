@@ -7,6 +7,7 @@ import type { Block, BlockSet } from "@/contracts/block";
 import type { Store, StoreSet } from "@/contracts/store";
 import { buildIndex, queryBlocks, MAX_LIMIT, type BlockIndex, type WallQuery, type WallResponse } from "@/lib/block-source";
 import { baseType, detailIndex, type DetailIndex } from "@/lib/block-detail";
+import { isUnnamed } from "@/lib/blocks";
 import { expandBlocks } from "@/lib/mock-blocks";
 import { pagesFromBlocks, profileFromApi, profileFromIndex, siteCardFromApi, siteCards, storeFromBlocks, summaryPages, type ProfilePage, type SiteCard, type SiteSummary, type SiteView } from "@/lib/site-profile";
 import { flowSummaries, flowSummariesFromApi, type FlowSummary } from "@/lib/flows";
@@ -298,9 +299,9 @@ export async function loadSitesDirectory(): Promise<SitesDirectory> {
   return { cards: siteCards(index), blockTypes: namedTypes([...counts].map(([value, count]) => ({ value, count }))) };
 }
 
-/** "-part" slices are what segmentation could not name ("zoo-home-part"): one store's markup, not a kind of block worth a link. */
+/** Unnamed sections are left out (see isUnnamed in lib/blocks.ts), and "-part" slices are what segmentation could not name ("zoo-home-part"): one store's markup, not a kind of block worth a link. */
 function namedTypes(list: { value: string; count: number }[]) {
-  return list.filter((t) => !t.value.endsWith("-part")).sort((a, b) => b.count - a.count);
+  return list.filter((t) => !t.value.endsWith("-part") && !isUnnamed(t.value)).sort((a, b) => b.count - a.count);
 }
 
 /** Every captured store's flow: from /api/sites when it is configured, otherwise from the loaded blocks. */

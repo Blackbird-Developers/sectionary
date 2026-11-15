@@ -16,7 +16,7 @@ import { type WallQuery, type WallResponse } from "@/lib/block-source";
 import { type DetailIndex } from "@/lib/block-detail";
 import { layOut, visible, GAP, DESKTOP_RATIO, MOBILE_RATIO, type Layout } from "@/lib/wall-layout";
 import { FILTERS, readSelected, writeSelected, toggleValue, toQuery, countSelected, SEARCH_KEY, type FilterKey } from "@/lib/filters";
-import { type Block } from "@/lib/blocks";
+import { namedOnly, type Block } from "@/lib/blocks";
 import { cn } from "@/lib/utils";
 import type { Viewport } from "@/contracts/block";
 
@@ -214,7 +214,11 @@ export function Wall() {
   const cursor = !settled ? null : current ? extra.cursor : (first?.nextCursor ?? null);
   const total = first?.total ?? 0;
   // The last counts stay up until the new ones arrive, so the filters do not blank between queries.
-  const facets = useMemo(() => first?.facets ?? counts?.facets ?? {}, [first, counts]);
+  // The Block filter never offers the unnamed bucket (see isUnnamed in lib/blocks.ts).
+  const facets = useMemo(() => {
+    const all = first?.facets ?? counts?.facets ?? {};
+    return all.block ? { ...all, block: namedOnly(all.block) } : all;
+  }, [first, counts]);
 
   // Back to the top when the filters change. A DOM call, no state. Glided
   // rather than jumped, so a switch of the Web / Mobile pill reads as moving
@@ -564,7 +568,8 @@ export function Wall() {
             <div
               key={card.block.id}
               role="listitem"
-              className="absolute"
+              // Each card is its own stacking layer; one with its Save menu open goes above its neighbours.
+              className="absolute has-[[aria-expanded=true]]:z-30"
               style={{
                 transform: `translate(${card.x}px, ${card.y}px)`,
                 width: card.width,

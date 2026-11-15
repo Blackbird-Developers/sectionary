@@ -34,8 +34,10 @@ export const PLATFORM_LABEL: Record<string, string> = {
   nextjs: "Custom (Next.js)",
   nuxt: "Custom (Nuxt)",
   wordpress: "WordPress",
+  // Detection found none of the above. A filter value, so it needs a name a person can read.
+  unknown: "Other",
 };
 
-export const platformLabel = (p: string | null) => (p ? (PLATFORM_LABEL[p] ?? p) : "Unknown");
+export const platformLabel = (p: string | null) => (p ? (PLATFORM_LABEL[p] ?? p) : "Other");
 export const industryLabel = (i: string) => INDUSTRY_LABEL[i] ?? i;
 export const rankLabel = (r: number | null) => (r == null ? "–" : r.toLocaleString("en-US"));
