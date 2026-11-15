@@ -10,7 +10,11 @@ import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 /**
  * A block on the wall. The frame reserves the block's exact aspect ratio and
  * paints its real background colour, so nothing shifts when the screenshot
- * arrives; the shimmer runs until then and the image fades in over 150 ms.
+ * arrives; the shimmer runs until then and the image fades in over 200 ms.
+ *
+ * The caption is an overlay, not a bar: at rest the wall is only screenshots.
+ * It rises over a scrim when the pointer rests on the card or the card takes
+ * keyboard focus, and it is always shown where there is no hover (touch).
  *
  * On the virtualised wall the height is already known (see lib/wall-layout.ts),
  * so it is passed in and the card fills it exactly rather than deriving its own
@@ -27,6 +31,7 @@ export function BlockCard({
   width,
   height,
   fit = "cover",
+  priority = false,
 }: {
   block: Block;
   onOpen: (b: Block) => void;
@@ -36,6 +41,8 @@ export function BlockCard({
   width?: number;
   height?: number;
   fit?: "cover" | "contain";
+  /** On the first screen: fetched at once and ahead of the rest, not lazily. */
+  priority?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
   // A pointer passing over on its way somewhere is not intent; one that stays a moment is.
@@ -111,14 +118,15 @@ export function BlockCard({
             alt=""
             width={block.w}
             height={block.h}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             onLoad={() => setLoaded(true)}
             onError={thumb ? () => setFull(true) : undefined}
             className={cn(
               // Blur to sharp rather than a plain fade, so the screenshot
               // resolves into place. Filter and opacity only: no layout.
-              "block h-full w-full transition-[opacity,filter] duration-150",
+              "block h-full w-full transition-[opacity,filter,scale] duration-200 group-hover:scale-[1.02] group-focus-within:scale-[1.02]",
               fitClass,
               loaded ? "opacity-100 blur-0" : "opacity-0 blur-md",
               preview && PREVIEW_BLUR,
@@ -128,11 +136,12 @@ export function BlockCard({
       </button>
       <figcaption
         className={cn(
-          "flex cursor-zoom-in items-center gap-1.5 px-2.5 text-[11px] text-muted-foreground",
-          fixed ? "h-8 shrink-0" : "py-2",
+          "pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end gap-1.5 bg-gradient-to-t from-black/75 via-black/40 to-transparent px-2.5 pt-8 pb-2 text-[11px] text-white/80",
+          "translate-y-1 opacity-0 transition-[opacity,translate] duration-200",
+          "group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100 touch:translate-y-0 touch:opacity-100",
         )}
       >
-        <span className="truncate font-medium text-foreground">{labelFor(block.typeHint)}</span>
+        <span className="truncate font-medium text-white">{labelFor(block.typeHint)}</span>
         {!narrow && <span className="truncate">{block.host}</span>}
         <span className="ml-auto inline-flex shrink-0 items-center gap-1 font-mono tabular-nums">
           {mobile ? <Smartphone className="size-3" aria-label="Mobile" /> : <Monitor className="size-3" aria-label="Desktop" />}
@@ -164,17 +173,12 @@ const SIZES_FACTOR = 0.85;
 
 /**
  * The same frame with nothing in it, for loading states. `fill` takes its
- * cell's full width with the wall's fixed caption height, as on the grid.
+ * cell's full width, as on the grid.
  */
 export function BlockCardSkeleton({ ratio, mobile, fill }: { ratio: number; mobile?: boolean; fill?: boolean }) {
   return (
     <div className={cn("overflow-hidden rounded-lg border bg-card", mobile && !fill && "mx-auto max-w-[300px]")} aria-hidden>
       <div className="shimmer w-full bg-muted" style={{ aspectRatio: `1 / ${ratio}` }} />
-      <div className={cn("flex items-center gap-2 px-2.5", fill ? "h-8" : "py-2")}>
-        <div className="shimmer h-3 w-20 rounded bg-muted" />
-        <div className="shimmer h-3 w-24 rounded bg-muted" />
-        <div className="shimmer ml-auto h-3 w-10 rounded bg-muted" />
-      </div>
     </div>
   );
 }

@@ -19,8 +19,12 @@ import type { Block } from "@/contracts/block";
 /** Gap between cards, matching the 12px the wall used before it was virtualised. */
 export const GAP = 12;
 
-/** Fixed caption height, so the computed height is exact and nothing drifts. */
-export const CAPTION_HEIGHT = 32;
+/**
+ * Height the caption adds under the screenshot. Zero since the caption became
+ * an overlay that appears on hover (always on for touch); kept as a constant so
+ * the layout maths stays in one place if a fixed bar ever returns.
+ */
+export const CAPTION_HEIGHT = 0;
 
 /**
  * Height over width of a desktop cell's screenshot. Near the median section

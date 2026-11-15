@@ -27,7 +27,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         <div className="mx-auto flex h-14 max-w-[1200px] items-center gap-2 px-4 sm:gap-4 sm:px-6">
           <Link href="/welcome" className="flex items-center gap-2 rounded-md outline-none touch:h-11 focus-visible:ring-2 focus-visible:ring-ring">
             <Logo />
-            <span className="font-heading text-[16px] font-semibold tracking-[0.01em]">Sectionary</span>
+            <span className="font-heading text-[18px] font-extrabold tracking-[-0.045em]">blimp</span>
           </Link>
           <nav aria-label="Library" className="ml-2 hidden items-center gap-0.5 sm:flex">
             {NAV.map((n) => (
@@ -60,7 +60,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
           <div className="max-w-sm space-y-3">
             <div className="flex items-center gap-2">
               <Logo />
-              <span className="font-heading text-[15px] font-semibold">Sectionary</span>
+              <span className="font-heading text-[17px] font-extrabold tracking-[-0.045em]">blimp</span>
             </div>
             <p className="text-[13px] leading-relaxed text-muted-foreground">
               Every block links back to the store it came from. Brand names identify a store; they don&apos;t mean it
@@ -90,7 +90,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             </ul>
           </nav>
         </div>
-        <div className="mx-auto max-w-[1200px] px-4 pb-8 font-mono text-[11px] text-muted-foreground sm:px-6">© 2026 Sectionary</div>
+        <div className="mx-auto max-w-[1200px] px-4 pb-8 font-mono text-[11px] text-muted-foreground sm:px-6">© 2026 Blimp</div>
       </footer>
     </div>
   );

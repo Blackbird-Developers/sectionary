@@ -75,7 +75,7 @@ export function SharedBoardView({
       <footer className="border-t">
         <div className="mx-auto flex max-w-[1400px] items-center gap-2 px-4 py-4 text-[12px] text-muted-foreground">
           <Logo />
-          Collected with Sectionary: real stores, cut into blocks.
+          Collected with Blimp: real stores, cut into blocks.
         </div>
       </footer>
       <BlockViewer

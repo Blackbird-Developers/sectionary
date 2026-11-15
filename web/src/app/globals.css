@@ -14,19 +14,19 @@
 }
 
 /*
- * Sectionary's palette is "Rust": true-grey neutrals with one rust accent for
- * actions, focus and selection, so the chrome stays quiet around the store
- * screenshots. The rust is Curated's (curated.design), 5.1:1 on white, so one
- * colour serves as button, ring and link in light mode. Type is unchanged from
- * Next Level: Bricolage Grotesque for titles, Inter for the UI, Geist Mono for
- * ids. Anything Sectionary-specific sits at the bottom.
+ * Blimp's palette is "Sky": quiet neutrals with one blue accent (#2F6BFF) for
+ * actions, focus and selection, so the chrome stays out of the way of the store
+ * screenshots. White on the blue is 4.5:1, so it carries buttons and large
+ * text; running-text links take a darker step in light mode and a lighter one
+ * in dark. Type is Manrope for titles and UI, Geist Mono for ids and counts.
+ * See brand/blimp-brand-guidelines.pdf. App-specific rules sit at the bottom.
  */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-manrope);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-bricolage);
+  --font-heading: var(--font-manrope);
   --color-ring: var(--ring);
   --color-link: var(--link);
   --color-signal: var(--signal);
@@ -50,46 +50,53 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
+  /* Motion: one quick ease-out for hovers and fades, one softer for layout. */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Every `transition-*` utility without its own ease takes the quick one. */
+  --default-transition-timing-function: var(--ease-out-expo);
 }
 
 :root {
-  --background: #fbfaf9;
-  --foreground: #1a1a1a;
+  /* Cloud ground, navy ink. */
+  --background: #f3f6fb;
+  --foreground: #0b1220;
   --card: #ffffff;
-  --card-foreground: #1a1a1a;
+  --card-foreground: #0b1220;
   --popover: #ffffff;
-  --popover-foreground: #1a1a1a;
-  --primary: #c54120;
+  --popover-foreground: #0b1220;
+  --primary: #2f6bff;
   --primary-foreground: #ffffff;
-  --secondary: #f3f1ef;
-  --secondary-foreground: #1a1a1a;
-  --muted: #f3f1ef;
-  --muted-foreground: #6f6a66;
-  --accent: #f3f1ef;
-  --accent-foreground: #1a1a1a;
+  --secondary: #e9eef6;
+  --secondary-foreground: #0b1220;
+  --muted: #e9eef6;
+  --muted-foreground: #4a566b;
+  --accent: #e9eef6;
+  --accent-foreground: #0b1220;
   --destructive: #b3122e;
-  --border: #e7e3df;
-  --input: #e7e3df;
-  /* The rust passes 5.1:1 on the ground, so it is the ring as it is. Links
-     take it one step darker (6.4:1) so running text reads comfortably. */
-  --ring: #c54120;
-  --link: #a8361a;
+  --border: #dfe6f1;
+  --input: #dfe6f1;
+  /* The blue is 4.1:1 on the ground: fine as a ring. Links take it a step
+     darker (5.6:1) so running text reads comfortably. */
+  --ring: #2f6bff;
+  --link: #1f55e0;
   /* Live dots and "new" markers. */
-  --signal: #c54120;
+  --signal: #2f6bff;
   --radius: 0.5rem;
 }
 
 .dark {
-  /* Curated's greys: #0F0F0F ground, #1B1B1B surface, #262626 raised. The rust
-     is lifted to #E4502A so it holds up on black, with near-black text on it. */
+  /* Neutral greys so store screenshots are not colour-cast: #0F0F0F ground,
+     #1B1B1B surface, #262626 raised. The blue stays #2F6BFF for fills with
+     white text on it; small blue text uses the lighter #6F9BFF (6:1). */
   --background: #0f0f0f;
   --foreground: #e8e8e8;
   --card: #1b1b1b;
   --card-foreground: #e8e8e8;
   --popover: #1b1b1b;
   --popover-foreground: #e8e8e8;
-  --primary: #e4502a;
-  --primary-foreground: #1a0d08;
+  --primary: #2f6bff;
+  --primary-foreground: #ffffff;
   --secondary: #262626;
   --secondary-foreground: #e8e8e8;
   --muted: #262626;
@@ -99,9 +106,9 @@
   --destructive: #ff5c5c;
   --border: #2e2e2e;
   --input: #2e2e2e;
-  --ring: #ff6a3d;
-  --link: #ff8a63;
-  --signal: #e4502a;
+  --ring: #6f9bff;
+  --link: #6f9bff;
+  --signal: #2f6bff;
 }
 
 @layer base {
@@ -111,7 +118,7 @@
   html {
     @apply font-sans;
     color-scheme: light;
-    /* Native checkboxes, radios and sliders take the rust, not the OS blue. */
+    /* Native checkboxes, radios and sliders take the brand blue. */
     accent-color: var(--primary);
   }
   ::selection {

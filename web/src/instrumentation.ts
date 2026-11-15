@@ -14,7 +14,12 @@ export function register() {
 }
 
 /** Wall pages, by viewport switch, exactly as the wall asks for them (components/wall.tsx, PAGE_SIZE). */
-const WALL = ["vp=desktop", "vp=mobile", "vp=desktop,mobile"].map((vp) => `/api/blocks?${vp}&limit=200`);
+// Each view's first page of blocks and its counts, as the wall asks for them
+// (components/wall.tsx: FIRST_PAGE_SIZE, then `facets=only`).
+const WALL = ["vp=desktop", "vp=mobile", "vp=desktop,mobile"].flatMap((vp) => [
+  `/api/blocks?${vp}&limit=60&facets=0`,
+  `/api/blocks?${vp}&facets=only`,
+]);
 
 async function warm(origin: string) {
   const get = async (path: string) => {

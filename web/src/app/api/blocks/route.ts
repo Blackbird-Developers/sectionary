@@ -32,6 +32,10 @@ export const dynamic = "force-dynamic";
  * typo tolerance and semantic search fused (see server/search.ts).
  * Facets and near misses come with the first page only: they describe the
  * whole result set, so later pages would repeat them.
+ *
+ * The wall asks for the two halves separately, so the screenshots never wait
+ * on the counts: `facets=0` is the first page of blocks alone, and
+ * `facets=only` is the counts (facets, near misses, total) with no blocks.
  */
 export async function GET(request: Request) {
   try {
@@ -57,10 +61,12 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
   const q = url.searchParams.get("q")?.trim() || null;
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
   const offset = Math.max(0, Number(url.searchParams.get("cursor")) || 0);
-  const first = offset === 0 && url.searchParams.get("facets") !== "0";
+  const mode = url.searchParams.get("facets");
+  const first = offset === 0 && mode !== "0";
+  const only = mode === "only";
 
   if (q) {
-    const { items, total, nextCursor, facets, nearMiss, search } = await searchBlocks(q, f, limit, offset, first);
+    const { items, total, nextCursor, facets, nearMiss, search } = await searchBlocks(q, f, only ? 1 : limit, only ? 0 : offset, only || first);
     // How the query was read goes in headers, so the body stays exactly BlocksResponse.
     const headers = {
       "x-search-terms": search.terms.join(" "),
@@ -68,17 +74,25 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
       "x-search-semantic": String(search.semantic),
       "x-search-intent": search.intents.join(" "),
     };
+    if (only) return { body: { items: [], blocks: [], generatedAt: new Date().toISOString(), nextCursor: null, total, facets, nearMiss }, headers };
     return { body: { items, blocks: items, generatedAt: new Date().toISOString(), nextCursor, total, ...(first && { facets, nearMiss }) }, headers };
+  }
+
+  if (only) {
+    const counts = await facetCounts(sql, f);
+    return { body: { items: [], blocks: [], generatedAt: new Date().toISOString(), nextCursor: null, total: counts.total, facets: counts.facets, nearMiss: counts.nearMiss } };
   }
 
   // Latest capture of each page only. Within a capture, page order, so one
   // store's blocks arrive ready for its page viewer and flow view.
-  const [rows, counts] = await Promise.all([
+  // Without facets the total is its own count, run alongside the page rather than after it.
+  const [rows, counts, counted] = await Promise.all([
     sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
       ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`,
     first ? facetCounts(sql, f) : null,
+    first ? null : sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`,
   ]);
-  const total = counts?.total ?? ((await sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`)[0].total as number);
+  const total = counts?.total ?? (counted![0].total as number);
   const items = rows.map(toBlock);
   return {
     body: {
