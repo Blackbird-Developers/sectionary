@@ -78,6 +78,31 @@ every fixture with its platform, page type and what it shows
 An importer that loads every entry of that index without special cases passes
 the M1 exit test. Images are not part of the fixtures.
 
+### Design metadata (additive, SEC-31)
+
+Three optional fields carry measured design data for the MCP server. They are
+present only on captures made with `--styles`; older captures lack them and
+every reader must treat them as missing (`null`), never estimate them.
+
+- `blocks[].style` (`BlockStyle`): the block's text styles (at most 8, with
+  their share of characters), background, text colours, accent, contrast pass
+  share, layout (columns, media side, width, padding, alignment), corner radius,
+  shadows, imagery and commerce facts.
+- `blocks[].outline` (`OutlineNode[]`): the block's contents top to bottom,
+  depth 3, at most 40 nodes, repeats collapsed into a `count`.
+- `pageStyles.desktop` / `.mobile` (`PageStyles`): the page's type scale,
+  heading distribution, palette roles, button variants, shape, spacing,
+  density, component counts and accessibility signals. `partial: true` means
+  the measuring budget ran out.
+
+**Measurements, never source.** These fields hold names, sizes, colours,
+counts and short labels. They never hold HTML, CSS, class names, inline
+styles, font files or URLs to them (`docs/bot-page.md`). The existing `tag`,
+`id` and `classes` on a block stay in the manifest for the importer and are
+never served through the MCP.
+
+Budget: the three fields add at most 20 KB to a manifest per viewport.
+
 When images move to object storage (SEC-9) the key layout will be
 `sites/<host>/<capturedAt>/<viewport>/<nn>-<type>.webp` and the manifest gains
 an optional `assetBase`. That is an additive change.
