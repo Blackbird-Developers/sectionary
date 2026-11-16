@@ -74,6 +74,13 @@ export const paddleEvents = pgTable("paddle_events", {
   userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), outcome: text("outcome").notNull(), payload: jsonb("payload").notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [index("paddle_events_user_idx").on(t.userId)]);
+// MCP API keys (SEC-31, migration 13): only the SHA-256 is stored; `prefix` tells keys apart on the account page.
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(), userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  keyHash: text("key_hash").notNull(), prefix: text("prefix").notNull(), name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+}, (t) => [uniqueIndex("api_keys_hash_uidx").on(t.keyHash), index("api_keys_user_idx").on(t.userId)]);
 export const blockViews = pgTable("block_views", {
   viewer: text("viewer").notNull(), day: date("day").notNull(), blockId: uuid("block_id").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

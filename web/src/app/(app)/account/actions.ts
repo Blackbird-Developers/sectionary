@@ -10,6 +10,8 @@ import { TwoStepError } from "@/server/totp";
 import { revalidatePath } from "next/cache";
 import { clientIp, hit, limitKey, RateLimitError } from "@/server/rate-limit";
 import { configuredOrigin } from "@/server/site-url";
+import { ApiKeyError, createApiKey, revokeApiKey } from "@/server/api-keys";
+import { accessOf, can } from "@/server/plans";
 
 // SEC-27 sign-in and SEC-28 billing actions. Thin: the work is in src/server.
 
@@ -44,7 +46,7 @@ export type SignInState =
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const message = (error: unknown) => {
-  if (error instanceof AuthError || error instanceof TwoStepCodeError || error instanceof TwoStepError || error instanceof RateLimitError) return error.message;
+  if (error instanceof AuthError || error instanceof TwoStepCodeError || error instanceof TwoStepError || error instanceof RateLimitError || error instanceof ApiKeyError) return error.message;
   console.error("[auth]", error);
   return "Something went wrong on our side. Try again in a minute.";
 };
@@ -229,4 +231,34 @@ export async function openBillingPortal(form: FormData) {
     redirect("/account?billing=error");
   }
   redirect(url);
+}
+
+// ---------------------------------------------------------------- MCP API keys (SEC-31)
+
+export type ApiKeyState =
+  | { status: "idle" }
+  | { status: "created"; key: string; name: string }
+  | { status: "error"; message: string };
+
+/** A new key for the MCP server. The key is in the answer once and never again. */
+export async function createApiKeyAction(_prev: ApiKeyState, form: FormData): Promise<ApiKeyState> {
+  const user = await currentUser();
+  if (!user) return { status: "error", message: "Sign in again first." };
+  if (!can(accessOf(user), "mcp")) return { status: "error", message: "The MCP server comes with Pro." };
+  let created: Awaited<ReturnType<typeof createApiKey>>;
+  try {
+    await hit([{ key: `api-key:u:${user.id}`, max: 10, windowSeconds: 60 * MINUTE }], "Too many new keys for now. Wait a while, then try again.");
+    created = await createApiKey(user.id, String(form.get("name") ?? ""));
+  } catch (error) {
+    return { status: "error", message: message(error) };
+  }
+  revalidatePath("/account");
+  return { status: "created", key: created.key, name: created.info.name };
+}
+
+export async function revokeApiKeyAction(form: FormData) {
+  const user = await currentUser();
+  const id = String(form.get("id") ?? "");
+  if (user && /^[0-9a-f-]{36}$/i.test(id)) await revokeApiKey(user.id, id);
+  revalidatePath("/account");
 }

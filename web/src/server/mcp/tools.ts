@@ -1,0 +1,264 @@
+import * as z from "zod";
+import { McpServer } from "@modelcontextprotocol/server";
+import type { BlockFilters } from "@/server/blocks";
+import { BLOCK_TYPES, ECOMMERCE_BLOCK_TYPES, GLOBAL_BLOCK_TYPES, INDUSTRIES, PAGE_ROLES, PROMPT_VERSION, STYLE_TAGS } from "@/server/mcp/taxonomy";
+import { decodeCursor, encodeCursor, MAX_ITEMS, unknownValue, withoutSource } from "@/server/mcp/shape";
+import { appName, findBlocks, findStores, getBlock, getStore, isTypeHint, libraryFacts, STYLE_NOTE, type McpBlock } from "@/server/mcp/data";
+
+// The Blimp MCP server, v1 (SEC-31, brief section 9 and step 6): five
+// read-only tools over the data that exists today. Design profiles, page
+// profiles, flows, benchmarks and similar blocks are v2, after the crawler
+// measures them. One fresh server per request (createMcpHandler in the route).
+
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
+const VIEWPORTS = ["desktop", "mobile"] as const;
+const PAGE_TYPES = ["home", "collection", "collection-list", "product", "cart", "checkout", "search", "account", "article", "blog", "page", "other"];
+
+// ---------------------------------------------------------------- output shapes
+
+const blockItem = z.object({
+  id: z.string(), store: z.string(), brand: z.string(), industry: z.string().nullable(), platform: z.string().nullable(),
+  page_type: z.string(), page_url: z.string(), viewport: z.string(), position: z.number(),
+  block_type: z.string().nullable(), type_hint: z.string(), page_role: z.string().nullable(), style_tags: z.array(z.string()),
+  description: z.string().nullable(), headline: z.string().nullable(),
+  size: z.object({ width: z.number(), height: z.number() }),
+  counts: z.object({ buttons: z.number(), images: z.number(), videos: z.number() }),
+  has_price: z.boolean().nullable(), has_reviews: z.boolean().nullable(), background: z.string().nullable(),
+  thumbnail_url: z.string().nullable(), captured_at: z.string(), tagger_version: z.string().nullable(), blimp_url: z.string(),
+  tag_note: z.string().optional(),
+  image_url: z.string().nullable().optional(), text: z.string().nullable().optional(), patterns: z.array(z.string()).optional(),
+  theme: z.string().nullable().optional(), apps: z.array(z.string()).optional(),
+  outline: z.null().optional(), style: z.null().optional(), style_note: z.string().optional(),
+});
+
+const storeItem = z.object({
+  host: z.string(), brand: z.string(), industry: z.string().nullable(), country: z.string().nullable(), platform: z.string().nullable(),
+  theme: z.string().nullable(), builder: z.string().nullable(), apps: z.array(z.string()), currency: z.string().nullable(), rank: z.number().nullable(),
+});
+
+const page = <T extends z.ZodType>(item: T) => z.object({ items: z.array(item), total: z.number(), has_more: z.boolean(), cursor: z.string().nullable() });
+
+// ---------------------------------------------------------------- helpers
+
+type Result = { content: { type: "text"; text: string }[]; structuredContent?: Record<string, unknown>; isError?: boolean };
+
+const fail = (text: string): Result => ({ content: [{ type: "text", text }], isError: true });
+const ok = (structured: Record<string, unknown>, text: string): Result => {
+  const clean = withoutSource(structured);
+  return { content: [{ type: "text", text }], structuredContent: clean };
+};
+
+const line = (b: McpBlock) =>
+  `- ${b.id} · ${b.store} · ${b.page_type} · ${b.viewport} · ${b.block_type ?? `${b.type_hint} (untagged)`}${b.headline ? ` · "${b.headline}"` : ""}`;
+
+const lower = (v: string | undefined) => v?.trim().toLowerCase() || undefined;
+const noApp = (app: string) => `No store in the library runs '${app}'. App names are as detected, e.g. 'Klaviyo', 'Yotpo'; blimp_get_store lists a store's apps.`;
+
+/** A filter value checked against its closed list; returns the error text or null. */
+function check(field: string, value: string | undefined, valid: readonly string[]): string | null {
+  return value && !valid.includes(value) ? unknownValue(field, value, valid) : null;
+}
+
+// ---------------------------------------------------------------- the server
+
+export function blimpServer(origin: string): McpServer {
+  const server = new McpServer(
+    { name: "blimp", version: "1.0.0", title: "Blimp" },
+    {
+      instructions:
+        "Blimp is a library of e-commerce website sections (blocks) captured from real stores, desktop and phone. " +
+        "Call blimp_list_taxonomy first to learn the valid block types, page types and industries. " +
+        "Search with blimp_search_blocks, then open the few worth it with blimp_get_block. " +
+        "Facts are measured from public pages; fields that were not collected are null, never guessed.",
+    },
+  );
+
+  server.registerTool(
+    "blimp_list_taxonomy",
+    {
+      title: "List Blimp's filter values",
+      description:
+        "The valid values for every filter: block types with what each means, page roles, style tags, industries, page types and platforms in the library, " +
+        "and how much of the library the tagger has labelled. Call this first: other tools reject values outside these lists.",
+      inputSchema: z.object({}),
+      outputSchema: z.object({
+        block_types: z.array(z.object({ value: z.string(), group: z.enum(["global", "ecommerce"]), meaning: z.string() })),
+        page_roles: z.array(z.object({ value: z.string(), meaning: z.string() })),
+        style_tags: z.array(z.string()),
+        industries: z.array(z.string()),
+        page_types: z.array(z.object({ value: z.string(), pages: z.number() })),
+        platforms: z.array(z.object({ value: z.string(), stores: z.number() })),
+        viewports: z.array(z.string()),
+        tagging: z.object({ blocks: z.number(), tagged: z.number(), share: z.number(), tagger_version: z.string(), note: z.string() }),
+      }),
+      annotations: READ_ONLY,
+    },
+    async () => {
+      const facts = await libraryFacts();
+      const share = facts.blocks ? Math.round((facts.tagged / facts.blocks) * 1000) / 1000 : 0;
+      const out = {
+        block_types: [
+          ...Object.entries(GLOBAL_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "global" as const, meaning })),
+          ...Object.entries(ECOMMERCE_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "ecommerce" as const, meaning })),
+        ],
+        page_roles: Object.entries(PAGE_ROLES).map(([value, meaning]) => ({ value, meaning })),
+        style_tags: [...STYLE_TAGS],
+        industries: [...INDUSTRIES],
+        page_types: facts.pageTypes,
+        platforms: facts.platforms,
+        viewports: [...VIEWPORTS],
+        tagging: {
+          blocks: facts.blocks, tagged: facts.tagged, share, tagger_version: PROMPT_VERSION,
+          note: share < 0.95
+            ? "Most blocks are not tagged yet. block_type, page_role, style_tag, has_price and has_reviews filters only match tagged blocks; use query for the rest. A block_type filter also accepts a theme's own section name (type_hint)."
+            : "Tagging is complete enough to filter on.",
+        },
+      };
+      return ok(out, `${out.block_types.length} block types, ${out.industries.length} industries, ${facts.pageTypes.length} page types. ` +
+        `${facts.tagged} of ${facts.blocks} blocks tagged (${Math.round(share * 100)}%). Full lists in the structured result.`);
+    },
+  );
+
+  server.registerTool(
+    "blimp_search_blocks",
+    {
+      title: "Search blocks",
+      description:
+        "Find website sections across stores. `query` is plain language (\"subscription picker with savings badge\"); filters narrow it. " +
+        "Without a query, lists blocks matching the filters. One block per section type per store and viewport. " +
+        "Returns at most 20; page on with `cursor`. `detail: \"full\"` adds the block's text (400 characters), image URL and tagger patterns.",
+      inputSchema: z.object({
+        query: z.string().max(200).optional().describe("Plain-language description of the section wanted"),
+        block_type: z.string().optional().describe("From blimp_list_taxonomy, e.g. 'product-reviews'"),
+        page_type: z.string().optional().describe("home, collection, product, cart, ..."),
+        industry: z.string().optional(),
+        platform: z.string().optional().describe("e.g. 'shopify'"),
+        app: z.string().optional().describe("An app the store runs, e.g. 'klaviyo', 'yotpo'"),
+        viewport: z.enum(VIEWPORTS).optional(),
+        style_tag: z.string().optional(),
+        has_price: z.boolean().optional(),
+        has_reviews: z.boolean().optional(),
+        has_video: z.boolean().optional(),
+        store: z.string().optional().describe("A store's host, e.g. 'myzoobox.com'"),
+        limit: z.number().int().min(1).max(MAX_ITEMS).default(8),
+        cursor: z.string().optional(),
+        detail: z.enum(["concise", "full"]).default("concise"),
+      }),
+      outputSchema: page(blockItem),
+      annotations: READ_ONLY,
+    },
+    async (a) => {
+      const blockType = lower(a.block_type), pageType = lower(a.page_type), industry = lower(a.industry), styleTag = lower(a.style_tag);
+      const error =
+        (blockType && !BLOCK_TYPES.includes(blockType as never) && !(await isTypeHint(blockType)) ? unknownValue("block_type", blockType, BLOCK_TYPES) : null) ??
+        check("page_type", pageType, PAGE_TYPES) ?? check("industry", industry, INDUSTRIES) ?? check("style_tag", styleTag, STYLE_TAGS);
+      if (error) return fail(error);
+      const offset = decodeCursor(a.cursor);
+      if (offset === null) return fail("That cursor is not one this server gave out. Repeat the search without it.");
+
+      const filters: BlockFilters = {};
+      if (blockType) filters.block = [blockType];
+      if (pageType) filters.page = [pageType];
+      if (industry) filters.industry = [industry];
+      if (a.platform) filters.platform = [lower(a.platform)!];
+      if (a.app) {
+        const app = await appName(a.app);
+        if (!app) return fail(noApp(a.app));
+        filters.app = [app];
+      }
+      if (a.viewport) filters.vp = [a.viewport];
+      if (a.store) filters.host = [lower(a.store)!.replace(/^https?:\/\//, "").replace(/\/.*$/, "")];
+      if (a.has_video !== undefined) filters.video = [a.has_video ? "yes" : "no"];
+
+      const found = await findBlocks({
+        query: a.query, filters, tags: { styleTags: styleTag ? [styleTag] : undefined, hasPrice: a.has_price, hasReviews: a.has_reviews },
+        limit: a.limit, offset, full: a.detail === "full", origin,
+      });
+      const cursor = found.hasMore ? encodeCursor(offset + found.items.length) : null;
+      const head = found.items.length ? `${found.total} matches; showing ${offset + 1}-${offset + found.items.length}.` : "No blocks match.";
+      const hint = !found.items.length && (blockType || styleTag || a.has_price !== undefined || a.has_reviews !== undefined)
+        ? " Tagger filters only match tagged blocks; try `query` instead (see tagging in blimp_list_taxonomy)." : "";
+      return ok({ items: found.items, total: found.total, has_more: found.hasMore, cursor },
+        [head + hint, ...found.items.map(line), cursor ? `More: pass cursor "${cursor}".` : ""].filter(Boolean).join("\n"));
+    },
+  );
+
+  server.registerTool(
+    "blimp_get_block",
+    {
+      title: "Get one block",
+      description:
+        "One block in full: store, page, position, block type and tagger output, up to 400 characters of its visible text, " +
+        "screenshot and thumbnail URLs, and the capture date. Outline and style are null until the crawler measures them.",
+      inputSchema: z.object({ id: z.string().describe("A block id from blimp_search_blocks") }),
+      outputSchema: blockItem,
+      annotations: READ_ONLY,
+    },
+    async ({ id }) => {
+      const block = await getBlock(id.trim(), origin);
+      if (!block) return fail(`No block with id '${id}'. Ids come from blimp_search_blocks.`);
+      return ok(block, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
+        `${block.text ? `Text: ${block.text}\n` : ""}Image: ${block.image_url ?? "none"}\nStyle: null (${STYLE_NOTE})`);
+    },
+  );
+
+  server.registerTool(
+    "blimp_search_stores",
+    {
+      title: "Search stores",
+      description: "Find stores in the library by name or domain words, industry, platform, country (ISO code) or an app they run. Most-visited stores first. At most 20; page on with `cursor`.",
+      inputSchema: z.object({
+        query: z.string().max(100).optional(),
+        industry: z.string().optional(),
+        platform: z.string().optional(),
+        country: z.string().length(2).optional().describe("ISO 3166 code, e.g. 'US', 'GB'"),
+        app: z.string().optional(),
+        limit: z.number().int().min(1).max(MAX_ITEMS).default(10),
+        cursor: z.string().optional(),
+      }),
+      outputSchema: page(storeItem),
+      annotations: READ_ONLY,
+    },
+    async (a) => {
+      const industry = lower(a.industry);
+      const error = check("industry", industry, INDUSTRIES);
+      if (error) return fail(error);
+      const offset = decodeCursor(a.cursor);
+      if (offset === null) return fail("That cursor is not one this server gave out. Repeat the search without it.");
+      const app = a.app ? await appName(a.app) : undefined;
+      if (app === null) return fail(noApp(a.app!));
+      const found = await findStores({ query: a.query, industry, platform: lower(a.platform), country: a.country, app, limit: a.limit, offset });
+      const cursor = found.hasMore ? encodeCursor(offset + found.items.length) : null;
+      return ok({ items: found.items, total: found.total, has_more: found.hasMore, cursor },
+        [found.items.length ? `${found.total} stores; showing ${offset + 1}-${offset + found.items.length}.` : "No stores match.",
+          ...found.items.map((s) => `- ${s.host} · ${s.brand} · ${s.industry ?? "?"} · ${s.platform ?? "unknown platform"}${s.theme ? ` (${s.theme})` : ""}`),
+          cursor ? `More: pass cursor "${cursor}".` : ""].filter(Boolean).join("\n"));
+    },
+  );
+
+  server.registerTool(
+    "blimp_get_store",
+    {
+      title: "Get one store",
+      description: "One store: industry, country, platform, theme, page builder, apps, every captured page with its block count and capture date, and the capture history.",
+      inputSchema: z.object({ host: z.string().describe("The store's domain, e.g. 'myzoobox.com'") }),
+      outputSchema: storeItem.extend({
+        title: z.string().nullable(),
+        pages: z.array(z.object({ url: z.string(), type: z.string(), captured_at: z.string(), blocks: z.number(),
+          desktop_thumbnail_url: z.string().nullable(), mobile_thumbnail_url: z.string().nullable() })),
+        captures: z.array(z.object({ captured_at: z.string(), pages: z.number() })),
+        design: z.null(), design_note: z.string(), blimp_url: z.string(),
+      }),
+      annotations: READ_ONLY,
+    },
+    async ({ host }) => {
+      const store = await getStore(host, origin);
+      if (!store) return fail(`No store '${host}' in the library. Find stores with blimp_search_stores.`);
+      return ok(store, `${store.brand} (${store.host}) · ${store.industry ?? "?"} · ${store.platform ?? "unknown platform"}${store.theme ? ` · theme ${store.theme}` : ""}\n` +
+        `Apps: ${store.apps.join(", ") || "none detected"}\n` +
+        `Pages: ${store.pages.map((p) => `${p.type} (${p.blocks} blocks, ${p.captured_at.slice(0, 10)})`).join("; ") || "none"}`);
+    },
+  );
+
+  return server;
+}
