@@ -28,7 +28,7 @@ const blockItem = z.object({
   tag_note: z.string().optional(),
   image_url: z.string().nullable().optional(), text: z.string().nullable().optional(), patterns: z.array(z.string()).optional(),
   theme: z.string().nullable().optional(), apps: z.array(z.string()).optional(),
-  outline: z.null().optional(), style: z.null().optional(), style_note: z.string().optional(),
+  outline: z.array(z.unknown()).nullable().optional(), style: z.record(z.string(), z.unknown()).nullable().optional(), style_note: z.string().optional(),
 });
 
 const storeItem = z.object({
@@ -189,7 +189,7 @@ export function blimpServer(origin: string): McpServer {
       title: "Get one block",
       description:
         "One block in full: store, page, position, block type and tagger output, up to 400 characters of its visible text, " +
-        "screenshot and thumbnail URLs, and the capture date. Outline and style are null until the crawler measures them.",
+        "screenshot and thumbnail URLs, and the capture date. Includes the measured outline and style for captures made with design metadata; null with a note for older ones.",
       inputSchema: z.object({ id: z.string().describe("A block id from blimp_search_blocks") }),
       outputSchema: blockItem,
       annotations: READ_ONLY,
@@ -198,7 +198,7 @@ export function blimpServer(origin: string): McpServer {
       const block = await getBlock(id.trim(), origin);
       if (!block) return fail(`No block with id '${id}'. Ids come from blimp_search_blocks.`);
       return ok(block, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
-        `${block.text ? `Text: ${block.text}\n` : ""}Image: ${block.image_url ?? "none"}\nStyle: null (${STYLE_NOTE})`);
+        `${block.text ? `Text: ${block.text}\n` : ""}Image: ${block.image_url ?? "none"}\nStyle: ${block.style ? "measured (outline and style in the structured result)" : `null (${STYLE_NOTE})`}`);
     },
   );
 

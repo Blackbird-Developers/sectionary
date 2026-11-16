@@ -22,7 +22,7 @@ const MCP_COLUMNS = (sql: Sql) => sql`b.id, s.host, s.brand, s.industry, s.platf
   b.headline, b.background, b.width, b.height, b.image_key, b.thumbnail_key, b.buttons, b.images, b.videos,
   b.ai_description, b.tags AS style_tags, b.ai_response->>'page_role' AS page_role, b.ai_response->'patterns' AS patterns,
   (b.ai_response->>'has_price')::boolean AS has_price, (b.ai_response->>'has_reviews')::boolean AS has_reviews,
-  b.ai_response->>'prompt_version' AS tagger_version, left(b.text, ${MAX_TEXT}) AS text`;
+  b.ai_response->>'prompt_version' AS tagger_version, left(b.text, ${MAX_TEXT}) AS text, b.style, b.outline`;
 
 export type McpBlock = {
   id: string;
@@ -56,8 +56,8 @@ export type McpBlock = {
   patterns?: string[];
   theme?: string | null;
   apps?: string[];
-  outline?: null;
-  style?: null;
+  outline?: unknown[] | null;
+  style?: Record<string, unknown> | null;
   style_note?: string;
 };
 
@@ -85,7 +85,8 @@ function toMcpBlock(r: Record<string, unknown>, origin: string, full: boolean): 
   return {
     ...block, image_url: image, text: clip(r.text as string | null, MAX_TEXT), patterns: (r.patterns as string[] | null) ?? [],
     theme: (r.theme_name as string | null) ?? null, apps: (r.apps as string[] | null) ?? [],
-    outline: null, style: null, style_note: STYLE_NOTE,
+    outline: (r.outline as unknown[] | null) ?? null, style: (r.style as Record<string, unknown> | null) ?? null,
+    ...(r.style ? {} : { style_note: STYLE_NOTE }),
   };
 }
 
