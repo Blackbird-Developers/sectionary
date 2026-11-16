@@ -175,7 +175,7 @@ function CodeGate({ mode, onCancel }: { mode: "codes" | "off"; onCancel: () => v
 function RecoveryCodes({ codes, done }: { codes: string[]; done?: boolean }) {
   const text = codes.join("\n");
   const download = () => {
-    const url = URL.createObjectURL(new Blob([`Sectionary recovery codes\n\n${text}\n`], { type: "text/plain" }));
+    const url = URL.createObjectURL(new Blob([`Blimp recovery codes\n\n${text}\n`], { type: "text/plain" }));
     const a = Object.assign(document.createElement("a"), { href: url, download: "sectionary-recovery-codes.txt" });
     a.click();
     URL.revokeObjectURL(url);

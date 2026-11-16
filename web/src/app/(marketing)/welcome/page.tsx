@@ -13,10 +13,10 @@ import { cn } from "@/lib/utils";
 import showcase from "./showcase.json";
 
 export const metadata: Metadata = {
-  title: { absolute: "Sectionary · Every storefront, cut into blocks" },
+  title: { absolute: "Blimp · The aerial view of ecommerce" },
   description:
     "A reference library of real online stores, cut into blocks: hero, buy box, reviews, cart. Desktop and phone side by side, with the platform, theme and apps behind each one. Join the waitlist.",
-  openGraph: { title: "Every storefront, cut into blocks", siteName: "Sectionary", type: "website", url: "/welcome" },
+  openGraph: { title: "Every storefront, cut into blocks", siteName: "Blimp", type: "website", url: "/welcome" },
   twitter: { card: "summary_large_image", title: "Every storefront, cut into blocks" },
 };
 
@@ -163,7 +163,7 @@ export default async function Welcome() {
             One block, and everything behind it.
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground text-pretty">
-            Galleries show you a pretty screenshot. Sectionary tells you what it is, where it lives, how it looks on a
+            Galleries show you a pretty screenshot. Blimp tells you what it is, where it lives, how it looks on a
             phone, and what the store runs to make it work.
           </p>
         </div>

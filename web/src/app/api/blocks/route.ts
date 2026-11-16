@@ -28,10 +28,15 @@ export const dynamic = "force-dynamic";
  * GET /api/blocks · BlocksQuery in, BlocksResponse out, plus the wall's
  * additions (WallQuery and WallResponse in lib/block-source.ts): the `video`
  * and `color` filters, facets for every filter and `nearMiss`.
- * Without `q`, newest captures first. With `q`, ranked by relevance: full text,
- * typo tolerance and semantic search fused (see server/search.ts).
+ * Without `q`, stores are mixed (see below) unless the query names a store,
+ * which keeps page order. With `q`, ranked by relevance: full text, typo
+ * tolerance and semantic search fused (see server/search.ts).
  * Facets and near misses come with the first page only: they describe the
  * whole result set, so later pages would repeat them.
+ *
+ * The wall asks for the two halves separately, so the screenshots never wait
+ * on the counts: `facets=0` is the first page of blocks alone, and
+ * `facets=only` is the counts (facets, near misses, total) with no blocks.
  */
 export async function GET(request: Request) {
   try {
@@ -57,10 +62,12 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
   const q = url.searchParams.get("q")?.trim() || null;
   const limit = Math.min(200, Math.max(1, Number(url.searchParams.get("limit")) || 60));
   const offset = Math.max(0, Number(url.searchParams.get("cursor")) || 0);
-  const first = offset === 0 && url.searchParams.get("facets") !== "0";
+  const mode = url.searchParams.get("facets");
+  const first = offset === 0 && mode !== "0";
+  const only = mode === "only";
 
   if (q) {
-    const { items, total, nextCursor, facets, nearMiss, search } = await searchBlocks(q, f, limit, offset, first);
+    const { items, total, nextCursor, facets, nearMiss, search } = await searchBlocks(q, f, only ? 1 : limit, only ? 0 : offset, only || first);
     // How the query was read goes in headers, so the body stays exactly BlocksResponse.
     const headers = {
       "x-search-terms": search.terms.join(" "),
@@ -68,17 +75,42 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
       "x-search-semantic": String(search.semantic),
       "x-search-intent": search.intents.join(" "),
     };
+    if (only) return { body: { items: [], blocks: [], generatedAt: new Date().toISOString(), nextCursor: null, total, facets, nearMiss }, headers };
     return { body: { items, blocks: items, generatedAt: new Date().toISOString(), nextCursor, total, ...(first && { facets, nearMiss }) }, headers };
   }
 
-  // Latest capture of each page only. Within a capture, page order, so one
+  if (only) {
+    const counts = await facetCounts(sql, f);
+    return { body: { items: [], blocks: [], generatedAt: new Date().toISOString(), nextCursor: null, total: counts.total, facets: counts.facets, nearMiss: counts.nearMiss } };
+  }
+
+  // Latest capture of each page only.
+  //
+  // A query that names a store keeps page order within each capture, so that
   // store's blocks arrive ready for its page viewer and flow view.
-  const [rows, counts] = await Promise.all([
-    sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
-      ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`,
+  //
+  // Any other query mixes the stores, so the wall is not a run of one store's
+  // sections followed by a run of the next. Each store's blocks are dealt in
+  // turns: every store's first, then every store's second, and so on. Which
+  // block is a store's first, and the order of stores within a turn, come from
+  // a hash of the ids: scattered, but the same on every request, so pages
+  // follow on from one another and the answer can be cached.
+  const rowsQuery = f.host?.length
+    ? sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
+      ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`
+    : sql`SELECT * FROM (
+        SELECT ${blockColumns(sql)},
+          row_number() OVER (PARTITION BY s.id ORDER BY md5(b.id::text)) AS turn,
+          md5(s.id::text) AS store_order
+        FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
+      ) mixed ORDER BY turn, store_order, id LIMIT ${limit} OFFSET ${offset}`;
+  // Without facets the total is its own count, run alongside the page rather than after it.
+  const [rows, counts, counted] = await Promise.all([
+    rowsQuery,
     first ? facetCounts(sql, f) : null,
+    first ? null : sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`,
   ]);
-  const total = counts?.total ?? ((await sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`)[0].total as number);
+  const total = counts?.total ?? (counted![0].total as number);
   const items = rows.map(toBlock);
   return {
     body: {

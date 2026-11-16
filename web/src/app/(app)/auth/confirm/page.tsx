@@ -15,7 +15,7 @@ export default async function ConfirmPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6 sm:py-12">
-      <h1 className="font-heading text-[22px] font-semibold">Sign in to Sectionary</h1>
+      <h1 className="font-heading text-[22px] font-semibold">Sign in to Blimp</h1>
       {tokenHash ? (
         <ConfirmSignIn tokenHash={tokenHash} type={type} />
       ) : (

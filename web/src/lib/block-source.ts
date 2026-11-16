@@ -127,6 +127,44 @@ function passes(dimension: Dimension, block: Block, store: Store | undefined): b
   return offered.some((value) => dimension.wanted.includes(value));
 }
 
+/** A small stable hash (FNV-1a): scatters ids without anything random, so the order is the same on every call. */
+function scatter(text: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i += 1) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+/**
+ * The wall's order when no store is named: stores are dealt in turns (every
+ * store's first block, then every store's second, and so on), so the wall is
+ * not a run of one store's sections followed by a run of the next. Which block
+ * is a store's first, and the order of stores within a turn, come from a hash
+ * of the ids: scattered but stable, so pages follow on from one another. The
+ * same rule as the mixed ORDER BY in app/api/blocks/route.ts, though the two
+ * hashes differ, so the sample and the API do not agree on the exact order.
+ */
+export function mixStores(blocks: Block[]): Block[] {
+  const byHost = new Map<string, Block[]>();
+  for (const b of blocks) {
+    const list = byHost.get(b.host);
+    if (list) list.push(b);
+    else byHost.set(b.host, [b]);
+  }
+  const hosts = [...byHost.keys()].sort((a, b) => scatter(a) - scatter(b) || a.localeCompare(b));
+  for (const list of byHost.values()) list.sort((a, b) => scatter(a.id) - scatter(b.id) || a.id.localeCompare(b.id));
+  const out: Block[] = [];
+  for (let turn = 0; out.length < blocks.length; turn += 1) {
+    for (const host of hosts) {
+      const block = byHost.get(host)![turn];
+      if (block) out.push(block);
+    }
+  }
+  return out;
+}
+
 /**
  * Run a query. Facet counts for a dimension ignore that dimension's own
  * selection, so ticking one platform still shows how many blocks the other
@@ -180,7 +218,9 @@ export function queryBlocks(index: BlockIndex, query: WallQuery = {}, options: {
 
   const limit = Math.min(MAX_LIMIT, Math.max(1, query.limit ?? DEFAULT_LIMIT));
   const offset = Math.max(0, Number(query.cursor) || 0);
-  const items = matched.slice(offset, offset + limit);
+  // One store's query keeps page order; anything else mixes the stores, as /api/blocks does.
+  const ordered = query.host ? matched : mixStores(matched);
+  const items = ordered.slice(offset, offset + limit);
   const next = offset + items.length;
 
   const nearMiss: Record<string, number> = {};

@@ -23,6 +23,24 @@ export const STORES_SRC = process.env.NEXT_PUBLIC_STORES_SRC ?? "/sample/stores.
 export const API_MODE = BLOCKS_SRC.startsWith("/api/");
 
 /**
+ * The first requests the wall makes on a plain visit (Web view, no filters):
+ * from the API the first page of blocks and, separately, the counts; or the
+ * whole sample file. The home page preloads them, so they download alongside
+ * the JavaScript instead of after it. They must stay byte-for-byte what
+ * lib/load-blocks.ts asks for (the wall's default query: `vp`, `limit`, then
+ * `facets`), or the browser fetches them twice.
+ */
+export const FIRST_WALL_SRC = API_MODE ? `${BLOCKS_SRC}?vp=desktop&limit=60&facets=0` : BLOCKS_SRC;
+export const FIRST_COUNTS_SRC = API_MODE ? `${BLOCKS_SRC}?vp=desktop&facets=only` : null;
+
+/**
+ * The origin block screenshots are served from (the CDN), if it is not this
+ * site. Set NEXT_PUBLIC_IMAGE_ORIGIN and every page opens the connection
+ * early, which saves the DNS and TLS round trips before the first screenshot.
+ */
+export const IMAGE_ORIGIN = process.env.NEXT_PUBLIC_IMAGE_ORIGIN || null;
+
+/**
  * Site profiles (SEC-19). Set NEXT_PUBLIC_SITES_SRC=/api/sites to read
  * /api/sites/[host]; unset, a profile is assembled from the loaded blocks.
  */

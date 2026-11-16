@@ -54,8 +54,24 @@ export function shownBlocks(blocks: Block[]): Block[] {
   return blocks.filter((b) => shown.has(b) || (b as Block & { mock?: boolean }).mock);
 }
 
+/**
+ * "unknown" is what capture writes when a section carries no name at all
+ * (src/page-script.ts). It is a gap in our labelling, not a kind of block, so
+ * it is never offered as a filter, a category or a search result. The AI
+ * tagger (platform/src/tagger.ts) replaces it with a real type once it runs.
+ */
+export const isUnnamed = (typeHint: string) => typeHint === "unknown" || typeHint === "unknown-part";
+
+/** A block-type facet without the unnamed bucket, for anything a person chooses from. */
+export function namedOnly<T extends { value: string }>(options: T[]): T[] {
+  return options.filter((o) => !isUnnamed(o.value));
+}
+
 /** "featured-collection" -> "Featured collection" */
 export function labelFor(typeHint: string): string {
+  // Capture found no name for it. Nobody should read "Unknown" on a card: it
+  // is a section like any other, just one without a label yet.
+  if (isUnnamed(typeHint)) return "Section";
   const s = typeHint.replace(/-part$/, "").replace(/[-_]+/g, " ").trim();
   return s ? s[0].toUpperCase() + s.slice(1) : "Block";
 }

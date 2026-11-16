@@ -7,6 +7,7 @@ import type { Block, BlockSet } from "@/contracts/block";
 import type { Store, StoreSet } from "@/contracts/store";
 import { buildIndex, queryBlocks, MAX_LIMIT, type BlockIndex, type WallQuery, type WallResponse } from "@/lib/block-source";
 import { baseType, detailIndex, type DetailIndex } from "@/lib/block-detail";
+import { isUnnamed } from "@/lib/blocks";
 import { expandBlocks } from "@/lib/mock-blocks";
 import { pagesFromBlocks, profileFromApi, profileFromIndex, siteCardFromApi, siteCards, storeFromBlocks, summaryPages, type ProfilePage, type SiteCard, type SiteSummary, type SiteView } from "@/lib/site-profile";
 import { flowSummaries, flowSummariesFromApi, type FlowSummary } from "@/lib/flows";
@@ -27,8 +28,14 @@ async function getJson<T>(src: string, signal?: AbortSignal): Promise<T> {
  * and near misses included (server/blocks.ts runs the same rules in SQL).
  */
 export type WallSource = {
-  /** One page of a query. `facets: false` for the pages after the first. */
+  /** One page of a query. `facets: false` for the pages after the first, or for a first page whose counts come from `counts`. */
   query(query: WallQuery, options?: { facets?: boolean; signal?: AbortSignal }): Promise<WallResponse>;
+  /**
+   * The counts of a query without its blocks: facets, near misses and total.
+   * Only the API has it. The wall asks for the first page with `facets: false`
+   * and for this alongside, so the screenshots never wait on the counting.
+   */
+  counts?(query: WallQuery): Promise<WallCounts>;
   /**
    * What the detail view needs for one block: the block (null when the id is
    * unknown) and the index its pairing, similar blocks and captures read.
@@ -41,6 +48,8 @@ export type WallSource = {
   /** Start fetching what opening this block needs, before it is opened (a hover). */
   prefetch?(block: Block): void;
 };
+
+export type WallCounts = Pick<WallResponse, "facets" | "nearMiss" | "total">;
 
 export function wallSource(): WallSource {
   return API_MODE ? apiSource : sampleSource;
@@ -96,6 +105,8 @@ function once<T>(cache: Map<string, Promise<T>>, key: string, load: () => Promis
 const storeBlocks = new Map<string, Promise<Block[]>>();
 const similarPools = new Map<string, Promise<Block[]>>();
 const firstPages = new Map<string, { at: number; response: Promise<WallResponse> }>();
+/** The same for counts (see WallSource.counts). */
+const firstCounts = new Map<string, { at: number; response: Promise<WallCounts> }>();
 
 /** How long the browser reuses a wall page it already has: switching Web / Mobile and back asks once. */
 const PAGE_TTL = 5 * 60_000;
@@ -115,8 +126,9 @@ function pageOf(block: Block): Promise<Block[]> {
 
 const apiSource: WallSource = {
   query(query, options) {
-    // The API sends facets with the first page only, so there is nothing to switch off.
-    const src = withQuery(BLOCKS_SRC, { ...query });
+    // The API sends facets with the first page only; `facets: false` on a first
+    // page leaves them out as well (the wall reads them from `counts`).
+    const src = withQuery(BLOCKS_SRC, { ...query, ...(options?.facets === false && !query.cursor && { facets: 0 }) });
     if (query.cursor) return getJson<WallResponse>(src, options?.signal);
     // First pages are kept a while: going back to a view already seen is instant.
     // The fetch itself is never aborted, so a view left half-loaded is ready next time.
@@ -134,6 +146,17 @@ const apiSource: WallSource = {
       signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
       hit.response.then(resolve, reject);
     });
+  },
+  counts(query) {
+    const src = withQuery(BLOCKS_SRC, { ...query, limit: undefined, cursor: undefined, facets: "only" });
+    let hit = firstCounts.get(src);
+    if (!hit || Date.now() - hit.at > PAGE_TTL) {
+      hit = { at: Date.now(), response: getJson<WallCounts>(src) };
+      const mine = hit;
+      hit.response.catch(() => firstCounts.get(src) === mine && firstCounts.delete(src));
+      firstCounts.set(src, hit);
+    }
+    return hit.response;
   },
   async detail(id, known, onPartial) {
     const block = known ?? (await fetch(`${BLOCKS_SRC}/${encodeURIComponent(id)}`).then((r) => (r.ok ? (r.json() as Promise<Block>) : null)));
@@ -276,9 +299,9 @@ export async function loadSitesDirectory(): Promise<SitesDirectory> {
   return { cards: siteCards(index), blockTypes: namedTypes([...counts].map(([value, count]) => ({ value, count }))) };
 }
 
-/** "-part" slices are what segmentation could not name ("zoo-home-part"): one store's markup, not a kind of block worth a link. */
+/** Unnamed sections are left out (see isUnnamed in lib/blocks.ts), and "-part" slices are what segmentation could not name ("zoo-home-part"): one store's markup, not a kind of block worth a link. */
 function namedTypes(list: { value: string; count: number }[]) {
-  return list.filter((t) => !t.value.endsWith("-part")).sort((a, b) => b.count - a.count);
+  return list.filter((t) => !t.value.endsWith("-part") && !isUnnamed(t.value)).sort((a, b) => b.count - a.count);
 }
 
 /** Every captured store's flow: from /api/sites when it is configured, otherwise from the loaded blocks. */

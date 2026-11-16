@@ -1,34 +1,92 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Bookmark, LayoutGrid, Route, Store } from "lucide-react";
 
 const NAV = [
-  { href: "/", label: "Blocks" },
-  { href: "/flows", label: "Flows" },
-  { href: "/sites", label: "Sites" },
-  { href: "/boards", label: "Boards" },
+  { href: "/", label: "Blocks", icon: LayoutGrid },
+  { href: "/flows", label: "Flows", icon: Route },
+  { href: "/sites", label: "Sites", icon: Store },
+  { href: "/boards", label: "Boards", icon: Bookmark },
 ];
 
-/** The four sections. A client component only to mark the current one, which
- *  screen readers announce ("current page") and the style picks up. */
+const isCurrent = (pathname: string, href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`));
+
+/**
+ * The four sections, in the top bar from tablet width up. A client component
+ * only to mark the current one, which screen readers announce ("current
+ * page") and the pill picks up. On phones the same four are the tab bar below.
+ */
 export function NavLinks() {
   const pathname = usePathname();
   return (
-    <nav aria-label="Primary" className="ml-1 flex items-center gap-0.5 sm:ml-2">
-      {NAV.map((n) => {
-        const current = n.href === "/" ? pathname === "/" : pathname === n.href || pathname.startsWith(`${n.href}/`);
-        return (
-          <Link
-            key={n.href}
-            href={n.href}
-            aria-current={current ? "page" : undefined}
-            className="inline-flex h-7 items-center rounded-md px-2 text-[13px] text-muted-foreground transition-colors duration-150 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:text-foreground aria-[current=page]:font-medium touch:h-11"
-          >
-            {n.label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Primary" className="ml-2 hidden items-center gap-0.5 md:flex">
+      {NAV.map((n) => (
+        <Link
+          key={n.href}
+          href={n.href}
+          aria-current={isCurrent(pathname, n.href) ? "page" : undefined}
+          className="inline-flex h-8 items-center rounded-full px-3 text-[13px] font-medium text-muted-foreground transition-colors duration-150 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-muted aria-[current=page]:text-foreground"
+        >
+          {n.label}
+        </Link>
+      ))}
     </nav>
   );
+}
+
+/**
+ * Phones: the sections as a tab bar along the bottom edge, where a thumb
+ * reaches, instead of four words squeezed into the top bar. 56px tall plus
+ * the home-indicator inset; the page leaves room for it (see AppShell).
+ */
+export function MobileTabs() {
+  const pathname = usePathname();
+  return (
+    <nav
+      aria-label="Primary"
+      className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
+    >
+      <div className="mx-auto flex h-14 max-w-[480px] items-stretch">
+        {NAV.map((n) => {
+          const current = isCurrent(pathname, n.href);
+          const Icon = n.icon;
+          return (
+            <Link
+              key={n.href}
+              href={n.href}
+              aria-current={current ? "page" : undefined}
+              className="group flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium text-muted-foreground outline-none transition-colors duration-150 focus-visible:bg-muted aria-[current=page]:text-foreground"
+            >
+              <span className="flex h-7 w-12 items-center justify-center rounded-full transition-[background-color,scale] duration-200 group-active:scale-90 group-aria-[current=page]:bg-primary/12 group-aria-[current=page]:text-primary">
+                <Icon className="size-[18px]" aria-hidden />
+              </span>
+              {n.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/**
+ * Marks the page as scrolled (`data-scrolled` on <html>) so the top bar can sit
+ * flat on the page at the top and lift onto a blurred, bordered strip once
+ * content passes under it. One passive listener, one attribute; no state.
+ */
+export function ScrollFlag() {
+  useEffect(() => {
+    const root = document.documentElement;
+    const update = () => root.toggleAttribute("data-scrolled", window.scrollY > 4);
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", update);
+      root.removeAttribute("data-scrolled");
+    };
+  }, []);
+  return null;
 }

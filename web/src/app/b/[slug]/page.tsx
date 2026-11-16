@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const board = await load((await params).slug);
   return {
     title: board?.name ?? "Board not found",
-    description: board?.description ?? `${board?.items.length ?? 0} website references, collected with Sectionary.`,
+    description: board?.description ?? `${board?.items.length ?? 0} website references, collected with Blimp.`,
     // Share links are unlisted: reachable by link, never by search.
     robots: { index: false, follow: false },
   };

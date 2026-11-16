@@ -1,14 +1,20 @@
 import Link from "next/link";
 import { CircleUser } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { NavLinks } from "@/components/nav-links";
+import { MobileTabs, NavLinks, ScrollFlag } from "@/components/nav-links";
+import { CommandPalette } from "@/components/command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PlanBadge } from "@/components/plan-badge";
 import { AuthHashRedirect } from "@/components/auth-hash-redirect";
 import { DevPlanSwitch } from "@/components/dev-plan-switch";
 
-/** Top bar (48px, hairline) plus the page. Mobile first: the nav stays inline
- *  because it is four short words; the search field grows on wider screens. */
+/**
+ * Top bar plus the page. From tablet width up: logo, the four sections, the
+ * search in the middle where the eye lands, then plan, theme and account.
+ * On phones the sections move to a tab bar along the bottom and the top bar
+ * keeps the logo, search and account. The bar sits flat on the page at the
+ * top and lifts onto a blurred strip once content scrolls under it.
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
@@ -20,15 +26,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex h-12 max-w-[1800px] items-center gap-2 px-3 sm:gap-4 sm:px-4">
-          <Link href="/welcome" aria-label="Sectionary home" className="flex items-center gap-2 rounded-md outline-none touch:h-11 focus-visible:ring-2 focus-visible:ring-ring">
+      <ScrollFlag />
+      <header className="sticky top-0 z-20 border-b border-transparent bg-background transition-[background-color,border-color,box-shadow] duration-200 [html[data-scrolled]_&]:border-border [html[data-scrolled]_&]:bg-background/80 [html[data-scrolled]_&]:shadow-[0_1px_12px_rgb(0_0_0/0.05)] [html[data-scrolled]_&]:backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-[1800px] items-center gap-2 px-3 sm:px-4">
+          <Link href="/welcome" aria-label="Blimp home" className="flex items-center gap-2 rounded-md outline-none touch:h-11 focus-visible:ring-2 focus-visible:ring-ring">
             <Logo />
-            <span className="font-heading text-[15px] font-semibold tracking-[0.01em]">Sectionary</span>
+            <span className="font-heading text-[17px] font-extrabold tracking-[-0.045em]">blimp</span>
           </Link>
           <NavLinks />
-          <div className="ml-auto flex items-center gap-1">
-            <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground md:inline">preview · sample data</span>
+          {/* The search: centred and wide from tablet up, an icon on phones. */}
+          <div className="flex min-w-0 flex-1 justify-end md:justify-center md:px-4">
+            <CommandPalette />
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground xl:inline">preview · sample data</span>
             <PlanBadge />
             <ThemeToggle />
             <Link
@@ -42,7 +53,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <main id="main" tabIndex={-1} className="mx-auto outline-none w-full max-w-[1800px] flex-1 px-3 py-3 sm:px-4 sm:py-4">{children}</main>
+      {/* Bottom padding on phones clears the tab bar and the home indicator. */}
+      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1800px] flex-1 px-3 pt-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none sm:px-4 md:pb-4">{children}</main>
+      <MobileTabs />
       {process.env.NODE_ENV === "development" && <DevPlanSwitch />}
     </div>
   );

@@ -16,15 +16,25 @@ import { type WallQuery, type WallResponse } from "@/lib/block-source";
 import { type DetailIndex } from "@/lib/block-detail";
 import { layOut, visible, GAP, DESKTOP_RATIO, MOBILE_RATIO, type Layout } from "@/lib/wall-layout";
 import { FILTERS, readSelected, writeSelected, toggleValue, toQuery, countSelected, SEARCH_KEY, type FilterKey } from "@/lib/filters";
-import { type Block } from "@/lib/blocks";
+import { namedOnly, type Block } from "@/lib/blocks";
 import { cn } from "@/lib/utils";
 import type { Viewport } from "@/contracts/block";
 
 /** How many blocks a page of the wall asks for. The contract caps it at 200. */
 const PAGE_SIZE = 200;
 
+/**
+ * The first page when the counts come separately (the API): enough for the
+ * first screens, small enough to arrive and parse quickly. Scrolling then
+ * fetches PAGE_SIZE at a time.
+ */
+const FIRST_PAGE_SIZE = 60;
+
 /** Rendered beyond the viewport, top and bottom, so a fast flick stays covered. */
 const OVERSCAN = 800;
+
+/** Cards starting above this many pixels are on the first screen: their screenshots load first, not lazily. */
+const FIRST_SCREEN = 900;
 
 /**
  * Space held open below the loaded blocks while the next page is on its way.
@@ -161,13 +171,28 @@ export function Wall() {
   // arrives the previous result stays up, marked busy, rather than flashing
   // skeletons: on the API a query is a round trip.
   const [result, setResult] = useState<{ key: string; response: WallResponse } | null>(null);
+  // On the API the blocks and the counts are two requests, so the screenshots
+  // never wait on the counting. A search stays one request: it is ranked once.
+  const split = Boolean(source.counts) && !query.q;
+  const [counts, setCounts] = useState<{ key: string; facets: WallResponse["facets"]; nearMiss?: Record<string, number> } | null>(null);
+  useEffect(() => {
+    if (!split || !source.counts) return;
+    let alive = true;
+    source.counts(query).then(
+      (c) => alive && setCounts({ key: queryKey, facets: c.facets, nearMiss: c.nearMiss }),
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [split, query, queryKey]);
   const first = result?.response ?? null;
   const ready = result !== null;
   const settled = result?.key === queryKey;
 
   useEffect(() => {
     const controller = new AbortController();
-    source.query({ ...query, limit: PAGE_SIZE }, { signal: controller.signal }).then(
+    source.query({ ...query, limit: split ? FIRST_PAGE_SIZE : PAGE_SIZE }, { signal: controller.signal, ...(split && { facets: false }) }).then(
       (response) => {
         setResult({ key: queryKey, response });
         setError(null);
@@ -175,7 +200,7 @@ export function Wall() {
       (e: Error) => !controller.signal.aborted && setError(e.message),
     );
     return () => controller.abort();
-  }, [query, queryKey]);
+  }, [query, queryKey, split]);
 
   // Pages fetched by scrolling, tagged with the query they belong to so a stale
   // set is ignored rather than cleared in an effect.
@@ -188,7 +213,12 @@ export function Wall() {
   );
   const cursor = !settled ? null : current ? extra.cursor : (first?.nextCursor ?? null);
   const total = first?.total ?? 0;
-  const facets = useMemo(() => first?.facets ?? {}, [first]);
+  // The last counts stay up until the new ones arrive, so the filters do not blank between queries.
+  // The Block filter never offers the unnamed bucket (see isUnnamed in lib/blocks.ts).
+  const facets = useMemo(() => {
+    const all = first?.facets ?? counts?.facets ?? {};
+    return all.block ? { ...all, block: namedOnly(all.block) } : all;
+  }, [first, counts]);
 
   // Back to the top when the filters change. A DOM call, no state. Glided
   // rather than jumped, so a switch of the Web / Mobile pill reads as moving
@@ -208,10 +238,11 @@ export function Wall() {
     if (!API_MODE || !settled) return;
     const others: string[][] = [["desktop"], ["mobile"], ["desktop", "mobile"]].filter((vp) => vp.join(",") !== (query.vp ?? ""));
     const timer = window.setTimeout(() => {
-      for (const vp of others) void source.query({ ...query, vp: vp.join(","), limit: PAGE_SIZE }).catch(() => undefined);
+      for (const vp of others)
+        void source.query({ ...query, vp: vp.join(","), limit: split ? FIRST_PAGE_SIZE : PAGE_SIZE }, split ? { facets: false } : undefined).catch(() => undefined);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [settled, query]);
+  }, [settled, query, split]);
 
   const loadMore = useCallback(() => {
     if (!cursor) return;
@@ -452,7 +483,7 @@ export function Wall() {
   // shrugging. nearMiss counts, per dimension, how many blocks a single
   // removal would reveal, so the biggest number is the most useful advice.
   const blame = useMemo(() => {
-    const near = first?.nearMiss ?? {};
+    const near = first?.nearMiss ?? (counts?.key === queryKey ? counts.nearMiss : undefined) ?? {};
     let key: string | null = null;
     let count = 0;
     for (const [candidate, n] of Object.entries(near)) {
@@ -468,7 +499,7 @@ export function Wall() {
     const spec = FILTERS.find((f) => f.key === key);
     if (!spec) return null;
     return { label: spec.label, count, clear: () => onClearOne(spec.key) };
-  }, [first, onSearch, onClearOne]);
+  }, [first, counts, queryKey, onSearch, onClearOne]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -537,14 +568,15 @@ export function Wall() {
             <div
               key={card.block.id}
               role="listitem"
-              className="absolute"
+              // Each card is its own stacking layer; one with its Save menu open goes above its neighbours.
+              className="absolute has-[[aria-expanded=true]]:z-30"
               style={{
                 transform: `translate(${card.x}px, ${card.y}px)`,
                 width: card.width,
                 height: card.height,
               }}
             >
-              <BlockCard block={card.block} onOpen={onOpen} onIntent={onIntent} width={card.width} height={card.height} fit={card.fit} />
+              <BlockCard block={card.block} onOpen={onOpen} onIntent={onIntent} width={card.width} height={card.height} fit={card.fit} priority={card.y < FIRST_SCREEN} />
             </div>
           ))}
 
