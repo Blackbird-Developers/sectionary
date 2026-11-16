@@ -16,7 +16,9 @@ export const sites = pgTable("sites", {
   apps: text("apps").array().notNull().default([]), currency: text("currency"), locale: text("locale"),
   country: text("country"), industry: text("industry").notNull().default("other"), industryScore: real("industry_score").notNull().default(0),
   rank: integer("rank"), mentions: integer("mentions").notNull().default(0), sources: text("sources").array().notNull().default([]),
-  validatedAt: timestamp("validated_at", { withTimezone: true }), ...timestamps,
+  validatedAt: timestamp("validated_at", { withTimezone: true }),
+  // Store design profile (SEC-31, migration 0014), built by profile-sites from the latest captures' page_styles.
+  designProfile: jsonb("design_profile"), designProfileAt: timestamp("design_profile_at", { withTimezone: true }), ...timestamps,
 }, (t) => [uniqueIndex("sites_host_uidx").on(t.host), index("sites_platform_idx").on(t.platform), index("sites_theme_idx").on(t.themeName), index("sites_industry_idx").on(t.industry), index("sites_country_idx").on(t.country), index("sites_rank_idx").on(t.rank), index("sites_apps_gin_idx").using("gin", t.apps)]);
 
 export const pages = pgTable("pages", {
@@ -27,7 +29,9 @@ export const pages = pgTable("pages", {
 
 export const captures = pgTable("captures", {
   id: uuid("id").primaryKey().defaultRandom(), pageId: uuid("page_id").notNull().references(() => pages.id, { onDelete: "cascade" }),
-  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(), desktop: jsonb("desktop"), mobile: jsonb("mobile"), ...timestamps,
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(), desktop: jsonb("desktop"), mobile: jsonb("mobile"),
+  // Manifest pageStyles (SEC-31, migration 0014): { desktop?: PageStyles, mobile?: PageStyles }, null without --styles.
+  pageStyles: jsonb("page_styles"), ...timestamps,
 }, (t) => [uniqueIndex("captures_page_time_uidx").on(t.pageId, t.capturedAt), index("captures_page_idx").on(t.pageId), index("captures_time_idx").on(t.capturedAt)]);
 
 export const blocks = pgTable("blocks", {
@@ -41,6 +45,8 @@ export const blocks = pgTable("blocks", {
   // Ordered slices when the image was taller than WebP allows (migration 0005), else null.
   imageSlices: jsonb("image_slices"),
   aiDescription: text("ai_description"), aiResponse: jsonb("ai_response"), embedding: vector("embedding"),
+  // Manifest style and outline (SEC-31, migration 0014), null without --styles.
+  style: jsonb("style"), outline: jsonb("outline"),
   // search_tsv (generated, migration 0004) is left out: Drizzle never writes it and the API reads it in SQL.
   embeddingModel: text("embedding_model"), embeddingHash: text("embedding_hash"), embeddedAt: timestamp("embedded_at", { withTimezone: true }),
   // What the current tags were made from (migration 0006), so only new or changed blocks are tagged again.
@@ -102,3 +108,10 @@ export const captureDiffs = pgTable("capture_diffs", {
   changedBlockCount: integer("changed_block_count").notNull().default(0),
   summary: jsonb("summary").notNull().default({}), ...timestamps,
 }, (t) => [index("capture_diffs_page_idx").on(t.pageId), index("capture_diffs_from_idx").on(t.fromCaptureId), index("capture_diffs_to_idx").on(t.toCaptureId)]);
+
+// What is typical per industry ('all' for every one), page type and viewport (SEC-31, migration 0014). Written by `npm run benchmarks`; served only when n >= 10.
+export const benchmarks = pgTable("benchmarks", {
+  industry: text("industry").notNull(), pageType: text("page_type").notNull(), viewport: text("viewport").notNull(), metric: text("metric").notNull(),
+  n: integer("n").notNull(), p25: real("p25"), p50: real("p50"), p75: real("p75"), shares: jsonb("shares"),
+  computedAt: timestamp("computed_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.industry, t.pageType, t.viewport, t.metric] })]);
