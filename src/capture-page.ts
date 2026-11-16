@@ -7,6 +7,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
+import { measureStyles, STYLE_THRESHOLDS, type BlockStyleC, type OutlineNodeC, type PageStylesC, type StyleResult } from './style-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
 
 export type ViewportName = 'desktop' | 'mobile';
@@ -31,14 +32,16 @@ export type CaptureOptions = {
   host?: string;
   /** Platform lane for the robots.txt request (Shopify throttles per IP across stores). */
   lane?: Lane;
+  /** Measure design metadata (SEC-31): pageStyles per viewport, style and outline per block. Off by default while it is proven. */
+  styles?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, styles: false };
 
-export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string };
+export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; style?: BlockStyleC; outline?: OutlineNodeC[] };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; ms: number }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; ms: number; pageStyles: PageStylesC | null; stylesError: string | null }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -266,6 +269,18 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     const meta = await page.evaluate(pageMeta);
     const links = opts.wantLinks ? await page.evaluate(collectLinks, 400).catch(() => [] as string[]) : [];
     const collected = await page.evaluate(collectBlocks, { minHeight: opts.minHeight, maxBlocks: opts.maxBlocks });
+    // Design metadata, while every block still carries its data-secref and nothing is hidden yet.
+    // A measuring failure never fails the page: the capture carries on without the new fields.
+    let styled: StyleResult | null = null;
+    let stylesError: string | null = null;
+    if (opts.styles && collected.blocks.length) {
+      styled = await page
+        .evaluate(measureStyles, { t: STYLE_THRESHOLDS, viewport: vp, pageType: pageType(new URL(page.url())) })
+        .catch((e: Error) => {
+          stylesError = e.message.split('\n')[0];
+          return null;
+        });
+    }
     // A page with nothing to cut up is a geo-block, a bot wall answering 200, or an empty shell. Keep what it says for the failure report.
     const emptyText = collected.blocks.length
       ? null
@@ -333,12 +348,12 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
         await loc.screenshot({ path: path.join(pageDir, file), type: 'jpeg', quality: opts.quality, animations: 'disabled', timeout: 30_000 });
         // Too tall for a JPEG comes out as an empty file rather than an error.
         if (!((await stat(path.join(pageDir, file)).catch(() => null))?.size || 0)) throw new Error('empty screenshot (block too tall for a JPEG?)');
-        blocks.push({ ...b, viewport: vp, file });
+        blocks.push({ ...b, viewport: vp, file, ...styled?.blocks[b.ref] });
       } catch (e) {
-        blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0] });
+        blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0], ...styled?.blocks[b.ref] });
       }
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, ms: Date.now() - t0 };
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
@@ -398,6 +413,7 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     page: { url: string; type: string; slug: string; capturedAt: string } & Partial<PageMeta>;
     viewports: Record<string, unknown>;
     blocks: CapturedBlock[];
+    pageStyles?: Partial<Record<ViewportName, PageStylesC>>;
   } = { site: { host, origin: u.origin }, page: { url, type, slug, capturedAt: new Date().toISOString() }, viewports: {}, blocks: [] };
 
   const vps: ViewportName[] = opts.only ? [opts.only] : ['desktop', 'mobile'];
@@ -417,7 +433,9 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     okCount++;
     const okBlocks = r.blocks.filter((b) => b.file).length;
     const themeName = r.site.theme && (r.site.theme as { name?: string }).name;
-    result.lines.push(`  ${vp}: ${r.site.platform}${themeName ? ' / ' + themeName : ''} · ${okBlocks}/${r.blocks.length} blocks (${r.strategy}) · ${(r.ms / 1000).toFixed(1)}s`);
+    const stylesNote = r.pageStyles ? ` · styles ${r.pageStyles.ms}ms${r.pageStyles.partial ? ' (partial)' : ''}` : r.stylesError ? ` · styles failed: ${r.stylesError}` : '';
+    result.lines.push(`  ${vp}: ${r.site.platform}${themeName ? ' / ' + themeName : ''} · ${okBlocks}/${r.blocks.length} blocks (${r.strategy}) · ${(r.ms / 1000).toFixed(1)}s${stylesNote}`);
+    if (r.pageStyles) (manifest.pageStyles ||= {})[vp] = r.pageStyles;
     manifest.viewports[vp] = { file: r.fullFile, width: VIEWPORTS[vp].width, fullHeight: r.fullHeight, strategy: r.strategy, status: r.status, ms: r.ms };
     if (!manifest.site.platform) Object.assign(manifest.site, r.site);
     if (!manifest.page.title) Object.assign(manifest.page, r.meta);

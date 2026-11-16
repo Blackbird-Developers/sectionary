@@ -15,6 +15,7 @@
 //   --stop-after N      stop after N stores (for testing)
 //   --enqueue-only      add to the queue, do not run
 //   --out data          where captures go          --db data/queue.sqlite
+//   --styles            also measure design metadata (SEC-31); off by default while it is proven
 //
 // It survives: a crash or a kill (the next start resumes; pages already
 // captured are not captured again), a hung page (hard time limit per
@@ -50,12 +51,13 @@ type Options = {
   stop: boolean;
   force: boolean;
   headed: boolean;
+  styles: boolean;
   out: string;
   db: string;
 };
 
 function parseArgs(argv: string[]): Options {
-  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, out: 'data', db: '' };
+  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, styles: false, out: 'data', db: '' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--seed') o.seed = argv[++i];
@@ -73,6 +75,7 @@ function parseArgs(argv: string[]): Options {
     else if (a === '--stop') o.stop = true;
     else if (a === '--force') o.force = true;
     else if (a === '--headed') o.headed = true;
+    else if (a === '--styles') o.styles = true;
     else if (a === '--out') o.out = argv[++i];
     else if (a === '--db') o.db = argv[++i];
     else {
@@ -469,7 +472,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', onStop);
   process.on('SIGTERM', onStop);
 
-  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out }, browser: getBrowser, log, stopping: isStopping };
+  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out, styles: opts.styles }, browser: getBrowser, log, stopping: isStopping };
   const todo = q.counts().pending || 0;
   console.log(`${todo} store(s) to capture, ${opts.parallel} at a time -> ${opts.out}/`);
 
