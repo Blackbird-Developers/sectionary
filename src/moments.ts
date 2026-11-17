@@ -435,6 +435,16 @@ async function addToCart(page: Page, ctx: MomentContext, out: MomentResult, t0: 
   // The main button by the brief's rules: never buy-now, a payment button, subscribe, pre-order or sold out.
   const atc = await page.evaluate(findAddToCart);
   if (!atc) return giveUp(out, ctx, 'add-to-cart', t0, 'no-atc');
+  // Only a Shopify theme's own product form: that cart is Shopify's, and /cart/clear.js empties it. A custom
+  // storefront on Shopify keeps its own cart, which clear.js cannot reach (absolutecollagen.com, 17 Nov 2026:
+  // /cart.js answers 404, its "Add" button put a different product in the bag, emptied by hand from its bag).
+  const themeCart = await page
+    .evaluate(() => {
+      const w = window as unknown as { Shopify?: { theme?: unknown } };
+      return !!w.Shopify?.theme && !!document.querySelector('[data-secmoment-atc="1"]')?.closest('form[action*="/cart/add"]');
+    })
+    .catch(() => false);
+  if (!themeCart) return giveUp(out, ctx, 'add-to-cart', t0, 'not-a-theme-cart');
   // Never a product with low stock: read around the product form, not the whole page (a site-wide banner may shout).
   const near = await page
     .evaluate(() => {

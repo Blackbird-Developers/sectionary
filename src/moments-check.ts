@@ -103,6 +103,8 @@ type CartCase = {
   soldOut?: boolean;
   /** "Only 2 left in stock" next to the button: never put in a cart. */
   lowStock?: boolean;
+  /** A custom storefront: no Shopify theme on the page and no /cart/add form, only a worded "Add" button. */
+  customStorefront?: boolean;
   platform?: string;
   want: { response?: string; confidence: 'high' | 'low'; error?: string; panelType?: string; cartDrawer?: boolean; filled: boolean; checkoutBlocked?: boolean; analyticsBlocked?: boolean };
 };
@@ -128,14 +130,22 @@ const WRAPPED: Partial<Record<CartCase['answer'], string>> = {
 function productPage(c: CartCase): string {
   const button = c.soldOut ? '<button type="submit" name="add" disabled>Sold out</button>' : '<button type="submit" name="add" style="width:300px;height:48px">Add to cart</button>';
   const add = c.answer === 'checkout' ? '' : "await fetch('/cart/add.js', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: [{ id: 111, quantity: 1 }] }) }); fetch('https://www.google-analytics.com/g/collect?en=add_to_cart').catch(function () {}); document.querySelector('.cart-count-bubble').textContent = '1';";
-  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font:16px sans-serif}</style></head><body>
+  // A Shopify theme carries window.Shopify.theme and a /cart/add form; a custom storefront has neither.
+  const theme = c.customStorefront ? '' : "<script>window.Shopify = { theme: { name: 'Test theme' } };</script>";
+  const form = c.customStorefront
+    ? '<div id="f"><button type="button" style="width:300px;height:48px">Add</button></div>'
+    : `<form action="/cart/add" method="post" id="f"><input type="hidden" name="id" value="111">${button}</form>`;
+  const wire = c.customStorefront
+    ? `document.querySelector('#f button').addEventListener('click', async function () { ${add} ${ANSWERS[c.answer]} });`
+    : `document.getElementById('f').addEventListener('submit', async function (e) { e.preventDefault(); ${add} ${ANSWERS[c.answer]} });`;
+  return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font:16px sans-serif}</style>${theme}</head><body>
     <header style="height:72px;display:flex;justify-content:space-between;align-items:center;padding:0 24px"><a href="/">Socks Co</a><span class="cart-count-bubble">0</span></header>
     <main style="padding:40px"><h1>Merino socks</h1><p>$18.00</p>${c.lowStock ? '<p>Only 2 left in stock</p>' : ''}
-      <form action="/cart/add" method="post" id="f"><input type="hidden" name="id" value="111">${button}</form>
+      ${form}
       <div class="shopify-payment-button"><button style="width:300px;height:48px">Buy it now</button></div>
     </main><section style="height:1600px"></section>
     ${WRAPPED[c.answer] ?? ''}
-    <script>document.getElementById('f').addEventListener('submit', async function (e) { e.preventDefault(); ${add} ${ANSWERS[c.answer]} });</script>
+    <script>${wire}</script>
   </body></html>`;
 }
 
@@ -149,6 +159,7 @@ const cartCases: CartCase[] = [
   { name: 'cart: a sold-out product is left alone', answer: 'drawer', soldOut: true, want: { confidence: 'low', error: 'no-atc', filled: false } },
   { name: 'cart: a product with low stock is left alone', answer: 'drawer', lowStock: true, want: { confidence: 'low', error: 'low-stock', filled: false } },
   { name: 'cart: not a Shopify store, never tried', answer: 'drawer', platform: 'woocommerce', want: { confidence: 'low', error: 'not-shopify', filled: false } },
+  { name: 'cart: a custom storefront on Shopify, never tried', answer: 'drawer', customStorefront: true, want: { confidence: 'low', error: 'not-a-theme-cart', filled: false } },
 ];
 
 async function runCart(browser: Browser, c: CartCase, dir: string): Promise<{ ok: boolean; said: string }> {
