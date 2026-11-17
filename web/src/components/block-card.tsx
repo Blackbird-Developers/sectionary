@@ -8,6 +8,7 @@ import { assetUrl } from "@/lib/data-source";
 import { blurOf, labelFor, thumbOf, type Block } from "@/lib/blocks";
 import { StoreIcon } from "@/components/store-icon";
 import { SaveToBoard } from "@/components/save-to-board";
+import { BlockClip } from "@/components/block-clip";
 import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 
 /**
@@ -48,6 +49,8 @@ export function BlockCard({
   priority?: boolean;
 }) {
   const [loaded, setLoaded] = useState(false);
+  // Hovered or focused: a block that moves plays its clip (BlockClip; touch screens play what is on screen instead).
+  const [hovering, setHovering] = useState(false);
   // A pointer passing over on its way somewhere is not intent; one that stays a moment is.
   const rest = useRef(0);
   useEffect(() => () => window.clearTimeout(rest.current), []);
@@ -80,6 +83,12 @@ export function BlockCard({
   const kind = labelFor(block.typeHint);
   return (
     <figure
+      onPointerEnter={() => setHovering(true)}
+      onPointerLeave={() => setHovering(false)}
+      onFocus={() => setHovering(true)}
+      onBlur={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setHovering(false);
+      }}
       className={cn(
         // No overflow clip here: the Save menu opens out of the card. The screenshot's own frame clips it.
         "group relative rounded-lg border bg-card transition-colors duration-150 hover:border-primary/60",
@@ -136,6 +145,14 @@ export function BlockCard({
               loaded ? "opacity-100 blur-0" : "opacity-0 blur-md",
               preview && PREVIEW_BLUR,
             )}
+          />
+          {/* A block that moves: its clip over the screenshot, playing while the card is hovered. Same scale on hover as the image. */}
+          <BlockClip
+            block={block}
+            active={hovering}
+            fit={fixed ? fit : "width"}
+            hidden={preview}
+            className="transition-[scale] duration-200 group-hover:scale-[1.02] group-focus-within:scale-[1.02]"
           />
           {/* A light veil so the white controls read on a white screenshot. */}
           <div

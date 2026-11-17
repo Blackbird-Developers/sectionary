@@ -6,6 +6,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, Check, Copy, ExternalLink, Link2, Loc
 import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { SaveToBoard } from "@/components/save-to-board";
+import { BlockClip } from "@/components/block-clip";
 import { useViewCheck, ViewLimitPanel } from "@/components/view-limit";
 import { useAccess } from "@/lib/account";
 import { ViewportSwitch } from "@/components/viewport-switch";
@@ -551,6 +552,8 @@ function Stage({ block }: { block: Block }) {
                 canZoom && (zoom ? "cursor-zoom-out" : "cursor-zoom-in"),
               )}
             />
+            {/* A block that moves plays its clip over the screenshot while it is on screen; clicks still zoom. */}
+            <BlockClip block={block} mode="view" />
           </div>
         )}
       </div>
