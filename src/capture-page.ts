@@ -7,6 +7,7 @@ import { mkdir, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
+import { measureStyles, STYLE_THRESHOLDS, type BlockStyleC, type OutlineNodeC, type PageStylesC, type StyleResult } from './style-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
 import { isEmptyCartBlock } from './empty-cart.js';
 import type { MomentKind } from '../web/src/contracts/manifest.js';
@@ -45,9 +46,11 @@ export type CaptureOptions = {
   momentsCartScope: CartScope;
   /** On a store's cart page: the cookies of the cart a product page filled, per viewport, so it shows its line item. */
   cartStates?: Partial<Record<ViewportName, HeldCart>>;
+  /** Measure design metadata (SEC-31): pageStyles per viewport, style and outline per block. Off by default while it is proven. */
+  styles?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own' };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false };
 
 let analyticsHosts: string[] | null = null;
 const ANALYTICS_HOSTS = () => (analyticsHosts ??= loadLines('config/analytics-hosts.txt'));
@@ -73,10 +76,10 @@ async function cartGate(polite: Politeness, url: string, host: string, opts: Cap
 type CartJob = { fill: boolean; held?: HeldCart };
 
 /** `moment` is set on the panel a moment revealed (a popup, an open menu), written after the page's own blocks. */
-export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind };
+export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[] };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -319,6 +322,18 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     const collected = await page.evaluate(collectBlocks, { minHeight: opts.minHeight, maxBlocks: opts.maxBlocks });
     // "Your cart is empty" is a state, not a cart design (src/empty-cart.ts). Before the block files are named.
     for (const b of collected.blocks) if (isEmptyCartBlock(kind, b.typeHint, b.text)) b.typeHint = 'empty-cart';
+    // Design metadata, while every block still carries its data-secref and nothing is hidden yet.
+    // A measuring failure never fails the page: the capture carries on without the new fields.
+    let styled: StyleResult | null = null;
+    let stylesError: string | null = null;
+    if (opts.styles && collected.blocks.length) {
+      styled = await page
+        .evaluate(measureStyles, { t: STYLE_THRESHOLDS, viewport: vp, pageType: pageType(new URL(page.url())) })
+        .catch((e: Error) => {
+          stylesError = e.message.split('\n')[0];
+          return null;
+        });
+    }
     // A page with nothing to cut up is a geo-block, a bot wall answering 200, or an empty shell. Keep what it says for the failure report.
     const emptyText = collected.blocks.length
       ? null
@@ -386,9 +401,9 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
         await loc.screenshot({ path: path.join(pageDir, file), type: 'jpeg', quality: opts.quality, animations: 'disabled', timeout: 30_000 });
         // Too tall for a JPEG comes out as an empty file rather than an error.
         if (!((await stat(path.join(pageDir, file)).catch(() => null))?.size || 0)) throw new Error('empty screenshot (block too tall for a JPEG?)');
-        blocks.push({ ...b, viewport: vp, file });
+        blocks.push({ ...b, viewport: vp, file, ...styled?.blocks[b.ref] });
       } catch (e) {
-        blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0] });
+        blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0], ...styled?.blocks[b.ref] });
       }
     }
     // Hook B: moments that change the page (open a menu, scroll to a sticky bar), now that every block is on disk.
@@ -404,7 +419,7 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       moments = done.moments;
       momentNotes = done.notes;
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0 };
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
@@ -494,6 +509,7 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     viewports: Record<string, unknown>;
     blocks: CapturedBlock[];
     moments?: CrawlerMoment[];
+    pageStyles?: Partial<Record<ViewportName, PageStylesC>>;
   } = { site: { host, origin: u.origin }, page: { url, type, slug, capturedAt: new Date().toISOString() }, viewports: {}, blocks: [] };
   // Present whenever moments were asked for, even if the store did nothing; absent otherwise, as before.
   if (opts.moments.length) manifest.moments = [];
@@ -547,7 +563,9 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     okCount++;
     const okBlocks = r.blocks.filter((b) => b.file).length;
     const themeName = r.site.theme && (r.site.theme as { name?: string }).name;
-    result.lines.push(`  ${vp}: ${r.site.platform}${themeName ? ' / ' + themeName : ''} · ${okBlocks}/${r.blocks.length} blocks (${r.strategy}) · ${(r.ms / 1000).toFixed(1)}s`);
+    const stylesNote = r.pageStyles ? ` · styles ${r.pageStyles.ms}ms${r.pageStyles.partial ? ' (partial)' : ''}` : r.stylesError ? ` · styles failed: ${r.stylesError}` : '';
+    result.lines.push(`  ${vp}: ${r.site.platform}${themeName ? ' / ' + themeName : ''} · ${okBlocks}/${r.blocks.length} blocks (${r.strategy}) · ${(r.ms / 1000).toFixed(1)}s${stylesNote}`);
+    if (r.pageStyles) (manifest.pageStyles ||= {})[vp] = r.pageStyles;
     manifest.viewports[vp] = { file: r.fullFile, width: VIEWPORTS[vp].width, fullHeight: r.fullHeight, strategy: r.strategy, status: r.status, ms: r.ms };
     if (!manifest.site.platform) Object.assign(manifest.site, r.site);
     if (!manifest.page.title) Object.assign(manifest.page, r.meta);

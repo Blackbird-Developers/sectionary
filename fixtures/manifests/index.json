@@ -133,6 +133,16 @@
     ]
   },
   {
+    "dir": "myzoobox.com/products-zoologist-club-styles",
+    "host": "myzoobox.com",
+    "platform": "shopify",
+    "pageType": "product",
+    "blocks": 10,
+    "shows": [
+      "design-metadata"
+    ]
+  },
+  {
     "dir": "nanit.com/collections-accessories",
     "host": "nanit.com",
     "platform": "shopify",

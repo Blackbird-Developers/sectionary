@@ -1,0 +1,2554 @@
+{
+  "site": {
+    "host": "myzoobox.com",
+    "origin": "https://myzoobox.com",
+    "platform": "shopify",
+    "theme": {
+      "name": "MZB Playful (Prime Day)",
+      "id": 164302749811,
+      "schema_name": "Dawn",
+      "schema_version": "15.2.0",
+      "theme_store_id": null,
+      "role": "main"
+    },
+    "builder": "pagefly",
+    "apps": [
+      "Klaviyo",
+      "Okendo",
+      "Yotpo",
+      "Microsoft Clarity",
+      "Google Analytics",
+      "Meta Pixel",
+      "Intelligems",
+      "Shop Pay",
+      "ActiveCampaign"
+    ],
+    "currency": "USD",
+    "locale": "en"
+  },
+  "page": {
+    "url": "https://myzoobox.com/products/zoologist-club-sibling-kit-easy-reader-3-month-plan",
+    "type": "product",
+    "slug": "products-zoologist-club-sibling-kit-easy-reader-3-month-plan",
+    "capturedAt": "2026-11-16T13:57:25.431Z",
+    "title": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan) – My ZOO Box",
+    "description": "My ZOO Box",
+    "canonical": "https://myzoobox.com/products/zoologist-club-sibling-kit-easy-reader-3-month-plan",
+    "ogImage": "http://myzoobox.com/cdn/shop/files/Zoologist-6Month-Subscription.jpg?v=1753091517",
+    "lang": "en",
+    "h1": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)"
+  },
+  "viewports": {
+    "desktop": {
+      "file": "desktop.jpg",
+      "width": 1440,
+      "fullHeight": 3686,
+      "strategy": "shopify-sections+refine",
+      "status": 200,
+      "ms": 26982
+    },
+    "mobile": {
+      "file": "mobile.jpg",
+      "width": 390,
+      "fullHeight": 5071,
+      "strategy": "shopify-sections+refine",
+      "status": 200,
+      "ms": 23262
+    }
+  },
+  "blocks": [
+    {
+      "ref": "b1",
+      "index": 1,
+      "typeHint": "header",
+      "parentType": null,
+      "tag": "div",
+      "id": "shopify-section-sections--23981793181811__header",
+      "classes": "shopify-section shopify-section-group-header-group section-header",
+      "top": 0,
+      "height": 112,
+      "width": 1440,
+      "text": "Early Black Friday: 14 boxes for the price of 12, plus a FREE binder on 3, 6 and 12-month plans See the offer → Subscriptions Gifting School Orders The ZOO Store FAQs Log in Start Now",
+      "textLength": 183,
+      "headline": null,
+      "buttons": 13,
+      "images": 51,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "desktop",
+      "file": "blocks/d-01-header.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 500,
+            "lineHeight": 1.35,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.43
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 600,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1a1a1a",
+            "share": 0.29
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 700,
+            "lineHeight": 1.35,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.11
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 600,
+            "lineHeight": 1.35,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.09
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.05
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 600,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1a1a1a",
+            "share": 0.03
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#ffffff",
+            "share": 0.68
+          },
+          {
+            "colour": "#1a1a1a",
+            "share": 0.32
+          }
+        ],
+        "accent": "#258d8f",
+        "border": null,
+        "contrastPass": 0.95,
+        "layout": {
+          "columns": 2,
+          "mediaSide": "left",
+          "width": "contained",
+          "contentWidth": 1320,
+          "padTop": 6,
+          "padBottom": 8,
+          "align": "center"
+        },
+        "radius": {
+          "button": 21.5,
+          "image": null,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 1,
+          "areaShare": 0.02,
+          "ratio": "1:1"
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": true,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "group",
+          "columns": 2,
+          "children": [
+            {
+              "type": "text",
+              "words": 20
+            },
+            {
+              "type": "badge"
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "columns": 3,
+          "children": [
+            {
+              "type": "image",
+              "ratio": "1:1",
+              "alt": true
+            },
+            {
+              "type": "link-list",
+              "count": 5
+            },
+            {
+              "type": "icon-row",
+              "count": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b2",
+      "index": 2,
+      "typeHint": "product",
+      "parentType": "main",
+      "tag": "div",
+      "id": null,
+      "classes": "product-page-grid",
+      "top": 152,
+      "height": 695,
+      "width": 1400,
+      "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan) $71.95 − + ADD TO CART Free Shipping On orders over $99 Secure Payment 100% protected transactions Easy Returns 30-day return policy Fast Email Support Get quick responses from our team via support email. SHARE THIS PRODUCT",
+      "textLength": 281,
+      "headline": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)",
+      "buttons": 8,
+      "images": 1,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "desktop",
+      "file": "blocks/d-02-product.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.37
+          },
+          {
+            "role": "heading-1",
+            "family": "Poppins",
+            "size": 36,
+            "weight": 900,
+            "lineHeight": 1.15,
+            "letterSpacing": -0.02,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.21
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.21
+          },
+          {
+            "role": "price",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.07
+          },
+          {
+            "role": "label",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.1,
+            "case": "uppercase",
+            "colour": "#1e3a5f",
+            "share": 0.07
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0.05,
+            "case": "uppercase",
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "role": "price",
+            "family": "Poppins",
+            "size": 36,
+            "weight": 900,
+            "lineHeight": 1,
+            "letterSpacing": 0.02,
+            "case": "none",
+            "colour": "#258d8f",
+            "share": 0.02
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#1e3a5f",
+            "share": 0.5
+          },
+          {
+            "colour": "#616161",
+            "share": 0.44
+          },
+          {
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "colour": "#258d8f",
+            "share": 0.02
+          }
+        ],
+        "accent": "#258d8f",
+        "border": null,
+        "contrastPass": 0.96,
+        "layout": {
+          "columns": 2,
+          "mediaSide": "left",
+          "width": "full",
+          "contentWidth": 1400,
+          "padTop": 0,
+          "padBottom": 15,
+          "align": "left"
+        },
+        "radius": {
+          "button": 10,
+          "image": 0,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 1,
+          "areaShare": 0.48,
+          "ratio": "1:1"
+        },
+        "commerce": {
+          "price": true,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": "Free Shipping On orders over $99",
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "group",
+          "columns": 2,
+          "children": [
+            {
+              "type": "image",
+              "ratio": "1:1",
+              "alt": true
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "heading",
+                  "level": 1,
+                  "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)"
+                },
+                {
+                  "type": "price",
+                  "compareAt": false
+                },
+                {
+                  "type": "form",
+                  "fields": [
+                    "number"
+                  ]
+                },
+                {
+                  "type": "text",
+                  "words": 2
+                },
+                {
+                  "type": "price",
+                  "compareAt": false
+                },
+                {
+                  "type": "text",
+                  "words": 25
+                },
+                {
+                  "type": "icon-row",
+                  "count": 4
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b3",
+      "index": 3,
+      "typeHint": "product",
+      "parentType": "main",
+      "tag": "div",
+      "id": null,
+      "classes": "product-tabs-container",
+      "top": 887,
+      "height": 181,
+      "width": 1400,
+      "text": "Description Reviews No description available.",
+      "textLength": 45,
+      "headline": null,
+      "buttons": 2,
+      "images": 0,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "desktop",
+      "file": "blocks/d-03-product.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 17,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.58
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 17,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#258d8f",
+            "share": 0.26
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 17,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#9e9e9e",
+            "share": 0.16
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#616161",
+            "share": 0.58
+          },
+          {
+            "colour": "#258d8f",
+            "share": 0.26
+          },
+          {
+            "colour": "#9e9e9e",
+            "share": 0.16
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0.58,
+        "layout": {
+          "columns": 1,
+          "mediaSide": "none",
+          "width": "full",
+          "contentWidth": 1400,
+          "padTop": 0,
+          "padBottom": 42,
+          "align": "left"
+        },
+        "radius": {
+          "button": 0,
+          "image": null,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 0,
+          "areaShare": 0,
+          "ratio": null
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "button",
+          "text": "Description",
+          "variant": 2
+        },
+        {
+          "type": "button",
+          "text": "Reviews",
+          "variant": null
+        },
+        {
+          "type": "text",
+          "words": 3
+        }
+      ]
+    },
+    {
+      "ref": "b4",
+      "index": 4,
+      "typeHint": "main-part",
+      "parentType": "main",
+      "tag": "div",
+      "id": "shop-by-age-pp",
+      "classes": "mzb-age-section-pp",
+      "top": 1108,
+      "height": 1674,
+      "width": 1400,
+      "text": "Get a New Animal Every Month! Find the perfect science adventure for your child. Ages 3–5 Play-based animal learning for little explorers, built to do together. Guided activities built for preschool attention spans Builds early skills like fine motor, early math, and early literacy Open-and-go learning with minimal prep EXPLORE CUB CLUB Learn more Ages 5–12 Real zoology + hands-on STEM for big thinkers who love to build and discover. Deeper animal science with anatomy, adaptations, and geography connections STEM projects and activities that build critical thinking Great for independent learners who ask \"why?\" EXPLORE ZOOLOGIST CLUB Learn more Not sure which to pick? If your child is not reading yet or needs letter reinforcement, start with Cub Club. If your child is reading, choose Zoologist Club for deeper science and anatomy. Newer reader? Add the Early Reader option to Zoologist Club.",
+      "textLength": 900,
+      "headline": "Get a New Animal Every Month!",
+      "buttons": 0,
+      "images": 10,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "desktop",
+      "file": "blocks/d-04-main-part.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 500,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#555555",
+            "share": 0.38
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 500,
+            "lineHeight": 1.4,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#555555",
+            "share": 0.21
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 500,
+            "lineHeight": 1.6,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#444444",
+            "share": 0.17
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 17,
+            "weight": 500,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#666666",
+            "share": 0.06
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "uppercase",
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": 1.4,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1a1a1a",
+            "share": 0.04
+          },
+          {
+            "role": "heading-3",
+            "family": "Poppins",
+            "size": 30,
+            "weight": 900,
+            "lineHeight": 1.2,
+            "letterSpacing": 0.01,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.03
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 18,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.03,
+            "case": "none",
+            "colour": "#e98442",
+            "share": 0.03
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#555555",
+            "share": 0.59
+          },
+          {
+            "colour": "#444444",
+            "share": 0.17
+          },
+          {
+            "colour": "#ffffff",
+            "share": 0.06
+          },
+          {
+            "colour": "#666666",
+            "share": 0.06
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0.89,
+        "layout": {
+          "columns": 2,
+          "mediaSide": "top",
+          "width": "full",
+          "contentWidth": 1400,
+          "padTop": 0,
+          "padBottom": 26,
+          "align": "center"
+        },
+        "radius": {
+          "button": null,
+          "image": 0,
+          "card": 24
+        },
+        "shadows": true,
+        "imagery": {
+          "count": 10,
+          "areaShare": 0.4,
+          "ratio": "4:3"
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "heading",
+          "level": 3,
+          "text": "Get a New Animal Every Month!"
+        },
+        {
+          "type": "text",
+          "words": 8
+        },
+        {
+          "type": "group",
+          "columns": 2,
+          "children": [
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "image",
+                  "ratio": "3:2",
+                  "alt": true
+                },
+                {
+                  "type": "image",
+                  "ratio": "4:3",
+                  "alt": true,
+                  "count": 3,
+                  "columns": 3
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "text",
+                  "words": 2
+                },
+                {
+                  "type": "image",
+                  "ratio": "21:9",
+                  "alt": true
+                },
+                {
+                  "type": "text",
+                  "words": 38
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "image",
+          "ratio": "3:2",
+          "alt": true
+        },
+        {
+          "type": "image",
+          "ratio": "4:3",
+          "alt": true,
+          "count": 3,
+          "columns": 3
+        },
+        {
+          "type": "text",
+          "words": 2
+        },
+        {
+          "type": "image",
+          "ratio": "21:9",
+          "alt": true
+        },
+        {
+          "type": "text",
+          "words": 86
+        }
+      ]
+    },
+    {
+      "ref": "b5",
+      "index": 5,
+      "typeHint": "footer",
+      "parentType": null,
+      "tag": "div",
+      "id": "shopify-section-sections--23981793083507__footer",
+      "classes": "shopify-section shopify-section-group-footer-group",
+      "top": 2822,
+      "height": 864,
+      "width": 1440,
+      "text": "Stay Wild, Join the ZOOmmunity! Get exclusive deals, animal fun facts, and be the first to know about new Animal Adventures. Sign Up By signing up, you agree to our Terms and Privacy Policy. Hands-on animal adventures, delivered monthly. Inspiring curiosity & sparking conservation. Learn More About My ZOO Box FAQs School Orders EMPOWER Foundation Gift Guide Meet the Pangolin Contact Us Affiliates & Partnerships My ZOO Box Clubs Cub Club Ages 3 to 5 Zoologist Club Ages 5 to 12 The ZOO Store One-Time Boxes Digital Unit Studies Shop All Support Contact Us Help & FAQs © 2026 My ZOO Box | All Rights Reserved Privacy Policy Cookie Policy Terms and Conditions",
+      "textLength": 660,
+      "headline": "Stay Wild, Join the ZOOmmunity!",
+      "buttons": 1,
+      "images": 5,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "desktop",
+      "file": "blocks/d-05-footer.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 450,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#666666",
+            "share": 0.28
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 400,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#d3e8e9",
+            "share": 0.2
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 400,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#888888",
+            "share": 0.15
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#999999",
+            "share": 0.07
+          },
+          {
+            "role": "heading-4",
+            "family": "Happy Monkey",
+            "size": 14,
+            "weight": 400,
+            "lineHeight": 1.3,
+            "letterSpacing": 0.01,
+            "case": "none",
+            "colour": "#333333",
+            "share": 0.07
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#999999",
+            "share": 0.06
+          },
+          {
+            "role": "heading-3",
+            "family": "Happy Monkey",
+            "size": 24,
+            "weight": 400,
+            "lineHeight": 1.3,
+            "letterSpacing": -0.01,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.05
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#888888",
+            "share": 0.04
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#666666",
+            "share": 0.28
+          },
+          {
+            "colour": "#d3e8e9",
+            "share": 0.2
+          },
+          {
+            "colour": "#888888",
+            "share": 0.18
+          },
+          {
+            "colour": "#999999",
+            "share": 0.14
+          }
+        ],
+        "accent": "#ffffff",
+        "border": null,
+        "contrastPass": 0.45,
+        "layout": {
+          "columns": 5,
+          "mediaSide": "top",
+          "width": "contained",
+          "contentWidth": 1200,
+          "padTop": 48,
+          "padBottom": 20,
+          "align": "center"
+        },
+        "radius": {
+          "button": 29.5,
+          "image": null,
+          "card": null
+        },
+        "shadows": true,
+        "imagery": {
+          "count": 2,
+          "areaShare": 0.01,
+          "ratio": "1:1"
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "image",
+          "ratio": "1:1",
+          "alt": false
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "text": "Stay Wild, Join the ZOOmmunity!"
+        },
+        {
+          "type": "text",
+          "words": 16
+        },
+        {
+          "type": "form",
+          "fields": [
+            "email"
+          ]
+        },
+        {
+          "type": "text",
+          "words": 11
+        },
+        {
+          "type": "group",
+          "columns": 5,
+          "children": [
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "image",
+                  "ratio": "1:1",
+                  "alt": true
+                },
+                {
+                  "type": "text",
+                  "words": 10
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "heading",
+                  "level": 4,
+                  "text": "Learn More"
+                },
+                {
+                  "type": "link-list",
+                  "count": 8
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "heading",
+                  "level": 4,
+                  "text": "My ZOO Box Clubs"
+                },
+                {
+                  "type": "text",
+                  "words": 12
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "heading",
+                  "level": 4,
+                  "text": "The ZOO Store"
+                },
+                {
+                  "type": "link-list",
+                  "count": 3
+                }
+              ]
+            },
+            {
+              "type": "group",
+              "children": [
+                {
+                  "type": "heading",
+                  "level": 4,
+                  "text": "Support"
+                },
+                {
+                  "type": "link-list",
+                  "count": 2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "group",
+          "columns": 2,
+          "children": [
+            {
+              "type": "text",
+              "words": 9
+            },
+            {
+              "type": "link-list",
+              "count": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b1",
+      "index": 1,
+      "typeHint": "header",
+      "parentType": null,
+      "tag": "div",
+      "id": "shopify-section-sections--23981793181811__header",
+      "classes": "shopify-section shopify-section-group-header-group section-header",
+      "top": 0,
+      "height": 107,
+      "width": 390,
+      "text": "Early Black Friday: 14 boxes for the price of 12 + FREE binder See the offer ×",
+      "textLength": 78,
+      "headline": null,
+      "buttons": 13,
+      "images": 51,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "mobile",
+      "file": "blocks/m-01-header.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 500,
+            "lineHeight": 1.4,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.57
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 700,
+            "lineHeight": 1.4,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.26
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 11,
+            "weight": 600,
+            "lineHeight": 1.4,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.18
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#ffffff",
+            "share": 1
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0,
+        "layout": {
+          "columns": 3,
+          "mediaSide": "none",
+          "width": "contained",
+          "contentWidth": 302,
+          "padTop": 7,
+          "padBottom": 66,
+          "align": "center"
+        },
+        "radius": {
+          "button": null,
+          "image": null,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 0,
+          "areaShare": 0,
+          "ratio": null
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "group",
+          "columns": 3,
+          "count": 3,
+          "children": [
+            {
+              "type": "text",
+              "words": 13
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ref": "b2",
+      "index": 2,
+      "typeHint": "product",
+      "parentType": "main",
+      "tag": "div",
+      "id": null,
+      "classes": "product-page-grid",
+      "top": 127,
+      "height": 1101,
+      "width": 375,
+      "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan) $71.95 − + ADD TO CART Free Shipping On orders over $99 Secure Payment 100% protected transactions Easy Returns 30-day return policy Fast Email Support Get quick responses from our team via support email. SHARE THIS PRODUCT",
+      "textLength": 281,
+      "headline": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)",
+      "buttons": 8,
+      "images": 1,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "mobile",
+      "file": "blocks/m-02-product.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.37
+          },
+          {
+            "role": "heading-1",
+            "family": "Poppins",
+            "size": 36,
+            "weight": 900,
+            "lineHeight": 1.15,
+            "letterSpacing": -0.02,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.21
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.21
+          },
+          {
+            "role": "price",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.07
+          },
+          {
+            "role": "label",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.1,
+            "case": "uppercase",
+            "colour": "#1e3a5f",
+            "share": 0.07
+          },
+          {
+            "role": "label",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0.05,
+            "case": "uppercase",
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "role": "price",
+            "family": "Poppins",
+            "size": 36,
+            "weight": 900,
+            "lineHeight": 1,
+            "letterSpacing": 0.02,
+            "case": "none",
+            "colour": "#258d8f",
+            "share": 0.02
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#1e3a5f",
+            "share": 0.5
+          },
+          {
+            "colour": "#616161",
+            "share": 0.44
+          },
+          {
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "colour": "#258d8f",
+            "share": 0.02
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0.96,
+        "layout": {
+          "columns": 1,
+          "mediaSide": "top",
+          "width": "full",
+          "contentWidth": 375,
+          "padTop": 0,
+          "padBottom": 48,
+          "align": "left"
+        },
+        "radius": {
+          "button": null,
+          "image": 0,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 1,
+          "areaShare": 0.26,
+          "ratio": "1:1"
+        },
+        "commerce": {
+          "price": true,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": "Free Shipping On orders over $99",
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "image",
+          "ratio": "1:1",
+          "alt": true
+        },
+        {
+          "type": "heading",
+          "level": 1,
+          "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)"
+        },
+        {
+          "type": "price",
+          "compareAt": false
+        },
+        {
+          "type": "form",
+          "fields": [
+            "number"
+          ]
+        },
+        {
+          "type": "text",
+          "words": 2
+        },
+        {
+          "type": "price",
+          "compareAt": false
+        },
+        {
+          "type": "text",
+          "words": 25
+        },
+        {
+          "type": "icon-row",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "ref": "b3",
+      "index": 3,
+      "typeHint": "product",
+      "parentType": "main",
+      "tag": "div",
+      "id": null,
+      "classes": "product-tabs-container",
+      "top": 1268,
+      "height": 175,
+      "width": 375,
+      "text": "Description Reviews No description available.",
+      "textLength": 45,
+      "headline": null,
+      "buttons": 2,
+      "images": 0,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "mobile",
+      "file": "blocks/m-03-product.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 17,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#616161",
+            "share": 0.58
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#258d8f",
+            "share": 0.26
+          },
+          {
+            "role": "button",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 700,
+            "lineHeight": null,
+            "letterSpacing": 0,
+            "case": "none",
+            "colour": "#9e9e9e",
+            "share": 0.16
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#616161",
+            "share": 0.58
+          },
+          {
+            "colour": "#258d8f",
+            "share": 0.26
+          },
+          {
+            "colour": "#9e9e9e",
+            "share": 0.16
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0.58,
+        "layout": {
+          "columns": 1,
+          "mediaSide": "none",
+          "width": "full",
+          "contentWidth": 375,
+          "padTop": 0,
+          "padBottom": 42,
+          "align": "left"
+        },
+        "radius": {
+          "button": 0,
+          "image": null,
+          "card": null
+        },
+        "shadows": false,
+        "imagery": {
+          "count": 0,
+          "areaShare": 0,
+          "ratio": null
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "button",
+          "text": "Description",
+          "variant": 0
+        },
+        {
+          "type": "button",
+          "text": "Reviews",
+          "variant": 1
+        },
+        {
+          "type": "text",
+          "words": 3
+        }
+      ]
+    },
+    {
+      "ref": "b4",
+      "index": 4,
+      "typeHint": "main-part",
+      "parentType": "main",
+      "tag": "div",
+      "id": "shop-by-age-pp",
+      "classes": "mzb-age-section-pp",
+      "top": 1468,
+      "height": 1988,
+      "width": 375,
+      "text": "Get a New Animal Every Month! Find the perfect science adventure for your child. Ages 3–5 Play-based animal learning for little explorers, built to do together. Guided activities built for preschool attention spans Builds early skills like fine motor, early math, and early literacy Open-and-go learning with minimal prep EXPLORE CUB CLUB Learn more Ages 5–12 Real zoology + hands-on STEM for big thinkers who love to build and discover. Deeper animal science with anatomy, adaptations, and geography connections STEM projects and activities that build critical thinking Great for independent learners who ask \"why?\" EXPLORE ZOOLOGIST CLUB Learn more Not sure which to pick? If your child is not reading yet or needs letter reinforcement, start with Cub Club. If your child is reading, choose Zoologist Club for deeper science and anatomy. Newer reader? Add the Early Reader option to Zoologist Club.",
+      "textLength": 900,
+      "headline": "Get a New Animal Every Month!",
+      "buttons": 0,
+      "images": 10,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "mobile",
+      "file": "blocks/m-04-main-part.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 500,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#555555",
+            "share": 0.38
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 500,
+            "lineHeight": 1.4,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#555555",
+            "share": 0.21
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 500,
+            "lineHeight": 1.6,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#444444",
+            "share": 0.17
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 15,
+            "weight": 500,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#666666",
+            "share": 0.06
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "uppercase",
+            "colour": "#ffffff",
+            "share": 0.04
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 700,
+            "lineHeight": 1.4,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#1a1a1a",
+            "share": 0.04
+          },
+          {
+            "role": "heading-3",
+            "family": "Poppins",
+            "size": 26,
+            "weight": 900,
+            "lineHeight": 1.2,
+            "letterSpacing": 0.01,
+            "case": "none",
+            "colour": "#1e3a5f",
+            "share": 0.03
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 16,
+            "weight": 700,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#e98442",
+            "share": 0.03
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#555555",
+            "share": 0.59
+          },
+          {
+            "colour": "#444444",
+            "share": 0.17
+          },
+          {
+            "colour": "#ffffff",
+            "share": 0.06
+          },
+          {
+            "colour": "#666666",
+            "share": 0.06
+          }
+        ],
+        "accent": null,
+        "border": null,
+        "contrastPass": 0.89,
+        "layout": {
+          "columns": 1,
+          "mediaSide": "top",
+          "width": "full",
+          "contentWidth": 375,
+          "padTop": 0,
+          "padBottom": 20,
+          "align": "center"
+        },
+        "radius": {
+          "button": null,
+          "image": 0,
+          "card": 24
+        },
+        "shadows": true,
+        "imagery": {
+          "count": 8,
+          "areaShare": 0.36,
+          "ratio": "4:3"
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "heading",
+          "level": 3,
+          "text": "Get a New Animal Every Month!"
+        },
+        {
+          "type": "text",
+          "words": 8
+        },
+        {
+          "type": "image",
+          "ratio": "3:2",
+          "alt": true
+        },
+        {
+          "type": "image",
+          "ratio": "4:3",
+          "alt": true,
+          "count": 3,
+          "columns": 3
+        },
+        {
+          "type": "text",
+          "words": 40
+        },
+        {
+          "type": "image",
+          "ratio": "3:2",
+          "alt": true
+        },
+        {
+          "type": "image",
+          "ratio": "4:3",
+          "alt": true,
+          "count": 3,
+          "columns": 3
+        },
+        {
+          "type": "text",
+          "words": 88
+        }
+      ]
+    },
+    {
+      "ref": "b5",
+      "index": 5,
+      "typeHint": "footer",
+      "parentType": null,
+      "tag": "div",
+      "id": "shopify-section-sections--23981793083507__footer",
+      "classes": "shopify-section shopify-section-group-footer-group",
+      "top": 3476,
+      "height": 1595,
+      "width": 390,
+      "text": "Stay Wild, Join the ZOOmmunity! Get exclusive deals, animal fun facts, and be the first to know about new Animal Adventures. Sign Up By signing up, you agree to our Terms and Privacy Policy. Hands-on animal adventures, delivered monthly. Inspiring curiosity & sparking conservation. Learn More About My ZOO Box FAQs School Orders EMPOWER Foundation Gift Guide Meet the Pangolin Contact Us Affiliates & Partnerships My ZOO Box Clubs Cub Club Ages 3 to 5 Zoologist Club Ages 5 to 12 The ZOO Store One-Time Boxes Digital Unit Studies Shop All Support Contact Us Help & FAQs © 2026 My ZOO Box | All Rights Reserved Privacy Policy Cookie Policy Terms and Conditions",
+      "textLength": 660,
+      "headline": "Stay Wild, Join the ZOOmmunity!",
+      "buttons": 1,
+      "images": 5,
+      "videos": 0,
+      "bg": "rgb(255, 255, 255)",
+      "viewport": "mobile",
+      "file": "blocks/m-05-footer.jpg",
+      "style": {
+        "type": [
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 450,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#666666",
+            "share": 0.28
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 14,
+            "weight": 400,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.04,
+            "case": "none",
+            "colour": "#d3e8e9",
+            "share": 0.2
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 13,
+            "weight": 400,
+            "lineHeight": 1.5,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#888888",
+            "share": 0.15
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#999999",
+            "share": 0.07
+          },
+          {
+            "role": "heading-4",
+            "family": "Happy Monkey",
+            "size": 14,
+            "weight": 400,
+            "lineHeight": 1.3,
+            "letterSpacing": 0.01,
+            "case": "none",
+            "colour": "#333333",
+            "share": 0.07
+          },
+          {
+            "role": "body",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#999999",
+            "share": 0.06
+          },
+          {
+            "role": "heading-3",
+            "family": "Happy Monkey",
+            "size": 18,
+            "weight": 400,
+            "lineHeight": 1.3,
+            "letterSpacing": -0.02,
+            "case": "none",
+            "colour": "#ffffff",
+            "share": 0.05
+          },
+          {
+            "role": "link",
+            "family": "Poppins",
+            "size": 12,
+            "weight": 400,
+            "lineHeight": 1.8,
+            "letterSpacing": 0.05,
+            "case": "none",
+            "colour": "#888888",
+            "share": 0.04
+          }
+        ],
+        "background": {
+          "kind": "colour",
+          "colour": "#ffffff"
+        },
+        "textColours": [
+          {
+            "colour": "#666666",
+            "share": 0.28
+          },
+          {
+            "colour": "#d3e8e9",
+            "share": 0.2
+          },
+          {
+            "colour": "#888888",
+            "share": 0.18
+          },
+          {
+            "colour": "#999999",
+            "share": 0.14
+          }
+        ],
+        "accent": "#ffffff",
+        "border": null,
+        "contrastPass": 0.4,
+        "layout": {
+          "columns": 1,
+          "mediaSide": "top",
+          "width": "contained",
+          "contentWidth": 358,
+          "padTop": 32,
+          "padBottom": 16,
+          "align": "center"
+        },
+        "radius": {
+          "button": 29.5,
+          "image": null,
+          "card": null
+        },
+        "shadows": true,
+        "imagery": {
+          "count": 2,
+          "areaShare": 0.01,
+          "ratio": "1:1"
+        },
+        "commerce": {
+          "price": false,
+          "compareAt": false,
+          "discount": null,
+          "rating": null,
+          "freeShipping": null,
+          "subscription": false,
+          "urgency": false,
+          "paymentBadges": false,
+          "products": 0,
+          "gridColumns": null
+        }
+      },
+      "outline": [
+        {
+          "type": "image",
+          "ratio": "1:1",
+          "alt": false
+        },
+        {
+          "type": "heading",
+          "level": 3,
+          "text": "Stay Wild, Join the ZOOmmunity!"
+        },
+        {
+          "type": "text",
+          "words": 16
+        },
+        {
+          "type": "form",
+          "fields": [
+            "email"
+          ]
+        },
+        {
+          "type": "text",
+          "words": 11
+        },
+        {
+          "type": "image",
+          "ratio": "1:1",
+          "alt": true
+        },
+        {
+          "type": "text",
+          "words": 10
+        },
+        {
+          "type": "heading",
+          "level": 4,
+          "text": "Learn More"
+        },
+        {
+          "type": "link-list",
+          "count": 8
+        },
+        {
+          "type": "heading",
+          "level": 4,
+          "text": "My ZOO Box Clubs"
+        },
+        {
+          "type": "text",
+          "words": 12
+        },
+        {
+          "type": "heading",
+          "level": 4,
+          "text": "The ZOO Store"
+        },
+        {
+          "type": "link-list",
+          "count": 3
+        },
+        {
+          "type": "heading",
+          "level": 4,
+          "text": "Support"
+        },
+        {
+          "type": "link-list",
+          "count": 2
+        },
+        {
+          "type": "text",
+          "words": 9
+        },
+        {
+          "type": "link-list",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "pageStyles": {
+    "desktop": {
+      "version": 1,
+      "partial": false,
+      "ms": 33,
+      "chars": 2001,
+      "typography": {
+        "families": [
+          {
+            "family": "Poppins",
+            "share": 0.96,
+            "roles": [
+              "heading",
+              "body",
+              "button"
+            ]
+          },
+          {
+            "family": "Happy Monkey",
+            "share": 0.04,
+            "roles": [
+              "heading"
+            ]
+          }
+        ],
+        "scale": [
+          {
+            "size": 12,
+            "share": 0.062
+          },
+          {
+            "size": 13,
+            "share": 0.101
+          },
+          {
+            "size": 14,
+            "share": 0.129
+          },
+          {
+            "size": 15,
+            "share": 0.349
+          },
+          {
+            "size": 16,
+            "share": 0.239
+          },
+          {
+            "size": 17,
+            "share": 0.046
+          },
+          {
+            "size": 18,
+            "share": 0.011
+          },
+          {
+            "size": 24,
+            "share": 0.015
+          },
+          {
+            "size": 30,
+            "share": 0.014
+          },
+          {
+            "size": 36,
+            "share": 0.031
+          }
+        ],
+        "bodySize": 15,
+        "bodyLineHeight": 1.5,
+        "headingRatios": [
+          1.33,
+          1.93
+        ],
+        "weights": [
+          400,
+          450,
+          500,
+          600,
+          700,
+          900
+        ],
+        "headingUppercaseShare": 0
+      },
+      "headings": {
+        "levels": [
+          {
+            "level": 1,
+            "count": 1,
+            "size": 36,
+            "weight": 900,
+            "family": "Poppins",
+            "uppercaseShare": 0,
+            "length": 57
+          },
+          {
+            "level": 2,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          },
+          {
+            "level": 3,
+            "count": 2,
+            "size": 27,
+            "weight": 650,
+            "family": "Poppins",
+            "uppercaseShare": 0,
+            "length": 30
+          },
+          {
+            "level": 4,
+            "count": 4,
+            "size": 14,
+            "weight": 400,
+            "family": "Happy Monkey",
+            "uppercaseShare": 0,
+            "length": 11.5
+          },
+          {
+            "level": 5,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          },
+          {
+            "level": 6,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          }
+        ],
+        "h1Count": 1,
+        "skips": 1,
+        "styledNotMarked": 0,
+        "share": 0.08,
+        "perScreen": 1.71
+      },
+      "colour": {
+        "palette": [
+          {
+            "role": "background",
+            "colour": "#ffffff",
+            "share": 1
+          },
+          {
+            "role": "text",
+            "colour": "#555555",
+            "share": 0.26
+          },
+          {
+            "role": "text-muted",
+            "colour": "#666666",
+            "share": 0.19
+          },
+          {
+            "role": "accent",
+            "colour": "#258d8f",
+            "share": 0.4
+          },
+          {
+            "role": "accent-text",
+            "colour": "#ffffff",
+            "share": 1
+          },
+          {
+            "role": "border",
+            "colour": "#51a4a5",
+            "share": 1
+          },
+          {
+            "role": "link",
+            "colour": "#666666",
+            "share": 0.34
+          }
+        ],
+        "hues": 3,
+        "contrastPass": 0.76
+      },
+      "buttons": {
+        "variants": [
+          {
+            "background": "#258d8f",
+            "text": "#ffffff",
+            "border": null,
+            "radius": 21.5,
+            "height": 43,
+            "paddingX": 22,
+            "fontSize": 14,
+            "weight": 700,
+            "case": "none",
+            "count": 1
+          },
+          {
+            "background": "#258d8f",
+            "text": "#ffffff",
+            "border": null,
+            "radius": 10,
+            "height": 53,
+            "paddingX": 28,
+            "fontSize": 16,
+            "weight": 700,
+            "case": "uppercase",
+            "count": 1
+          },
+          {
+            "background": null,
+            "text": "#258d8f",
+            "border": null,
+            "radius": 0,
+            "height": 49,
+            "paddingX": 0,
+            "fontSize": 17,
+            "weight": 700,
+            "case": "none",
+            "count": 1
+          }
+        ],
+        "primary": 1,
+        "labels": [
+          "Start Now",
+          "ADD TO CART",
+          "Description",
+          "Reviews",
+          "Sign Up"
+        ]
+      },
+      "shape": {
+        "radius": {
+          "button": 10,
+          "image": 0,
+          "card": 24,
+          "input": 6
+        },
+        "label": "rounded",
+        "shadows": true
+      },
+      "spacing": {
+        "contentWidth": 1260,
+        "gutter": 20,
+        "blockPadding": 13,
+        "baseUnit": null
+      },
+      "layout": {
+        "screens": 4.1,
+        "blocks": 5,
+        "wordsPerScreen": 84,
+        "imagesPerScreen": 3.42,
+        "imageryShare": 0.27,
+        "gridColumns": null
+      },
+      "components": {
+        "forms": 2,
+        "inputs": 2,
+        "accordions": 0,
+        "carousels": 0,
+        "tabs": 0,
+        "tables": 0,
+        "videos": 0,
+        "sticky": 1
+      },
+      "accessibility": {
+        "altShare": 1,
+        "headingOrderValid": false,
+        "contrastPass": 0.76,
+        "lang": true,
+        "labelledInputs": 0.5,
+        "tapTargets": null
+      }
+    },
+    "mobile": {
+      "version": 1,
+      "partial": false,
+      "ms": 31,
+      "chars": 1901,
+      "typography": {
+        "families": [
+          {
+            "family": "Poppins",
+            "share": 0.96,
+            "roles": [
+              "heading",
+              "body",
+              "button"
+            ]
+          },
+          {
+            "family": "Happy Monkey",
+            "share": 0.04,
+            "roles": [
+              "heading"
+            ]
+          }
+        ],
+        "scale": [
+          {
+            "size": 11,
+            "share": 0.007
+          },
+          {
+            "size": 12,
+            "share": 0.098
+          },
+          {
+            "size": 13,
+            "share": 0.109
+          },
+          {
+            "size": 14,
+            "share": 0.545
+          },
+          {
+            "size": 15,
+            "share": 0.141
+          },
+          {
+            "size": 16,
+            "share": 0.022
+          },
+          {
+            "size": 17,
+            "share": 0.013
+          },
+          {
+            "size": 18,
+            "share": 0.016
+          },
+          {
+            "size": 26,
+            "share": 0.015
+          },
+          {
+            "size": 36,
+            "share": 0.033
+          }
+        ],
+        "bodySize": 14,
+        "bodyLineHeight": 1.5,
+        "headingRatios": [
+          1.64,
+          1.57
+        ],
+        "weights": [
+          400,
+          450,
+          500,
+          600,
+          700,
+          900
+        ],
+        "headingUppercaseShare": 0
+      },
+      "headings": {
+        "levels": [
+          {
+            "level": 1,
+            "count": 1,
+            "size": 36,
+            "weight": 900,
+            "family": "Poppins",
+            "uppercaseShare": 0,
+            "length": 57
+          },
+          {
+            "level": 2,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          },
+          {
+            "level": 3,
+            "count": 2,
+            "size": 22,
+            "weight": 650,
+            "family": "Poppins",
+            "uppercaseShare": 0,
+            "length": 30
+          },
+          {
+            "level": 4,
+            "count": 4,
+            "size": 14,
+            "weight": 400,
+            "family": "Happy Monkey",
+            "uppercaseShare": 0,
+            "length": 11.5
+          },
+          {
+            "level": 5,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          },
+          {
+            "level": 6,
+            "count": 0,
+            "size": null,
+            "weight": null,
+            "family": null,
+            "uppercaseShare": null,
+            "length": null
+          }
+        ],
+        "h1Count": 1,
+        "skips": 1,
+        "styledNotMarked": 0,
+        "share": 0.09,
+        "perScreen": 1.17
+      },
+      "colour": {
+        "palette": [
+          {
+            "role": "background",
+            "colour": "#ffffff",
+            "share": 1
+          },
+          {
+            "role": "text",
+            "colour": "#555555",
+            "share": 0.28
+          },
+          {
+            "role": "text-muted",
+            "colour": "#666666",
+            "share": 0.2
+          },
+          {
+            "role": "accent",
+            "colour": "#bedddd",
+            "share": 0.05
+          },
+          {
+            "role": "border",
+            "colour": "#51a4a5",
+            "share": 1
+          },
+          {
+            "role": "link",
+            "colour": "#666666",
+            "share": 0.47
+          }
+        ],
+        "hues": 3,
+        "contrastPass": 0.7
+      },
+      "buttons": {
+        "variants": [
+          {
+            "background": null,
+            "text": "#258d8f",
+            "border": null,
+            "radius": 0,
+            "height": 44,
+            "paddingX": 0,
+            "fontSize": 15,
+            "weight": 700,
+            "case": "none",
+            "count": 1
+          },
+          {
+            "background": null,
+            "text": "#9e9e9e",
+            "border": null,
+            "radius": 0,
+            "height": 44,
+            "paddingX": 0,
+            "fontSize": 15,
+            "weight": 700,
+            "case": "none",
+            "count": 1
+          },
+          {
+            "background": "#ffffff",
+            "text": "#1a1a1a",
+            "border": "#1a1a1a",
+            "radius": 29.5,
+            "height": 59,
+            "paddingX": 30,
+            "fontSize": 16,
+            "weight": 700,
+            "case": "none",
+            "count": 1
+          }
+        ],
+        "primary": 2,
+        "labels": [
+          "Description",
+          "Reviews",
+          "Sign Up"
+        ]
+      },
+      "shape": {
+        "radius": {
+          "button": 0,
+          "image": 0,
+          "card": 24,
+          "input": 6
+        },
+        "label": "sharp",
+        "shadows": true
+      },
+      "spacing": {
+        "contentWidth": 330,
+        "gutter": 8,
+        "blockPadding": 24,
+        "baseUnit": null
+      },
+      "layout": {
+        "screens": 6,
+        "blocks": 5,
+        "wordsPerScreen": 54,
+        "imagesPerScreen": 1.83,
+        "imageryShare": 0.19,
+        "gridColumns": null
+      },
+      "components": {
+        "forms": 2,
+        "inputs": 2,
+        "accordions": 0,
+        "carousels": 0,
+        "tabs": 0,
+        "tables": 0,
+        "videos": 0,
+        "sticky": 1
+      },
+      "accessibility": {
+        "altShare": 1,
+        "headingOrderValid": false,
+        "contrastPass": 0.7,
+        "lang": true,
+        "labelledInputs": 0.5,
+        "tapTargets": 0.23
+      }
+    }
+  }
+}

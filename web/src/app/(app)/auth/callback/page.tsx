@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Sign in", robots: { index: false } }
 export default function CallbackPage() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6 sm:py-12">
-      <h1 className="font-heading text-[22px] font-semibold">Sign in to Blimp</h1>
+      <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Sign in to Blimp</h1>
       <CallbackSignIn />
     </div>
   );

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { currentUser, safeNext } from "@/server/auth";
 import { authConfigured } from "@/server/supabase-auth";
-import { accessOf, freeDailyViews, inTrial, priceIds, viewLimit } from "@/server/plans";
+import { accessOf, can, freeDailyViews, inTrial, priceIds, viewLimit } from "@/server/plans";
+import { listApiKeys, MAX_KEYS } from "@/server/api-keys";
+import { configuredOrigin } from "@/server/site-url";
+import { ApiKeysCard } from "@/components/api-keys-card";
 import QRCode from "qrcode";
 import { otpauthUrl, twoStepConfigured } from "@/server/totp";
 import { pendingSetupSecret, recoveryCodesLeft } from "@/server/two-step";
@@ -33,7 +36,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6 sm:py-12">
         <div>
-          <h1 className="font-heading text-[22px] font-semibold">Sign in</h1>
+          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Sign in</h1>
           <p className="mt-1 text-[14px] text-muted-foreground text-pretty">No password. We email you a link and a code; either one signs you in.</p>
         </div>
         {authConfigured() ? (
@@ -55,12 +58,17 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     if (secret) setup = { secret, qrSvg: await QRCode.toString(otpauthUrl(secret, user.email), { type: "svg", margin: 0, errorCorrectionLevel: "M", color: { dark: "#000000", light: "#ffffff" } }) };
   }
   const billingNote = typeof params.billing === "string" ? BILLING_NOTE[params.billing] : undefined;
+  // Null hides the card: before migration 13 (api_keys) runs, the page still works.
+  const apiKeys = await listApiKeys(user.id).catch((error) => {
+    console.error("[account] api keys", error instanceof Error ? error.message : error);
+    return null;
+  });
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 py-2 sm:py-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-heading text-[22px] font-semibold">Account</h1>
+          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Account</h1>
           <p className="mt-1 truncate text-[14px] text-muted-foreground">{user.email}</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -111,6 +119,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         configured={twoStepConfigured()}
         note={params.two_step === "unavailable" ? "Two-step sign-in could not start just now. Try again in a minute." : undefined}
       />
+
+      {apiKeys && (
+        <ApiKeysCard keys={apiKeys} endpoint={`${configuredOrigin() ?? "http://localhost:3000"}/api/mcp`} allowed={can(access, "mcp")} max={MAX_KEYS} />
+      )}
 
       <PlanPicker
         plan={user.plan}

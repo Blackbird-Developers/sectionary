@@ -23,6 +23,7 @@
     "moments-check": "tsx src/moments-check.ts",
     "clips-try": "tsx src/clips-try.ts",
     "retype-blocks": "tsx src/retype-blocks.ts",
+    "styles-check": "tsx src/styles-check.ts",
     "prune-seeds": "tsx src/prune-seeds.ts",
     "test": "tsx --test src/*.test.ts",
     "hello-capture": "tsx ops/hello-capture.ts"

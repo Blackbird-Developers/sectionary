@@ -105,7 +105,7 @@ export default function BotPage() {
   return (
     <LegalPage
       eyebrow="For store owners"
-      title="SectionaryBot, the crawler behind Sectionary."
+      title="SectionaryBot, the crawler behind Blimp."
       lede={
         <p>
           If you found <code className="rounded-sm bg-muted px-1 font-mono text-[0.88em]">SectionaryBot</code> in your

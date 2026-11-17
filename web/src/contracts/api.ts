@@ -124,7 +124,8 @@ export type Account = {
   twoStep: boolean;
 };
 /** Pro-only things the UI locks for Free and signed-out viewers ("open" is opening a block at all). */
-export type Feature = "open" | "brief" | "history" | "boards" | "filters" | "copy-image" | "source-link" | "full-images";
+// "mcp": the MCP server at /api/mcp with an API key (SEC-31). Pro and Team until the owner decides otherwise.
+export type Feature = "open" | "brief" | "history" | "boards" | "filters" | "copy-image" | "source-link" | "full-images" | "mcp";
 /**
  * `gates` is false while PLAN_GATES is off (everything open). `features` is
  * what this viewer may use, signed out included.

@@ -119,8 +119,8 @@ type Candidate = { id: string; score: number };
  * header that says "Subscriptions" twice beats a block that says "subscribe
  * and save 20%".
  */
-async function candidates(sql: Sql, f: BlockFilters, groups: Group[], vector: string | null): Promise<Candidate[]> {
-  const where = blockWhere(sql, f);
+async function candidates(sql: Sql, f: BlockFilters, groups: Group[], vector: string | null, extra?: ExtraWhere): Promise<Candidate[]> {
+  const where = extra ? sql`${blockWhere(sql, f)} AND ${extra}` : blockWhere(sql, f);
   // websearch syntax with "or" between terms: nothing to escape, stop words drop out.
   const any = groups.flatMap((g) => g.terms).join(" or ");
   const each = groups.map((g) => g.terms.join(" or "));
@@ -190,7 +190,10 @@ async function readQuery(sql: Sql, words: string[], intents: boolean): Promise<{
  * values would add. Each list is capped at CANDIDATES, so on a broad query the
  * counts describe the best matches rather than every match.
  */
-export async function searchBlocks(q: string, f: BlockFilters, limit: number, offset: number, withFacets = true): Promise<SearchResult> {
+/** A condition beyond the wall's filters, ANDed into the WHERE over blockJoins (the MCP server's tagger filters). */
+export type ExtraWhere = ReturnType<typeof blockWhere>;
+
+export async function searchBlocks(q: string, f: BlockFilters, limit: number, offset: number, withFacets = true, extra?: ExtraWhere): Promise<SearchResult> {
   const sql = database();
   const words = queryWords(q);
   const [first, embedding] = await Promise.all([readQuery(sql, words, true), embedQuery(q.trim())]);
@@ -202,7 +205,7 @@ export async function searchBlocks(q: string, f: BlockFilters, limit: number, of
   }
 
   const rank = (groups: Group[]) => Promise.all([
-    candidates(sql, f, groups, vector),
+    candidates(sql, f, groups, vector, extra),
     withFacets && filtered ? candidates(sql, {}, groups, vector) : null,
   ]);
   let [ranked, pool] = await rank(query.groups);

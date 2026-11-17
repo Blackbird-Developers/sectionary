@@ -48,7 +48,7 @@ export function can(access: Plan | null, feature: Feature): boolean {
   return false;
 }
 
-const FEATURES: Feature[] = ["open", "brief", "history", "boards", "filters", "copy-image", "source-link", "full-images"];
+const FEATURES: Feature[] = ["open", "brief", "history", "boards", "filters", "copy-image", "source-link", "full-images", "mcp"];
 export const featuresFor = (access: Plan | null): Feature[] => FEATURES.filter((f) => can(access, f));
 
 /** Null when the viewer has no cap. Signed-out viewers cannot open blocks at all (can(null, "open")). */

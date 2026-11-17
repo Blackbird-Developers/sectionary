@@ -6,7 +6,8 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import sharp from "sharp";
 import { encode as blurhashEncode } from "blurhash";
-import type { Manifest, ManifestBlock } from "../../web/src/contracts/manifest.js";
+import type { Manifest, ManifestBlock, PageStyles } from "../../web/src/contracts/manifest.js";
+import { bucketFor } from "../../web/src/lib/colour.js";
 import { blocks, captures, pages, sites, siteTech, captureDiffs } from "./schema.js";
 
 try { process.loadEnvFile(resolve(import.meta.dirname, "../.env")); } catch {}
@@ -147,8 +148,22 @@ function blockFields(captureId: string, block: ManifestBlock) {
     parentType: block.parentType, tag: block.tag, elementId: block.id, classes: block.classes,
     top: Math.round(block.top), height: Math.round(block.height), width: Math.round(block.width),
     text: block.text, textLength: block.textLength, headline: block.headline || null,
-    buttons: block.buttons, images: block.images, videos: block.videos, background: block.bg, updatedAt: new Date(),
+    buttons: block.buttons, images: block.images, videos: block.videos, background: block.bg,
+    style: block.style ?? null, outline: block.outline ?? null, updatedAt: new Date(),
   };
+}
+
+/**
+ * The manifest's pageStyles with each palette colour's bucket filled from
+ * web/src/lib/colour.ts, so the design data and the wall's colour filter agree
+ * (brief section 4.3). Null when the capture was made without --styles.
+ */
+function pageStylesWithBuckets(styles: Manifest["pageStyles"]): Manifest["pageStyles"] | null {
+  if (!styles) return null;
+  const fill = (s: PageStyles | undefined): PageStyles | undefined => s && {
+    ...s, colour: { ...s.colour, palette: s.colour.palette.map((p) => ({ ...p, bucket: p.bucket ?? bucketFor(p.colour) ?? undefined })) },
+  };
+  return { ...(styles.desktop && { desktop: fill(styles.desktop) }), ...(styles.mobile && { mobile: fill(styles.mobile) }) };
 }
 
 // Detect changes between two sets of blocks
@@ -226,8 +241,10 @@ try {
       const [capture] = await tx.insert(captures).values({
         pageId: page.id, capturedAt: new Date(manifest.page.capturedAt),
         desktop: viewportWithImage(manifest.viewports.desktop, images), mobile: viewportWithImage(manifest.viewports.mobile, images),
+        pageStyles: pageStylesWithBuckets(manifest.pageStyles),
       }).onConflictDoUpdate({ target: [captures.pageId, captures.capturedAt], set: {
-        desktop: viewportWithImage(manifest.viewports.desktop, images), mobile: viewportWithImage(manifest.viewports.mobile, images), updatedAt: new Date(),
+        desktop: viewportWithImage(manifest.viewports.desktop, images), mobile: viewportWithImage(manifest.viewports.mobile, images),
+        pageStyles: pageStylesWithBuckets(manifest.pageStyles), updatedAt: new Date(),
       }}).returning({ id: captures.id });
 
       // Insert/update blocks
