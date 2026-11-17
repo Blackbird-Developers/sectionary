@@ -9,17 +9,17 @@
 // written down (pending file) and emptied after the cart page is captured, or at the end of the store,
 // or at the start of the next run after a crash; one cart that will not empty stops cart moments for the run.
 import type { Browser, BrowserContext, Page, Route } from 'playwright';
-import { mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, unlink, writeFile } from 'node:fs/promises';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
 export type CartScope = 'own' | 'optin' | 'all';
 /**
- * `all` (any store whose robots.txt allows the cart actions) also needs this in the environment. The bot page
- * promises carts only "on stores that have agreed to it", and Shopify's API terms (7 Oct 2026, "API
- * Restrictions" 8 and 14) forbid automated collection through its APIs, the cart API included, without its
- * written OK: legal read of 17 Nov 2026 (Ben's Downloads/cart-legal-read.md). Own and opted-in stores only until
- * that changes.
+ * `all` (any store whose robots.txt allows the cart actions) also needs this in the environment, a deliberate
+ * switch per run. Ben chose carts on every such store on 17 Nov 2026, after the legal read (his
+ * Downloads/cart-legal-read.md): the risk he accepted is Shopify's API terms (7 Oct 2026, "API Restrictions"
+ * 8 and 14), which forbid automated collection through its APIs, the cart API included, without its written OK.
+ * The bot page says "on stores whose robots.txt allows it"; low-stock products are skipped (moment-logic.ts).
  */
 export const CART_ALL_ENV = 'MOMENTS_CART_ALL';
 export const CART_ALL_VALUE = 'I_HAVE_SIGN_OFF';
@@ -116,8 +116,12 @@ export async function addByApi(page: Page): Promise<boolean> {
 export const EMPTY_WAITS_MS = [0];
 export const QUIET_MS = 10 * 60_000;
 export const MAX_TRIES = 5;
-/** At most this many filled carts may wait to be emptied at once; past it no new cart is filled. */
-export const MAX_WAITING = 3;
+/**
+ * At most this many filled carts may wait to be emptied at once; past it no new cart is filled until one is
+ * emptied (capture.ts and crawl.ts wait for a free place before the next product page). 6, not 3, since carts
+ * go to every store whose robots.txt allows them (Ben, 17 Nov 2026): about 3 carts in 4 wait 10 minutes or more.
+ */
+export const MAX_WAITING = 6;
 
 /**
  * Empty the cart behind the context's cookies and check it holds nothing. Not through a page: no scripts, no
@@ -170,6 +174,21 @@ export const cartsStopped = (): string | null => stoppedFor;
 const pendingDir = (out: string) => path.join(out, '_carts');
 const pendingFile = (out: string, host: string, vp: string) => path.join(pendingDir(out), `${host}-${vp}.json`);
 
+/**
+ * Every cart event, one JSON line each, in <out>/carts-log.jsonl: filled, waiting (Shopify answered 429), emptied
+ * (and checked) or failed. The record that each cart a store got from us was emptied again, and when.
+ */
+export async function logCart(out: string, host: string, vp: string, event: 'filled' | 'waiting' | 'emptied' | 'failed', extra: Record<string, unknown> = {}): Promise<void> {
+  await mkdir(out, { recursive: true }).catch(() => {});
+  await appendFile(path.join(out, 'carts-log.jsonl'), JSON.stringify({ at: new Date().toISOString(), host, vp, event, ...extra }) + '\n', 'utf8').catch(() => {});
+}
+
+/** A cart that answered but would not empty, or gave no answer: logged, and cart filling stops for the run. */
+export async function noteFailed(out: string, host: string, vp: string): Promise<void> {
+  await logCart(out, host, vp, 'failed');
+  stopCarts(host);
+}
+
 /** A written-down cart: the cookies that point at it, when it was filled, and the tries Shopify did not answer. */
 type Pending = HeldCart & { host: string; vp: string; at: string; tries?: number; lastTry?: string };
 
@@ -177,6 +196,7 @@ type Pending = HeldCart & { host: string; vp: string; at: string; tries?: number
 export async function notePending(out: string, host: string, vp: string, cart: HeldCart): Promise<void> {
   await mkdir(pendingDir(out), { recursive: true });
   await writeFile(pendingFile(out, host, vp), JSON.stringify({ host, vp, at: new Date().toISOString(), ...cart }), 'utf8');
+  await logCart(out, host, vp, 'filled', { origin: cart.origin });
 }
 
 /** This store already holds a filled cart at this viewport: never a second product. */
@@ -190,8 +210,10 @@ export function waitingCarts(out: string): string[] {
   return existsSync(dir) ? readdirSync(dir).filter((n) => n.endsWith('.json')) : [];
 }
 
+/** The cart was emptied and checked: no longer written down. */
 export async function clearPending(out: string, host: string, vp: string): Promise<void> {
   await unlink(pendingFile(out, host, vp)).catch(() => {});
+  await logCart(out, host, vp, 'emptied');
 }
 
 /** One more try Shopify did not answer (429): when, and how many so far. */
@@ -201,6 +223,7 @@ export async function noteTry(out: string, host: string, vp: string): Promise<nu
   p.tries = (p.tries ?? 0) + 1;
   p.lastTry = new Date().toISOString();
   await writeFile(file, JSON.stringify(p), 'utf8');
+  await logCart(out, host, vp, 'waiting', { tries: p.tries });
   return p.tries;
 }
 
@@ -263,7 +286,7 @@ async function sweepNow(browser: Browser, out: string, opts: SweepOptions): Prom
       } else if (r.rateLimited && (await noteTry(out, p.host, p.vp)) < MAX_TRIES) res.waiting.push(label);
       else {
         res.failed.push(label);
-        stopCarts(p.host);
+        await noteFailed(out, p.host, p.vp);
       }
     } finally {
       await context.close().catch(() => {});
@@ -274,20 +297,24 @@ async function sweepNow(browser: Browser, out: string, opts: SweepOptions): Prom
 
 /**
  * The end of a run: keep trying the written-down carts as each falls due, until none waits or maxWaitMs has
- * gone by. What still waits then is tried first by the next run.
+ * gone by. What still waits then is tried first by the next run. untilBelow: stop as soon as fewer than that
+ * many wait (a run waiting for a free place under MAX_WAITING); skipUntried as in emptyPending.
  */
-export async function drainPending(browser: Browser, out: string, opts: { maxWaitMs?: number; quietMs?: number } = {}): Promise<SweepResult> {
+export async function drainPending(browser: Browser, out: string, opts: { maxWaitMs?: number; quietMs?: number; untilBelow?: number; skipUntried?: boolean } = {}): Promise<SweepResult> {
   const quietMs = opts.quietMs ?? QUIET_MS;
   const until = Date.now() + (opts.maxWaitMs ?? 25 * 60_000);
   const all: SweepResult = { emptied: [], waiting: [], failed: [] };
   for (;;) {
-    const r = await emptyPending(browser, out, { quietMs });
+    const r = await emptyPending(browser, out, { quietMs, skipUntried: opts.skipUntried });
     all.emptied.push(...r.emptied);
     all.failed.push(...r.failed);
     all.waiting = r.waiting;
     const left = (await readPending(out)).filter((p) => !all.failed.includes(`${p.host} ${p.vp}`));
-    if (!left.length) return all;
-    const next = Math.min(...left.map((p) => dueAt(p, quietMs)));
+    if (!left.length || (opts.untilBelow !== undefined && left.length < opts.untilBelow)) return all;
+    // Only carts this loop will try decide when it looks again; with skipUntried an untried cart never falls due here.
+    const triable = opts.skipUntried ? left.filter((p) => p.lastTry) : left;
+    if (!triable.length) return all;
+    const next = Math.min(...triable.map((p) => dueAt(p, quietMs)));
     if (next > until) return all;
     const wait = Math.max(1_000, next - Date.now());
     console.log(`cart: ${left.length} cart(s) waiting for Shopify's rate limit to pass; next try in ${wait < 60_000 ? `${Math.ceil(wait / 1000)} s` : `${Math.ceil(wait / 60_000)} min`}`);

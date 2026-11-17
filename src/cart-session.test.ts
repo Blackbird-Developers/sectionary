@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { chromium, type Browser } from 'playwright';
-import { cartsStopped, drainPending, emptyCart, emptyPending, waitingCarts, MAX_TRIES } from './cart-session.js';
+import { cartsStopped, clearPending, drainPending, emptyCart, emptyPending, notePending, noteTry, waitingCarts, MAX_TRIES } from './cart-session.js';
 
 /** What the fake store answers to /cart/clear.js and /cart.js: empty, rate limited, or a cart that stays full. */
 let mode: 'ok' | '429' | 'full' = 'ok';
@@ -112,6 +112,28 @@ test('a mid-run sweep never touches a cart nobody has tried: its cart page may s
   // The store's own end (or the run's) does try it.
   const end = await emptyPending(browser, out, { host: 'g.test' });
   assert.deepEqual(end, { emptied: ['g.test desktop'], waiting: [], failed: [] });
+});
+
+test('every cart event is logged: filled, waiting, emptied', async () => {
+  const before = existsSync(path.join(out, 'carts-log.jsonl')) ? (await readFile(path.join(out, 'carts-log.jsonl'), 'utf8')).split('\n').filter(Boolean).length : 0;
+  await notePending(out, 'h.test', 'mobile', { origin, state: { cookies: [], origins: [] } });
+  await noteTry(out, 'h.test', 'mobile');
+  await clearPending(out, 'h.test', 'mobile');
+  const lines = (await readFile(path.join(out, 'carts-log.jsonl'), 'utf8')).split('\n').filter(Boolean).slice(before).map((l) => JSON.parse(l) as { host: string; vp: string; event: string; tries?: number });
+  assert.deepEqual(lines.map((l) => `${l.host} ${l.vp} ${l.event}${l.tries ? ' ' + l.tries : ''}`), ['h.test mobile filled', 'h.test mobile waiting 1', 'h.test mobile emptied']);
+  assert.deepEqual(waitingCarts(out), []);
+});
+
+test('waiting for a free place stops as soon as fewer carts wait than the cap', async () => {
+  fresh('ok');
+  // Two carts that had a try long ago (due) and one tried just now (not due).
+  await writePending('i.test', 'desktop', { tries: 1, lastTry: new Date(0).toISOString() });
+  await writePending('j.test', 'desktop', { tries: 1, lastTry: new Date(0).toISOString() });
+  await writePending('k.test', 'desktop', { tries: 1, lastTry: new Date().toISOString() });
+  const r = await drainPending(browser, out, { untilBelow: 2, skipUntried: true, maxWaitMs: 5_000 });
+  assert.deepEqual(r.emptied.sort(), ['i.test desktop', 'j.test desktop']);
+  assert.deepEqual(waitingCarts(out), ['k.test-desktop.json']);
+  await emptyPending(browser, out, { quietMs: 0 });
 });
 
 test('the end of a run keeps trying as carts fall due, until empty', async () => {

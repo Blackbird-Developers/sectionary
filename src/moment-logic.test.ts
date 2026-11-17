@@ -1,7 +1,7 @@
 // npm test   (node:test via tsx)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classOf, classifyResponse, diffOverlays, parseMomentKinds, popupVerdict, BUILT_KINDS } from './moment-logic.js';
+import { classOf, classifyResponse, diffOverlays, lowStock, parseMomentKinds, popupVerdict, BUILT_KINDS } from './moment-logic.js';
 import type { Overlay } from './moment-script.js';
 
 let seq = 0;
@@ -66,6 +66,11 @@ test('what appeared between two snapshots', () => {
   // The header grew into a mega menu.
   const grown = withText('Shop About Cart Shirts Trousers Shoes Bags Hats', { key: 'm1', x: 0, y: 0, w: 1440, h: 420 });
   assert.deepEqual(diffOverlays(before, [grown], 1440, 900).found.map((x) => x.key), ['m1']);
+});
+
+test('low stock is never put in a cart', () => {
+  for (const t of ['Only 2 left in stock', 'Hurry, just 3 left!', 'Low stock', 'Low in stock: order soon', 'Almost gone', 'Last one available', 'Only a few left']) assert.equal(lowStock(t), true, t);
+  for (const t of ['In stock, ships today', 'Limited edition print', 'Last chance for summer prices', 'Selling fast', 'Free shipping over $50', '2 left feet socks']) assert.equal(lowStock(t), false, t);
 });
 
 test('marketing popups, and the dialogs that are not', () => {

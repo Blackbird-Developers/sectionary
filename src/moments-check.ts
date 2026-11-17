@@ -101,6 +101,8 @@ type CartCase = {
   /** What the store does when the product form is sent. */
   answer: 'drawer' | 'wrapped-drawer' | 'sliding-drawer' | 'toast' | 'redirect' | 'checkout' | 'none';
   soldOut?: boolean;
+  /** "Only 2 left in stock" next to the button: never put in a cart. */
+  lowStock?: boolean;
   platform?: string;
   want: { response?: string; confidence: 'high' | 'low'; error?: string; panelType?: string; cartDrawer?: boolean; filled: boolean; checkoutBlocked?: boolean; analyticsBlocked?: boolean };
 };
@@ -128,7 +130,7 @@ function productPage(c: CartCase): string {
   const add = c.answer === 'checkout' ? '' : "await fetch('/cart/add.js', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ items: [{ id: 111, quantity: 1 }] }) }); fetch('https://www.google-analytics.com/g/collect?en=add_to_cart').catch(function () {}); document.querySelector('.cart-count-bubble').textContent = '1';";
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;font:16px sans-serif}</style></head><body>
     <header style="height:72px;display:flex;justify-content:space-between;align-items:center;padding:0 24px"><a href="/">Socks Co</a><span class="cart-count-bubble">0</span></header>
-    <main style="padding:40px"><h1>Merino socks</h1><p>$18.00</p>
+    <main style="padding:40px"><h1>Merino socks</h1><p>$18.00</p>${c.lowStock ? '<p>Only 2 left in stock</p>' : ''}
       <form action="/cart/add" method="post" id="f"><input type="hidden" name="id" value="111">${button}</form>
       <div class="shopify-payment-button"><button style="width:300px;height:48px">Buy it now</button></div>
     </main><section style="height:1600px"></section>
@@ -145,6 +147,7 @@ const cartCases: CartCase[] = [
   { name: 'cart: the store goes to its cart page', answer: 'redirect', want: { response: 'redirect', confidence: 'high', filled: true } },
   { name: 'cart: a button that starts a checkout is stopped', answer: 'checkout', want: { confidence: 'low', error: 'checkout-attempt', filled: true, checkoutBlocked: true } },
   { name: 'cart: a sold-out product is left alone', answer: 'drawer', soldOut: true, want: { confidence: 'low', error: 'no-atc', filled: false } },
+  { name: 'cart: a product with low stock is left alone', answer: 'drawer', lowStock: true, want: { confidence: 'low', error: 'low-stock', filled: false } },
   { name: 'cart: not a Shopify store, never tried', answer: 'drawer', platform: 'woocommerce', want: { confidence: 'low', error: 'not-shopify', filled: false } },
 ];
 

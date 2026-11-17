@@ -20,7 +20,7 @@ const DOES = [
   "Desktop and phone width, one page per second at most",
   "Names itself in every request as SectionaryBot/<version>",
   "May scroll, open the menu or a product option, and screenshot how the page reacts",
-  "On stores that have agreed to it, adds one product to a cart, photographs it and empties it again",
+  "Where robots.txt allows it, adds one product to a cart, photographs it and empties it again",
 ];
 
 const NEVER = [
@@ -58,7 +58,7 @@ export default function BotPage() {
             <code>SectionaryBot/&lt;version&gt;</code> with a link to this page.
           </p>
           <p>
-            To show how a page behaves, it may scroll, open the navigation menu, select a product option or open a product preview, and take a screenshot of the result. On stores that have agreed to it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
+            To show how a page behaves, it may scroll, open the navigation menu, select a product option or open a product preview, and take a screenshot of the result. On stores whose robots.txt allows it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
           </p>
         </>
       ),

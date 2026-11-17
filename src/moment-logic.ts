@@ -143,6 +143,14 @@ const NOT_MARKETING: [RegExp, string][] = [
   [/choose your (country|location|region|language)|shipping to|select your (country|region)|change (country|region)|you('re| are) (visiting|viewing|shopping)/i, 'location-picker'],
 ];
 
+/**
+ * Low stock near the add-to-cart button ("Only 2 left", "Low stock", "Almost gone"): never put such a product in a
+ * cart, even for a few minutes. Some stores hold stock while it sits in a cart (apps like Cart Reserve), and a last
+ * unit is the one a real shopper might miss (legal read of 17 Nov 2026, before carts on every store).
+ */
+const LOW_STOCK = /\b(only|just)\s+\d{1,2}\s+(left|remaining|in stock)\b|\blow (in )?stock\b|\blast (one|item|unit|few)\b|\b(few|limited) (items |pieces |units )?left\b|\bonly a few left\b|\balmost (gone|sold out)\b/i;
+export const lowStock = (text: string): boolean => LOW_STOCK.test(text);
+
 /** The brief's rules 5 and 6 (7.1): a marketing popup has a sign-up field or offer words; consent, age and country dialogs are not. */
 export function popupVerdict(o: Overlay): { ok: boolean; reason: string } {
   for (const [re, reason] of NOT_MARKETING) if (re.test(o.text)) return { ok: false, reason };

@@ -12,7 +12,7 @@ import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } 
 import { isEmptyCartBlock } from './empty-cart.js';
 import type { MomentKind } from '../web/src/contracts/manifest.js';
 import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
-import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, notePending, noteTry, stopCarts, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
+import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
 export type ViewportName = 'desktop' | 'mobile';
 
@@ -547,7 +547,7 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
         await noteTry(opts.out, host, vp);
         result.lines.push(`  ${vp}: cart not emptied yet (Shopify rate limit); kept in ${path.join(opts.out, '_carts')}, tried again after 10 quiet minutes`);
       } else {
-        stopCarts(host);
+        await noteFailed(opts.out, host, vp);
         result.lines.push(`  ${vp}: CART NOT EMPTIED, kept in ${path.join(opts.out, '_carts')} to try again`);
       }
     }

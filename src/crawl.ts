@@ -32,7 +32,7 @@ import path from 'node:path';
 import { Queue, type SeedRow, type StoreRow, type StoreStatus } from './queue.js';
 import { parseCsv } from './csv.js';
 import { capturePage, pageType, DEFAULT_CAPTURE, type CaptureOptions, type PageResult, type ViewportName } from './capture-page.js';
-import { drainPending, emptyPending, waitingCarts, type CartScope, type HeldCart } from './cart-session.js';
+import { drainPending, emptyPending, waitingCarts, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 import { parseMomentKinds } from './moment-logic.js';
 import type { MomentKind } from '../web/src/contracts/manifest.js';
 import { chooseFromLinks, discoverShopify } from './discover.js';
@@ -535,6 +535,8 @@ async function main(): Promise<void> {
       // Carts that waited out Shopify's rate limit elsewhere in the run: emptied as they fall due.
       // Never a cart nobody has tried yet: it may belong to a store another worker is still crawling.
       if (waitingCarts(opts.out).length) await emptyPending(await getBrowser(), opts.out, { skipUntried: true }).catch(() => null);
+      // Too many carts waiting for Shopify's rate limit: this worker waits for a free place before its next store.
+      if (opts.moments.includes('add-to-cart') && waitingCarts(opts.out).length >= MAX_WAITING) await drainPending(await getBrowser(), opts.out, { untilBelow: MAX_WAITING, skipUntried: true, maxWaitMs: 60 * 60_000 }).catch(() => null);
       let r: Outcome;
       try {
         r = await processStore(ctx, s);

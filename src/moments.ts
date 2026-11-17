@@ -12,7 +12,7 @@ import type { MomentKind } from '../web/src/contracts/manifest.js';
 import type { CapturedBlock } from './capture-page.js';
 import { hidePinned, restorePinned } from './page-script.js';
 import { cartBadge, describePanel, findAddToCart, findCartDrawerToggle, findMenuTrigger, findStickyBars, forceHide, overlayShowing, pinnedAtTop, snapshotOverlays, type Overlay } from './moment-script.js';
-import { classOf, classifyResponse, diffOverlays, popupVerdict, MOMENT_THRESHOLDS } from './moment-logic.js';
+import { classOf, classifyResponse, diffOverlays, lowStock, popupVerdict, MOMENT_THRESHOLDS } from './moment-logic.js';
 import { addByApi, cartCount, installGuards, type Guards } from './cart-session.js';
 
 /** What the crawler writes for one moment. src/contract-check.ts holds it to the contract's ManifestMoment. */
@@ -435,6 +435,15 @@ async function addToCart(page: Page, ctx: MomentContext, out: MomentResult, t0: 
   // The main button by the brief's rules: never buy-now, a payment button, subscribe, pre-order or sold out.
   const atc = await page.evaluate(findAddToCart);
   if (!atc) return giveUp(out, ctx, 'add-to-cart', t0, 'no-atc');
+  // Never a product with low stock: read around the product form, not the whole page (a site-wide banner may shout).
+  const near = await page
+    .evaluate(() => {
+      const button = document.querySelector('[data-secmoment-atc="1"]');
+      const area = button?.closest('form')?.closest('section, [class*="product" i], main') || button?.closest('section, main');
+      return ((area as HTMLElement | null)?.innerText || '').slice(0, 4000);
+    })
+    .catch(() => '');
+  if (lowStock(near)) return giveUp(out, ctx, 'add-to-cart', t0, 'low-stock');
   // No "is the cart empty" request first: the context is fresh, so its cart can hold nothing, and every extra
   // cart request brings Shopify's rate limit closer (cart-session.ts EMPTY_WAITS_MS).
 

@@ -16,7 +16,7 @@ import { buildIndex } from './build-index.js';
 import { Politeness, PoliteError, hostOf } from './polite.js';
 import { capturePage, pageType, DEFAULT_CAPTURE, type CaptureOptions, type ViewportName } from './capture-page.js';
 import { parseMomentKinds } from './moment-logic.js';
-import { drainPending, emptyPending, waitingCarts, type HeldCart } from './cart-session.js';
+import { drainPending, emptyPending, waitingCarts, MAX_WAITING, type HeldCart } from './cart-session.js';
 
 export { pageType } from './capture-page.js';
 
@@ -138,6 +138,11 @@ async function main(): Promise<void> {
     for (const url of uniq) {
       // Only carts that already had a try and have been quiet: a fresh cart waits for its own cart page.
       if (waitingCarts(opts.out).length) await emptyPending(browser, opts.out, { skipUntried: true }).catch(() => null);
+      // Too many carts waiting for Shopify's rate limit: wait for a free place before a product page fills another.
+      if (opts.moments.includes('add-to-cart') && pageType(new URL(url)) === 'product' && waitingCarts(opts.out).length >= MAX_WAITING) {
+        console.log(`cart: ${waitingCarts(opts.out).length} carts wait to be emptied; waiting for a free place before the next product page`);
+        await drainPending(browser, opts.out, { untilBelow: MAX_WAITING, skipUntried: true, maxWaitMs: 60 * 60_000 }).catch(() => null);
+      }
       console.log(`\n${url}  [${pageType(new URL(url))}]`);
       const host = new URL(url).hostname.replace(/^www\./, '');
       const carts = held.get(host);

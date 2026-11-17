@@ -400,7 +400,7 @@ function StepScreen({
             <span className="text-[13px] font-medium">Not available</span>
             <span className="max-w-48 text-[12px] text-muted-foreground">
               {cart === "empty"
-                ? "This store's cart was empty when we visited. We only add a product to the cart of stores that agreed to it."
+                ? "This store's cart was empty when we visited. We only add a product where the store's robots.txt allows it."
                 : "This store's cart link opens another page, so there is no cart page to show."}
             </span>
             <Button variant="ghost" size="sm" onClick={() => setShowAnyway(true)}>

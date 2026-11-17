@@ -12,7 +12,7 @@ more than one page per second, and identifies itself in every request as
 
 To show how a page behaves, it may scroll, open the navigation menu, select a
 product option or open a product preview, and take a screenshot of the result.
-On stores that have agreed to it, it also adds one product to a cart to
+On stores whose robots.txt allows it, it also adds one product to a cart to
 photograph the cart, then empties the cart again. While it does this it blocks
 the store's analytics and ad tracking, so it is not counted as a shopper. It
 never types into a field, and the only form it sends is a product's add to cart.
