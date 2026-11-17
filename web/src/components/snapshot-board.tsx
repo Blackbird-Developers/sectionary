@@ -42,7 +42,7 @@ export function SnapshotBoard() {
   if (state === "invalid" || state === "error") {
     return (
       <div className="mx-auto max-w-md px-4 py-24 text-center">
-        <h1 className="font-heading text-[20px] font-semibold">This link does not open a board</h1>
+        <h1 className="font-heading text-[20px] font-extrabold tracking-[-0.03em]">This link does not open a board</h1>
         <p className="mt-2 text-muted-foreground">
           {state === "invalid" ? "It may have been cut off when it was pasted. Ask for the link again." : "The references could not be loaded. Try again in a moment."}
         </p>

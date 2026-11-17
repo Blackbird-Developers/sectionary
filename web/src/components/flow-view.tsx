@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Lock, Maximize2, Tag, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Lock, Maximize2, Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { Stack } from "@/components/site-profile";
@@ -17,6 +17,7 @@ import { labelFor, PAGE_TYPE_LABEL, type Block } from "@/lib/blocks";
 import { platformLabel } from "@/lib/stores";
 import { flowOf, pageView, FLOW_STEPS, type Flow, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
+import { BackLink } from "@/components/back-link";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
 
 /** From here up the screens share the row's width; below, the row scrolls sideways a screen at a time. */
@@ -157,17 +158,13 @@ export function FlowView({ host }: { host: string }) {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
-        <Link
-          href={`/sites/${encodeURIComponent(store.host)}`}
-          className="inline-flex w-fit items-center gap-1 rounded-md text-[12px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:-my-3 touch:h-11 touch:pr-3"
-        >
-          <ArrowLeft className="size-3.5" /> {store.brand}
-        </Link>
+        {/* Back to wherever the person came from (Flows, a search, the store); the store page when opened directly. */}
+        <BackLink fallbackHref={`/sites/${encodeURIComponent(store.host)}`} fallbackLabel={store.brand} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
           <StoreIcon key={store.host} host={store.host} brand={store.brand} size={44} className="rounded-xl" />
           {/* The basis lets the switch drop to its own line on phones instead of squeezing the title. */}
           <div className="min-w-0 flex-1 basis-52">
-            <h1 className="font-heading text-[22px] leading-tight font-semibold">
+            <h1 className="font-heading text-[22px] leading-tight font-extrabold tracking-[-0.03em]">
               {store.brand} <span className="font-medium text-muted-foreground">flow</span>
             </h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">

@@ -6,7 +6,7 @@ import { CopyButton } from "@/components/copy-button";
 export const metadata: Metadata = {
   title: "SectionaryBot",
   description:
-    "SectionaryBot is the crawler behind Sectionary. What it captures, what it never touches, and how to stop it with one line of robots.txt.",
+    "SectionaryBot is the crawler behind Blimp. What it captures, what it never touches, and how to stop it with one line of robots.txt.",
   alternates: { canonical: "/bot" },
 };
 
@@ -35,7 +35,7 @@ export default function BotPage() {
       title: "Who we are",
       body: (
         <p>
-          SectionaryBot is the crawler behind Sectionary, a reference library of real website and online-store designs,
+          SectionaryBot is the crawler behind Blimp, a reference library of real website and online-store designs,
           built by Blackbird.
         </p>
       ),
@@ -92,14 +92,14 @@ export default function BotPage() {
     {
       id: "attribution",
       title: "Attribution",
-      body: <p>Every screenshot in Sectionary names the store and links to the page it came from.</p>,
+      body: <p>Every screenshot in Blimp names the store and links to the page it came from.</p>,
     },
   ];
 
   return (
     <LegalPage
       eyebrow="For store owners"
-      title="SectionaryBot, the crawler behind Sectionary."
+      title="SectionaryBot, the crawler behind Blimp."
       lede={
         <p>
           If you found <code className="rounded-sm bg-muted px-1 font-mono text-[0.88em]">SectionaryBot</code> in your

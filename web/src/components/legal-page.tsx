@@ -6,7 +6,7 @@ export type LegalSection = { id: string; title: string; body: React.ReactNode };
 
 /**
  * The frame Terms, Privacy and /bot share (SEC-29): the landing page's type
- * (Bricolage titles, mono labels, the rust for links), a reading column of
+ * (Manrope titles, mono labels, the link blue), a reading column of
  * about 68 characters, and the section list pinned beside it on wide screens.
  */
 export function LegalPage({
@@ -31,7 +31,7 @@ export function LegalPage({
       <section className="border-b">
         <div className="mx-auto max-w-[1200px] px-4 pt-14 pb-12 sm:px-6 md:pt-20 md:pb-16">
           <p className="hero-rise font-mono text-[12px] tracking-wider text-link uppercase">{eyebrow}</p>
-          <h1 className="hero-rise mt-4 max-w-[16em] font-heading text-[40px] leading-[1] font-semibold tracking-[-0.025em] text-balance sm:text-[56px]" style={rise(100)}>
+          <h1 className="hero-rise mt-4 max-w-[16em] font-heading text-[40px] leading-[1] font-extrabold tracking-[-0.045em] text-balance sm:text-[56px]" style={rise(100)}>
             {title}
           </h1>
           <div className="hero-rise mt-5 max-w-[38em] text-[17px] leading-relaxed text-muted-foreground text-pretty" style={rise(200)}>
@@ -71,7 +71,7 @@ export function LegalPage({
         <article className="legal max-w-[68ch]">
           {sections.map((s, i) => (
             <section key={s.id} id={s.id} aria-labelledby={`${s.id}-h`} className="scroll-mt-24 border-t pt-8 pb-10 first:border-t-0 first:pt-0">
-              <h2 id={`${s.id}-h`} className="flex items-baseline gap-3 font-heading text-[22px] leading-tight font-semibold tracking-[-0.01em] sm:text-[26px]">
+              <h2 id={`${s.id}-h`} className="flex items-baseline gap-3 font-heading text-[22px] leading-tight font-extrabold tracking-[-0.03em] sm:text-[26px]">
                 <span className="font-mono text-[12px] font-normal text-link">{num(i)}</span>
                 {s.title}
               </h2>

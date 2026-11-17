@@ -9,11 +9,11 @@ import { cn } from "@/lib/utils";
 export type SelectOption = { value: string; label: string; count?: number };
 
 /**
- * A dropdown in Sectionary's own chrome, replacing the native <select>, whose
+ * A dropdown in Blimp's own chrome, replacing the native <select>, whose
  * open list is drawn by the OS (system blue highlight, system font). The
- * trigger is the same outline chip as the Blocks filters, and turns rust when
+ * trigger is the same outline chip as the Blocks filters, and turns blue when
  * `active` (a filter is applied). The list is the filter panel's popover: card
- * surface, hairline border, muted hover, a rust check on the chosen option.
+ * surface, hairline border, muted hover, a blue check on the chosen option.
  *
  * Keyboard follows the WAI-ARIA select-only combobox pattern: Up/Down/Enter/
  * Space open it, arrows, Home/End and type-ahead move, Enter or Space picks,
@@ -38,7 +38,7 @@ export function Select({
   options: SelectOption[];
   /** Accessible name, e.g. "Country". */
   label: string;
-  /** Show the trigger in the selected (rust) state. */
+  /** Show the trigger in the selected (blue) state. */
   active?: boolean;
   className?: string;
   triggerClassName?: string;

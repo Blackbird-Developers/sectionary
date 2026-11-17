@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { signInWithAccessToken, type ConfirmState } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
 
 const idle: ConfirmState = { status: "idle" };
 
@@ -33,7 +34,7 @@ export function CallbackSignIn() {
     if (found && "token" in found) form.current?.requestSubmit();
   }, [found]);
 
-  if (found === undefined) return <p className="text-[14px] text-muted-foreground">Signing you in…</p>;
+  if (found === undefined) return <Signing />;
 
   if (!found || "error" in found) {
     const expired = found && /expired|denied/i.test(found.error);
@@ -48,7 +49,7 @@ export function CallbackSignIn() {
   return (
     <form ref={form} action={submit} className="flex flex-col gap-3">
       <input type="hidden" name="access_token" value={found.token} />
-      <p className="text-[14px] text-muted-foreground">{pending ? "Signing you in…" : "Finishing sign-in on this device."}</p>
+      <Signing label={pending ? "Signing you in…" : "Finishing sign-in on this device."} busy={pending || state.status !== "error"} />
       {state.status === "error" && (
         <>
           <p aria-live="polite" className="text-[13px] text-destructive">
@@ -61,5 +62,15 @@ export function CallbackSignIn() {
         </>
       )}
     </form>
+  );
+}
+
+/** The wait, with the Blimp tile drifting beside it. */
+function Signing({ label = "Signing you in…", busy = true }: { label?: string; busy?: boolean }) {
+  return (
+    <p role="status" className="flex items-center gap-2.5 text-[14px] text-muted-foreground">
+      <Logo spinning={busy} className="size-5" />
+      {label}
+    </p>
   );
 }

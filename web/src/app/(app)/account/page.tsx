@@ -36,7 +36,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6 sm:py-12">
         <div>
-          <h1 className="font-heading text-[22px] font-semibold">Sign in</h1>
+          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Sign in</h1>
           <p className="mt-1 text-[14px] text-muted-foreground text-pretty">No password. We email you a link and a code; either one signs you in.</p>
         </div>
         {authConfigured() ? (
@@ -68,7 +68,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 py-2 sm:py-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-heading text-[22px] font-semibold">Account</h1>
+          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Account</h1>
           <p className="mt-1 truncate text-[14px] text-muted-foreground">{user.email}</p>
         </div>
         <div className="flex flex-wrap gap-2">
