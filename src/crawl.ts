@@ -16,6 +16,9 @@
 //   --enqueue-only      add to the queue, do not run
 //   --out data          where captures go          --db data/queue.sqlite
 //   --styles            also measure design metadata (SEC-31); off by default while it is proven
+//   --moments safe      also capture moments (popups, open menus, sticky buy bars; src/moments.ts), own sites only for now
+//   --moments all --moments-cart-scope own|optin|all   also fill one cart per store and photograph it (src/cart-session.ts);
+//                       all also needs MOMENTS_CART_ALL=I_HAVE_SIGN_OFF
 //
 // It survives: a crash or a kill (the next start resumes; pages already
 // captured are not captured again), a hung page (hard time limit per
@@ -28,7 +31,10 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { Queue, type SeedRow, type StoreRow, type StoreStatus } from './queue.js';
 import { parseCsv } from './csv.js';
-import { capturePage, DEFAULT_CAPTURE, type CaptureOptions, type PageResult } from './capture-page.js';
+import { capturePage, pageType, DEFAULT_CAPTURE, type CaptureOptions, type PageResult, type ViewportName } from './capture-page.js';
+import { drainPending, emptyPending, waitingCarts, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
+import { parseMomentKinds } from './moment-logic.js';
+import type { MomentKind } from '../web/src/contracts/manifest.js';
 import { chooseFromLinks, discoverShopify } from './discover.js';
 import { buildIndex } from './build-index.js';
 import { Politeness, installFetchCrashGuard, laneFor } from './polite.js';
@@ -54,10 +60,12 @@ type Options = {
   styles: boolean;
   out: string;
   db: string;
+  moments: MomentKind[];
+  momentsCartScope: CartScope;
 };
 
 function parseArgs(argv: string[]): Options {
-  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, styles: false, out: 'data', db: '' };
+  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, styles: false, out: 'data', db: '', moments: [], momentsCartScope: 'own' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--seed') o.seed = argv[++i];
@@ -76,6 +84,21 @@ function parseArgs(argv: string[]): Options {
     else if (a === '--force') o.force = true;
     else if (a === '--headed') o.headed = true;
     else if (a === '--styles') o.styles = true;
+    else if (a === '--moments-cart-scope') {
+      const v = argv[++i];
+      if (v !== 'own' && v !== 'optin' && v !== 'all') {
+        console.error('--moments-cart-scope must be own, optin or all');
+        process.exit(1);
+      }
+      o.momentsCartScope = v;
+    } else if (a === '--moments') {
+      try {
+        o.moments = parseMomentKinds(argv[++i] || '');
+      } catch (e) {
+        console.error((e as Error).message);
+        process.exit(1);
+      }
+    }
     else if (a === '--out') o.out = argv[++i];
     else if (a === '--db') o.db = argv[++i];
     else {
@@ -313,40 +336,53 @@ async function processStore(ctx: Ctx, s: StoreRow): Promise<Outcome> {
     q.setPlan(s.host, urls);
   }
 
-  for (const url of urls) {
-    if (ctx.stopping()) {
-      q.release(s.host, Date.now() - t0);
-      return { status: 'pending', pages: pagesOk, blocks, ms: Date.now() - t0, reason: 'stopped, will resume' };
+  // A cart a product page filled goes with us to the store's cart page (src/cart-session.ts); whatever is
+  // still held when the store ends, for any reason, is emptied in the finally.
+  const held: Partial<Record<ViewportName, HeldCart>> = {};
+  try {
+    for (const url of urls) {
+      if (ctx.stopping()) {
+        q.release(s.host, Date.now() - t0);
+        return { status: 'pending', pages: pagesOk, blocks, ms: Date.now() - t0, reason: 'stopped, will resume' };
+      }
+      const already = q.pageCaptured(s.host, url);
+      if (already) {
+        pagesOk++;
+        blocks += already.blocks;
+        continue;
+      }
+      const toCart = pageType(new URL(url)) === 'cart' && Object.keys(held).length > 0;
+      const pageExtra: Partial<CaptureOptions> = toCart ? { ...extra, cartStates: { ...held } } : extra;
+      let r = await captureResilient(ctx, url, pageExtra);
+      // robots.txt did not answer (often the www or regional host the store
+      // redirected to). That is a hiccup, not a "no": one more try after a pause,
+      // and if it still fails the store ends "partial" so --retry-failed returns to it.
+      if (r.status === 'skipped' && r.reason === 'robots-unreachable' && !robotsRetried) {
+        robotsRetried = true;
+        await sleep(15_000);
+        await polite.forgetFailure(url);
+        r = await captureResilient(ctx, url, pageExtra);
+      }
+      if (r.cart) Object.assign(held, r.cart);
+      for (const vp of r.emptied ?? []) delete held[vp];
+      await record(r);
+      if (r.status === 'captured' || r.status === 'partial') {
+        pagesOk++;
+        blocks += r.blocks;
+      }
+      if (r.status === 'partial' || r.status === 'failed' || (r.status === 'skipped' && r.reason === 'robots-unreachable')) problems.push(`${r.type}: ${r.reason}`);
     }
-    const already = q.pageCaptured(s.host, url);
-    if (already) {
-      pagesOk++;
-      blocks += already.blocks;
-      continue;
-    }
-    let r = await captureResilient(ctx, url, extra);
-    // robots.txt did not answer (often the www or regional host the store
-    // redirected to). That is a hiccup, not a "no": one more try after a pause,
-    // and if it still fails the store ends "partial" so --retry-failed returns to it.
-    if (r.status === 'skipped' && r.reason === 'robots-unreachable' && !robotsRetried) {
-      robotsRetried = true;
-      await sleep(15_000);
-      await polite.forgetFailure(url);
-      r = await captureResilient(ctx, url, extra);
-    }
-    await record(r);
-    if (r.status === 'captured' || r.status === 'partial') {
-      pagesOk++;
-      blocks += r.blocks;
-    }
-    if (r.status === 'partial' || r.status === 'failed' || (r.status === 'skipped' && r.reason === 'robots-unreachable')) problems.push(`${r.type}: ${r.reason}`);
-  }
 
-  const status: StoreStatus = problems.length === 0 ? 'done' : 'partial';
-  const reason = problems.length ? problems.slice(0, 3).join(' | ').slice(0, 300) : null;
-  const ms = Date.now() - t0;
-  q.finish(s.host, { status, reason, pagesTotal: 1 + urls.length, pagesOk, blocks, ms, bytes: await dirBytes(path.join(opts.out, s.host)) });
-  return { status, pages: pagesOk, blocks, ms, reason };
+    const status: StoreStatus = problems.length === 0 ? 'done' : 'partial';
+    const reason = problems.length ? problems.slice(0, 3).join(' | ').slice(0, 300) : null;
+    const ms = Date.now() - t0;
+    q.finish(s.host, { status, reason, pagesTotal: 1 + urls.length, pagesOk, blocks, ms, bytes: await dirBytes(path.join(opts.out, s.host)) });
+    return { status, pages: pagesOk, blocks, ms, reason };
+  } finally {
+    // The cart page was not reached, failed, or never existed: empty the cart anyway, and check.
+    // A cart already tried and rate limited is left alone until it has been quiet (cart-session.ts QUIET_MS).
+    if (opts.moments.includes('add-to-cart')) await emptyPending(await ctx.browser(), opts.out, { host: s.host }).catch(() => null);
+  }
 }
 
 // ---- Main ---------------------------------------------------------------------
@@ -472,7 +508,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', onStop);
   process.on('SIGTERM', onStop);
 
-  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out, styles: opts.styles }, browser: getBrowser, log, stopping: isStopping };
+  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out, styles: opts.styles, moments: opts.moments, momentsCartScope: opts.momentsCartScope }, browser: getBrowser, log, stopping: isStopping };
   const todo = q.counts().pending || 0;
   console.log(`${todo} store(s) to capture, ${opts.parallel} at a time -> ${opts.out}/`);
 
@@ -496,6 +532,11 @@ async function main(): Promise<void> {
       }
       announcedWait = false;
       claimed++;
+      // Carts that waited out Shopify's rate limit elsewhere in the run: emptied as they fall due.
+      // Never a cart nobody has tried yet: it may belong to a store another worker is still crawling.
+      if (waitingCarts(opts.out).length) await emptyPending(await getBrowser(), opts.out, { skipUntried: true }).catch(() => null);
+      // Too many carts waiting for Shopify's rate limit: this worker waits for a free place before its next store.
+      if (opts.moments.includes('add-to-cart') && waitingCarts(opts.out).length >= MAX_WAITING) await drainPending(await getBrowser(), opts.out, { untilBelow: MAX_WAITING, skipUntried: true, maxWaitMs: 60 * 60_000 }).catch(() => null);
       let r: Outcome;
       try {
         r = await processStore(ctx, s);
@@ -513,7 +554,17 @@ async function main(): Promise<void> {
 
   try {
     await getBrowser();
+    // A crash or a kill can leave a filled cart behind: empty those first.
+    const leftover = await emptyPending(await getBrowser(), opts.out);
+    if (leftover.emptied.length) console.log(`cart: emptied ${leftover.emptied.length} cart(s) an earlier run left`);
+    if (leftover.failed.length) console.error(`CART NOT EMPTIED from an earlier run: ${leftover.failed.join(', ')}`);
     await Promise.all(Array.from({ length: opts.parallel }, worker));
+    // Carts still waiting for Shopify's rate limit: tried as each falls due, before the browser closes. On a stop
+    // request only the ones due now; the rest are the next run's first job.
+    if (waitingCarts(opts.out).length) {
+      const end = stopping ? await emptyPending(await getBrowser(), opts.out) : await drainPending(await getBrowser(), opts.out);
+      if (end.emptied.length) console.log(`cart: emptied ${end.emptied.length} cart(s) that waited for Shopify's rate limit`);
+    }
   } finally {
     await (browser as Browser | null)?.close().catch(() => {});
     dropLock(lock);
@@ -523,6 +574,9 @@ async function main(): Promise<void> {
   await buildIndex(opts.out).catch(() => 0);
   console.log('\n' + (await report(q, opts, true)));
   if (stopping) console.log('Stopped on request. Run `npm run crawl` to carry on from here.');
+  const cartDir = path.join(opts.out, '_carts');
+  const unemptied = existsSync(cartDir) ? (await readdir(cartDir)).filter((n) => n.endsWith('.json')) : [];
+  if (unemptied.length) console.error(`CART NOT EMPTIED: ${unemptied.join(', ')} (kept in ${cartDir}; the next run tries again)`);
   console.log(`Report: ${path.join(opts.out, 'crawl-report.md')} · browse the captures with: npm run viewer`);
   q.close();
 }

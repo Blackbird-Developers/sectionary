@@ -8,11 +8,13 @@
 //   npm run review-sheets -- --seed seeds/pilot-50.csv     only the stores of one seed file
 //   npm run review-sheets -- --blocks [--type product] [--viewport mobile] [--stores-per-sheet 4]
 //                                          every block one page was cut into, in order
+//   npm run review-sheets -- --moments [--out _tmp/moments-run] [--per-sheet 6] [--only-high]
+//                                          every moment (src/moments.ts) with its frames side by side
 //
 // No image library: the sheets are small HTML pages that the already installed
 // Chromium turns into JPEGs.
 import { chromium } from 'playwright';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -30,6 +32,8 @@ async function main(): Promise<void> {
   const out = arg('--out', 'data');
   const perSheet = Number(arg('--per-sheet', '5'));
   const only = arg('--only', '').split(',').filter(Boolean);
+  // --moments reads the manifests themselves, so it works for a one-off capture too (no queue database).
+  if (argv.includes('--moments')) return momentSheets(out, Number(arg('--per-sheet', '6')), argv.includes('--only-high'));
 
   const db = new DatabaseSync(path.join(out, 'queue.sqlite'), { readOnly: true });
   let stores = db.prepare(`select host, platform, status, pages_ok, pages_total, blocks, reason from stores where status in ('done', 'partial', 'failed', 'skipped') order by (rank is null), rank, host`).all() as StoreRow[];
@@ -123,6 +127,69 @@ async function main(): Promise<void> {
   await browser.close();
   db.close();
   console.log(`${sheet} sheet(s) for ${stores.length} store(s) -> ${reviewDir}`);
+}
+
+type SheetMoment = {
+  id: string; kind: string; viewport: string; confidence: string; response?: string; error?: string; ms: number;
+  trigger: { action: string; label: string | null; via: string | null };
+  frames: { role: string; file: string; width: number; height: number }[];
+};
+
+// One row per moment: what it is and why, then its frames (before, after, the panel alone). This is how
+// moment detection gets tuned (moments brief, 10.4): is the panel the right element, and the label right?
+async function momentSheets(out: string, perSheet: number, onlyHigh: boolean): Promise<void> {
+  const reviewDir = path.join(out, '_review');
+  const manifests: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name.startsWith('_') || e.name.startsWith('.')) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (e.name === 'manifest.json') manifests.push(p);
+    }
+  };
+  walk(out);
+  const rows: string[] = [];
+  for (const file of manifests.sort()) {
+    const m = JSON.parse(readFileSync(file, 'utf8')) as { site: { host: string }; page: { type: string; url: string }; moments?: SheetMoment[] };
+    const dir = path.relative(reviewDir, path.dirname(file)).split(path.sep).join('/');
+    for (const mo of m.moments || []) {
+      if (onlyHigh && mo.confidence !== 'high') continue;
+      const phone = mo.viewport === 'mobile';
+      const frames = mo.frames
+        .map((f) => `<figure class="${f.role}${phone ? ' phone' : ''}"><figcaption>${esc(f.role)} · ${f.width}x${f.height}</figcaption><img src="${dir}/${f.file}"></figure>`)
+        .join('');
+      const label = `<b>${esc(m.site.host)}</b> · ${esc(m.page.type)} · ${esc(mo.viewport)}<br><span class="kind">${esc(mo.kind)}</span>${mo.response ? ` → ${esc(mo.response)}` : ''}<br><span class="${mo.confidence}">${esc(mo.confidence)}</span>${mo.error ? ` <i>${esc(mo.error)}</i>` : ''} · ${(mo.ms / 1000).toFixed(1)}s<br>${esc(mo.trigger.action)}${mo.trigger.label ? `: "${esc(mo.trigger.label)}"` : ''}<br><small>${esc(mo.trigger.via || '')}</small>`;
+      rows.push(`<section><div class="label">${label}</div>${frames || '<div class="empty">no frames</div>'}</section>`);
+    }
+  }
+  if (!rows.length) {
+    console.log(`no moments in the manifests under ${out}`);
+    return;
+  }
+  await mkdir(reviewDir, { recursive: true });
+  const browser = await chromium.launch();
+  const page = await browser.newPage({ viewport: { width: 1840, height: 900 } });
+  let sheet = 0;
+  for (let i = 0; i < rows.length; i += perSheet) {
+    sheet++;
+    const html = `<!doctype html><meta charset="utf-8"><style>
+      body{margin:0;padding:12px;background:#111;color:#ddd;font:13px/1.35 system-ui,sans-serif;width:1816px}
+      section{display:flex;gap:14px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #333}
+      .label{width:230px;flex:none;word-break:break-word} .kind{color:#9cf} .high{color:#7d7} .low{color:#fc6} i{color:#f99} small{color:#888}
+      figure{margin:0} figcaption{color:#999;margin-bottom:4px}
+      figure img{display:block;background:#222;object-fit:contain;object-position:top}
+      .before img,.after img{width:520px;height:325px} .phone.before img,.phone.after img{width:180px;height:390px}
+      .panel img{max-width:520px;max-height:390px} .empty{color:#666}
+    </style>${rows.slice(i, i + perSheet).join('')}`;
+    const htmlFile = path.join(reviewDir, `moments-${String(sheet).padStart(2, '0')}.html`);
+    await writeFile(htmlFile, html, 'utf8');
+    await page.goto('file:///' + path.resolve(htmlFile).split(path.sep).join('/'));
+    await page.waitForLoadState('networkidle').catch(() => {});
+    await page.screenshot({ path: htmlFile.replace(/\.html$/, '.jpg'), fullPage: true, type: 'jpeg', quality: 80 });
+  }
+  await browser.close();
+  console.log(`${sheet} moment sheet(s), ${rows.length} moment(s) -> ${reviewDir}`);
 }
 
 main();

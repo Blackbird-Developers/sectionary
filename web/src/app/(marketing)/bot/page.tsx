@@ -19,13 +19,16 @@ const DOES = [
   "At most a handful of pages per store: home, a collection or two, a product or two",
   "Desktop and phone width, one page per second at most",
   "Names itself in every request as SectionaryBot/<version>",
+  "May scroll, open the menu or a product option, and screenshot how the page reacts",
+  "Where robots.txt allows it, adds one product to a cart, photographs it and empties it again",
 ];
 
 const NEVER = [
-  "Signs in, adds to cart or places an order",
+  "Signs in, goes to checkout or places an order",
   "Captures account, checkout or search pages",
   "Collects personal data",
   "Copies your code, images or files",
+  "Types into a field",
 ];
 
 export default function BotPage() {
@@ -54,6 +57,9 @@ export default function BotPage() {
             desktop and phone width, no more than one page per second, and identifies itself in every request as{" "}
             <code>SectionaryBot/&lt;version&gt;</code> with a link to this page.
           </p>
+          <p>
+            To show how a page behaves, it may scroll, open the navigation menu, select a product option or open a product preview, and take a screenshot of the result. On stores whose robots.txt allows it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
+          </p>
         </>
       ),
     },
@@ -62,7 +68,7 @@ export default function BotPage() {
       title: "What it does not do",
       body: (
         <p>
-          It never signs in, never adds anything to a cart or places an order, never captures account, checkout or
+          It never signs in, never goes to checkout or places an order, never enters any details, never captures account, checkout or
           search pages, never collects personal data, and never copies your code, images or files. The only things
           stored are our own screenshots plus public facts about the page (its address, the platform it runs on, the
           apps it loads).
