@@ -14,7 +14,7 @@ export const blockColumns = (sql: Sql) => sql`b.id, s.host, p.type AS page_type,
   s.platform, s.theme_name, s.apps, b.buttons, b.images, b.videos, left(b.text, 400) AS text, b.clip`;
 
 /** blocks.clip (migration 0015) as the importer stores it; Block.clip is its contract shape. */
-type StoredClip = { kind: string; url: string; width: number; height: number; durationMs: number };
+type StoredClip = { kind: string; url: string; width: number; height: number; durationMs: number; rect?: { x: number; y: number; width: number; height: number } };
 export const blockJoins = (sql: Sql) => sql`blocks b JOIN captures c ON c.id=b.capture_id JOIN pages p ON p.id=c.page_id JOIN sites s ON s.id=p.site_id`;
 
 /** A row as a Block, plus `thumb` (the 600px thumbnail, see thumbOf in lib/blocks.ts), which contract v1 does not have yet. */
@@ -28,7 +28,9 @@ export function toBlock(r: Record<string, unknown>): Block & { thumb?: string } 
     src: (r.image_key as string | null) ?? "", platform: (r.platform as string | null) ?? null, theme: (r.theme_name as string | null) ?? null,
     apps: (r.apps as string[]) ?? [], buttons: r.buttons as number, images: r.images as number, videos: r.videos as number, text: r.text as string,
     ...(r.thumbnail_key ? { thumb: r.thumbnail_key as string } : {}),
-    ...(clip?.url ? { clip: { kind: clip.kind, src: clip.url, w: clip.width, h: clip.height, ms: clip.durationMs } } : {}),
+    ...(clip?.url
+      ? { clip: { kind: clip.kind, src: clip.url, w: clip.width, h: clip.height, ms: clip.durationMs, ...(clip.rect ? { rect: { x: clip.rect.x, y: clip.rect.y, w: clip.rect.width, h: clip.rect.height } } : {}) } }
+      : {}),
   };
 }
 

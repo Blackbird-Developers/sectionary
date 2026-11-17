@@ -18,6 +18,7 @@ import { platformLabel } from "@/lib/stores";
 import { cartStateOf, flowOf, pageView, FLOW_STEPS, type CartState, type Flow, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
 import { BackLink } from "@/components/back-link";
+import { BlockClip } from "@/components/block-clip";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
 
 /** From here up the screens share the row's width; below, the row scrolls sideways a screen at a time. */
@@ -873,6 +874,8 @@ function PageBody({ page, shown, markers, onLeave }: { page: ProfilePage; shown:
                 decoding="async"
                 className={cn("block h-full w-full", preview && PREVIEW_BLUR)}
               />
+              {/* A block that moves plays its clip while it is on screen (never over a blurred preview). */}
+              <BlockClip block={b} mode="view" hidden={preview} />
               {/* Where the block starts and ends, on hover or focus. */}
               <span className="pointer-events-none absolute inset-0 opacity-0 ring-2 ring-primary ring-inset transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" />
               {/* The marker names the link, so what is read out is what is shown. */}
