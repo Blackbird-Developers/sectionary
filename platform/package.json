@@ -8,6 +8,7 @@
     "db:migrate": "tsx src/migrate.ts",
     "import": "tsx src/import.ts",
     "tag-blocks": "tsx src/tagger.ts",
+    "rule-tag": "tsx src/rule-tagger.ts",
     "embed": "tsx src/embed.ts",
     "profile-sites": "tsx src/profile.ts",
     "benchmarks": "tsx src/benchmarks.ts",

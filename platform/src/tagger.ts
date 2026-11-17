@@ -9,6 +9,9 @@
 //   npm run tag-blocks -- collect              # store results of ended batches
 //   npm run tag-blocks -- report [--out file]  # counts, tokens, estimated and actual cost
 //
+//   --untagged-only (run, submit): only blocks with no block_type yet, i.e. what the free
+//   rule tagger (npm run rule-tag) could not label. The cheap way to finish the library.
+//
 //   npm run tag-blocks -- eval-create          # pick the 200-block eval set (platform/eval/)
 //   npm run tag-blocks -- eval-sheet           # HTML sheet to label it by hand
 //   npm run tag-blocks -- eval                 # tag all 200, agreement on block_type, fail < 90%
@@ -84,7 +87,7 @@ async function candidates(opts: { ids?: string[]; limit: number; force?: boolean
   let current = 0, waiting = 0;
   let after: string | undefined;
   while (todo.length < opts.limit) {
-    const page = await blockInputs(sql, { after, limit: 1000, ids: opts.ids });
+    const page = await blockInputs(sql, { after, limit: 1000, ids: opts.ids, untaggedOnly: flag("untagged-only") });
     if (!page.length) break;
     after = page[page.length - 1].id;
     const ids = page.map((b) => b.id);
