@@ -36,6 +36,70 @@ export type ManifestViewport =
   | { file: string; width: number; fullHeight: number; strategy: string; status: number | null; ms: number }
   | { error: string; status: number | null };
 
+// Moments and clips (additive, docs/CONTRACTS.md). Both are off by default in the crawler
+// (--moments, --clips): a capture without them has no `moments` key and no `moment`,
+// `motionHint` or `clip` field, exactly as before.
+
+/** What a store does when a shopper uses it. */
+export type MomentKind =
+  | "first-visit-popup" | "menu-open" | "sticky-atc"
+  | "variant-change" | "quick-view"
+  | "add-to-cart" | "cart-drawer";
+
+/** How the store answered an add to cart. */
+export type MomentResponse = "drawer" | "modal" | "toast" | "redirect" | "inline" | "none";
+
+export type MomentFrame = {
+  /** before = the page as it was; after = the screen once the store answered; panel = the element that appeared, alone. */
+  role: "before" | "after" | "panel";
+  /** Path relative to the manifest's folder. before/after: moments/<d|m>-<kind>-<role>.jpg; panel: the panel block's image. */
+  file: string;
+  /** CSS pixels. */
+  width: number;
+  height: number;
+};
+
+export type ManifestMoment = {
+  /** `<d|m>-<kind>`, with `-2`, `-3` appended if a kind repeats on a page. Unique within the manifest. */
+  id: string;
+  kind: MomentKind;
+  viewport: Viewport;
+  trigger: {
+    action: "none" | "scroll" | "hover" | "click" | "select";
+    /** The element acted on: its visible text or aria-label, at most 80 characters. */
+    label: string | null;
+    /** How it was found, for debugging. */
+    via: string | null;
+  };
+  /** add-to-cart only. */
+  response?: MomentResponse;
+  frames: MomentFrame[];
+  /** The `ref` of the block written for the panel that appeared (that block has `moment` set), when there is one. */
+  panelRef?: string | null;
+  /** high = every check for the kind passed; low = kept for tuning detection, never shown. */
+  confidence: "high" | "low";
+  ms: number;
+  error?: string;
+};
+
+/** Why a block was considered for a clip. */
+export type MotionKind = "video" | "embed" | "carousel" | "marquee" | "animation";
+
+/** A short, silent, looping recording of a block that moves by itself. The block's screenshot is its poster. */
+export type ManifestClip = {
+  kind: MotionKind;
+  /** Path relative to the manifest's folder (blocks/d-02-hero.mp4), or null when recording or encoding failed. */
+  file: string | null;
+  /** Pixels of the encoded file. */
+  width: number;
+  height: number;
+  durationMs: number;
+  bytes: number;
+  /** The part of the block that was recorded, in CSS pixels from the block's top-left corner. */
+  rect: { x: number; y: number; width: number; height: number };
+  error?: string;
+};
+
 export type ManifestBlock = {
   ref: string;
   index: number;
@@ -62,6 +126,12 @@ export type ManifestBlock = {
   style?: BlockStyle;
   /** The block's contents top to bottom, depth 3, at most 40 nodes (SEC-31). */
   outline?: OutlineNode[];
+  /** Set when this block is the panel a moment revealed (a cart drawer, an open menu), not part of the page at rest. */
+  moment?: MomentKind;
+  /** Set whenever the crawler considered the block for a clip, recorded or not. */
+  motionHint?: MotionKind;
+  /** The recorded clip, when the block was seen moving. */
+  clip?: ManifestClip;
 };
 
 export type Manifest = {
@@ -71,6 +141,8 @@ export type Manifest = {
   blocks: ManifestBlock[];
   /** Page design profile per viewport (SEC-31). Absent on captures made without --styles. */
   pageStyles?: Partial<Record<Viewport, PageStyles>>;
+  /** What the store did when the crawler used it. Absent when moments were not asked for. */
+  moments?: ManifestMoment[];
 };
 
 // ---------------------------------------------------------------------------

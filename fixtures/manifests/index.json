@@ -117,7 +117,8 @@
     "pageType": "home",
     "blocks": 42,
     "shows": [
-      "baseline"
+      "baseline",
+      "example:clip"
     ]
   },
   {
@@ -125,9 +126,10 @@
     "host": "myzoobox.com",
     "platform": "shopify",
     "pageType": "product",
-    "blocks": 10,
+    "blocks": 12,
     "shows": [
-      "baseline"
+      "baseline",
+      "example:moments"
     ]
   },
   {

@@ -52,10 +52,18 @@ export function SiteProfileView({ host }: { host: string }) {
   // and opens the other, and that close must not close the page.
   const closeMode = useCallback((mode: PageMode) => setOpen((o) => (o?.mode === mode ? null : o)), []);
   const setMode = useCallback((mode: PageMode) => setOpen((o) => (o ? { ...o, mode } : o)), []);
-  // Block by block, Web / Mobile moves to the same part of the page at the other viewport.
+  // Block by block, Web / Mobile moves to the same part of the page at the other
+  // viewport. The match is a best guess and does not reverse cleanly, so the
+  // block switched from is remembered: switching straight back (without
+  // stepping) returns to it rather than guessing again and landing a block off.
   const setBlocksViewport = useCallback(
     (viewport: Viewport) =>
-      setOpen((o) => (o?.blocks && o.viewport !== viewport ? { ...o, viewport, at: matchAt(o.blocks[o.viewport], o.at, o.blocks[viewport]) } : o)),
+      setOpen((o) => {
+        if (!o?.blocks || o.viewport === viewport) return o;
+        const back = o.cameFrom;
+        const at = back && back.viewport === viewport && back.landed === o.at ? back.at : matchAt(o.blocks[o.viewport], o.at, o.blocks[viewport]);
+        return { ...o, viewport, at, cameFrom: { viewport: o.viewport, at: o.at, landed: at } };
+      }),
     [],
   );
   const bothViewports = Boolean(open?.blocks?.desktop.length && open.blocks.mobile.length);
@@ -237,8 +245,8 @@ export function SiteProfileView({ host }: { host: string }) {
         page={open?.mode === "page" ? open.page : null}
         blocks={open?.blocks ?? null}
         viewport={open?.viewport ?? "desktop"}
-        onViewport={(viewport) => setOpen((o) => (o ? { ...o, viewport, at: 0 } : o))}
-        onBlock={(at) => setOpen((o) => (o ? { ...o, mode: "blocks", at } : o))}
+        onViewport={(viewport) => setOpen((o) => (o ? { ...o, viewport, at: 0, cameFrom: undefined } : o))}
+        onBlock={(at) => setOpen((o) => (o ? { ...o, mode: "blocks", at, cameFrom: undefined } : o))}
         onMode={setMode}
         focus={open?.at ?? 0}
         onClose={() => closeMode("page")}
@@ -362,7 +370,15 @@ export function Stack({ src, blocks, ratio }: { src: string | null; blocks: Bloc
   );
 }
 
-type OpenPage = { page: ProfilePage; blocks: PageBlocks | null; viewport: Viewport; mode: PageMode; at: number };
+type OpenPage = {
+  page: ProfilePage;
+  blocks: PageBlocks | null;
+  viewport: Viewport;
+  mode: PageMode;
+  at: number;
+  /** The last Web / Mobile switch: from which block, and where it landed. */
+  cameFrom?: { viewport: Viewport; at: number; landed: number };
+};
 
 /**
  * A page's blocks at both viewports, top to bottom: the sample carries them,
