@@ -9,6 +9,9 @@ import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
 import { isEmptyCartBlock } from './empty-cart.js';
+import type { MomentKind } from '../web/src/contracts/manifest.js';
+import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
+import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, notePending, noteTry, stopCarts, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
 export type ViewportName = 'desktop' | 'mobile';
 
@@ -32,14 +35,48 @@ export type CaptureOptions = {
   host?: string;
   /** Platform lane for the robots.txt request (Shopify throttles per IP across stores). */
   lane?: Lane;
+  /** Moments to capture (src/moments.ts). Empty, the default, changes nothing about a capture. */
+  moments: MomentKind[];
+  /**
+   * Who may have a product put in a cart by add-to-cart (src/cart-session.ts). own = config/own-sites.txt;
+   * optin = also config/moments-optin.txt (stores that said yes); all = any store whose robots.txt allows the
+   * cart, and only with MOMENTS_CART_ALL=I_HAVE_SIGN_OFF (why it stays locked: CART_ALL_ENV in cart-session.ts).
+   */
+  momentsCartScope: CartScope;
+  /** On a store's cart page: the cookies of the cart a product page filled, per viewport, so it shows its line item. */
+  cartStates?: Partial<Record<ViewportName, HeldCart>>;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own' };
 
-export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string };
+let analyticsHosts: string[] | null = null;
+const ANALYTICS_HOSTS = () => (analyticsHosts ??= loadLines('config/analytics-hosts.txt'));
+let optinHosts: string[] | null = null;
+const OPTIN_HOSTS = () => (optinHosts ??= loadLines('config/moments-optin.txt'));
+
+/** Whether this store may have a product put in its cart: scope first, then robots.txt for every cart path we use. */
+async function cartGate(polite: Politeness, url: string, host: string, opts: CaptureOptions): Promise<{ ok: boolean; reason: string }> {
+  if (cartsStopped()) return { ok: false, reason: `stopped, a cart would not empty (${cartsStopped()})` };
+  if (polite.isOwn(host)) return { ok: true, reason: 'own site' };
+  if (opts.momentsCartScope === 'own') return { ok: false, reason: 'scope own' };
+  if (opts.momentsCartScope === 'optin' && !OPTIN_HOSTS().includes(host)) return { ok: false, reason: 'scope optin' };
+  if (opts.momentsCartScope === 'all' && process.env[CART_ALL_ENV] !== CART_ALL_VALUE) return { ok: false, reason: `scope all needs ${CART_ALL_ENV}=${CART_ALL_VALUE}` };
+  const origin = new URL(url).origin;
+  for (const p of ['/cart', '/cart/add.js', '/cart/clear.js', '/cart.js']) {
+    const v = await polite.allowed(origin + p, opts.lane);
+    if (!v.ok) return { ok: false, reason: `robots.txt: ${p}` };
+  }
+  return { ok: true, reason: 'robots.txt allows the cart' };
+}
+
+/** What one viewport does with a cart: fill it on a product page, or open a filled one on the cart page and empty it after. */
+type CartJob = { fill: boolean; held?: HeldCart };
+
+/** `moment` is set on the panel a moment revealed (a popup, an open menu), written after the page's own blocks. */
+export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; ms: number }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -59,6 +96,10 @@ export type PageResult = {
   /** When no block was found at all: what the page says instead ("Restricted Access. Sorry, you cannot visit our store from your current location."). */
   emptyText: string | null;
   lines: string[];
+  /** A product page that filled the store's cart: its cookies per viewport, for the cart page (also kept in <out>/_carts until emptied). */
+  cart?: Partial<Record<ViewportName, HeldCart>>;
+  /** A cart page opened with a filled cart: the viewports whose cart was emptied again and checked. */
+  emptied?: ViewportName[];
 };
 
 // A leading language or region segment: /gl, /en-us, /us/en, /en_GB.
@@ -133,7 +174,9 @@ const HIDE_CONSENT_CSS = `
 { display: none !important; visibility: hidden !important; }
 `;
 
-async function dismissOverlays(page: Page): Promise<void> {
+// `escape: false` for moments: a store can answer the key itself. myzoobox.com shows a small fallback list
+// instead of its mega menu when the menu is hovered just after Escape.
+async function dismissOverlays(page: Page, escape = true): Promise<void> {
   // A hidden consent dialog can leave the page scroll-locked; without scrolling nothing lazy-loads.
   await page
     .evaluate(() => {
@@ -153,7 +196,7 @@ async function dismissOverlays(page: Page): Promise<void> {
       }
     })
     .catch(() => {});
-  await page.keyboard.press('Escape').catch(() => {});
+  if (escape) await page.keyboard.press('Escape').catch(() => {});
   await page
     .evaluate(() => {
       // Close (never accept) newsletter popups, modals and cookie banners.
@@ -206,7 +249,7 @@ async function autoScroll(page: Page): Promise<void> {
     .catch(() => {});
 }
 
-async function captureViewportInner(context: BrowserContext, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness): Promise<ViewportResult> {
+async function captureViewportInner(context: BrowserContext, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness, fill: { origin: string | null } | null = null): Promise<ViewportResult> {
   // tsx/esbuild wraps inner functions in a __name() helper that only exists in
   // Node. Functions we ship into the page via page.evaluate still contain the
   // call, so define a no-op shim in the page before any script runs.
@@ -237,6 +280,12 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       wall = await page.evaluate(detectWall).catch(() => null);
     }
     if (wall) return { ok: false, status, error: `wall:${wall.kind}: "${wall.text}"`, ms: Date.now() - t0 };
+    const kind = pageType(new URL(url));
+    // Hook A: the first-visit popup can only be caught before dismissOverlays closes it.
+    const mctx: MomentContext = { vp, pageDir, quality: opts.quality, pageType: kind, kinds: opts.moments, dismiss: (p: Page) => dismissOverlays(p, false) };
+    // add-to-cart runs only when capturePage cleared this store and viewport for it (cartGate, one cart per run).
+    if (fill) mctx.cart = { context, analyticsHosts: ANALYTICS_HOSTS(), pace: () => polite.waitFor(url, opts.lane), onFill: (origin) => (fill.origin = origin) };
+    const popup: MomentResult | null = opts.moments.length ? await runPopupWatch(page, mctx) : null;
     await dismissOverlays(page);
     await autoScroll(page);
     await page.waitForTimeout(600);
@@ -264,11 +313,11 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     await page.waitForTimeout(500);
 
     const site = await page.evaluate(detectSite);
+    mctx.platform = site.platform;
     const meta = await page.evaluate(pageMeta);
     const links = opts.wantLinks ? await page.evaluate(collectLinks, 400).catch(() => [] as string[]) : [];
     const collected = await page.evaluate(collectBlocks, { minHeight: opts.minHeight, maxBlocks: opts.maxBlocks });
     // "Your cart is empty" is a state, not a cart design (src/empty-cart.ts). Before the block files are named.
-    const kind = pageType(new URL(url));
     for (const b of collected.blocks) if (isEmptyCartBlock(kind, b.typeHint, b.text)) b.typeHint = 'empty-cart';
     // A page with nothing to cut up is a geo-block, a bot wall answering 200, or an empty shell. Keep what it says for the failure report.
     const emptyText = collected.blocks.length
@@ -342,14 +391,31 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
         blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0] });
       }
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, ms: Date.now() - t0 };
+    // Hook B: moments that change the page (open a menu, scroll to a sticky bar), now that every block is on disk.
+    let moments: CrawlerMoment[] = [];
+    let momentNotes: string[] = [];
+    if (opts.moments.length) {
+      // A popup that opened while the blocks were being shot would cover every frame (sisterlylab.com's
+      // sign-up form on a product page), so close late popups first, by their close buttons only.
+      await dismissOverlays(page, false);
+      const later = await runMoments(page, mctx);
+      const done = await finalizeMoments(popup ? [popup, later] : [later], pageDir, vp, collected.blocks.length + 1);
+      blocks.push(...done.panels);
+      moments = done.moments;
+      momentNotes = done.notes;
+    }
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0 };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
 }
 
-/** One viewport with a hard ceiling: when time runs out the context is closed, which unblocks anything still waiting on the page. */
-async function captureViewport(browser: Browser, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness): Promise<ViewportResult> {
+/**
+ * One viewport with a hard ceiling: when time runs out the context is closed, which unblocks anything still
+ * waiting on the page. Before it closes: the cookies of a cart add-to-cart filled (even when the page timed
+ * out mid-moment), and on a cart page opened with a filled cart's cookies, the cart is emptied and checked.
+ */
+async function captureViewport(browser: Browser, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness, job: CartJob = { fill: false }): Promise<ViewportResult & { cart?: HeldCart; empty?: { ok: boolean; rateLimited: boolean } }> {
   const v = VIEWPORTS[vp];
   const t0 = Date.now();
   let context: BrowserContext;
@@ -364,20 +430,37 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
       colorScheme: 'light',
       reducedMotion: 'reduce',
       ignoreHTTPSErrors: true,
+      ...(job.held ? { storageState: job.held.state } : {}),
     });
+    // A filled cart's page never reaches a checkout, and its "viewed cart" never reaches the store's analytics.
+    if (job.held) await installGuards(context, ANALYTICS_HOSTS());
   } catch (e) {
     return { ok: false, status: null, error: `browser: ${(e as Error).message.split('\n')[0]}`, ms: Date.now() - t0 };
   }
+  const fill = job.fill ? { origin: null as string | null } : null;
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<ViewportResult>((resolve) => {
-    timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs);
+    // Moments add up to 6 s before the blocks and 35 s after them; filling a cart up to 20 s more.
+    const extra = opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0;
+    timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
+  let r: ViewportResult;
   try {
-    return await Promise.race([captureViewportInner(context, url, vp, pageDir, opts, polite), timeout]);
+    r = await Promise.race([captureViewportInner(context, url, vp, pageDir, opts, polite, fill), timeout]);
   } finally {
     if (timer) clearTimeout(timer);
+  }
+  let cart: HeldCart | undefined;
+  let empty: { ok: boolean; rateLimited: boolean } | undefined;
+  try {
+    if (fill?.origin) cart = { origin: fill.origin, state: await context.storageState() };
+    if (job.held) empty = await emptyCart(context, job.held.origin);
+  } catch {
+    if (job.held) empty = { ok: false, rateLimited: false };
+  } finally {
     await context.close().catch(() => {});
   }
+  return { ...r, ...(cart ? { cart } : {}), ...(empty ? { empty } : {}) };
 }
 
 /** Capture one page at the requested viewports and write its manifest. Never throws. */
@@ -395,6 +478,14 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     return result;
   }
 
+  // Moments reach other people's stores only in the release that adds the bot page sentence saying the
+  // crawler interacts (moments brief, section 11, approved 17 Nov 2026). Until then: our own stores.
+  // MOMENTS_THIRD_PARTY=yes lets the 50-store pilot through.
+  if (opts.moments.length && !polite.isOwn(host) && process.env.MOMENTS_THIRD_PARTY !== 'yes') {
+    opts = { ...opts, moments: [] };
+    result.lines.push('  moments: skipped, own sites only until the bot page says the crawler interacts');
+  }
+
   const pageDir = path.join(opts.out, host, slug);
   await mkdir(pageDir, { recursive: true });
   const manifest: {
@@ -402,13 +493,48 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     page: { url: string; type: string; slug: string; capturedAt: string } & Partial<PageMeta>;
     viewports: Record<string, unknown>;
     blocks: CapturedBlock[];
+    moments?: CrawlerMoment[];
   } = { site: { host, origin: u.origin }, page: { url, type, slug, capturedAt: new Date().toISOString() }, viewports: {}, blocks: [] };
+  // Present whenever moments were asked for, even if the store did nothing; absent otherwise, as before.
+  if (opts.moments.length) manifest.moments = [];
+  // Filling a cart (src/cart-session.ts): decided once per product page.
+  let cartOk = false;
+  if (opts.moments.includes('add-to-cart') && type === 'product') {
+    const gate = await cartGate(polite, url, host, opts);
+    cartOk = gate.ok;
+    result.lines.push(`  cart: ${gate.ok ? 'may be filled' : 'not filled'} (${gate.reason})`);
+  }
 
   const vps: ViewportName[] = opts.only ? [opts.only] : ['desktop', 'mobile'];
   let okCount = 0;
   const errors: string[] = [];
   for (const vp of vps) {
-    const r = await captureViewport(browser, url, vp, pageDir, opts, polite);
+    // One cart per store and viewport per run: never when this viewport already holds one, and never while
+    // MAX_WAITING carts wait for Shopify's rate limit to let us empty them.
+    const waiting = cartOk ? waitingCarts(opts.out).length : 0;
+    const fill = cartOk && !hasPending(opts.out, host, vp) && !cartsStopped() && waiting < MAX_WAITING;
+    if (cartOk && !fill) result.lines.push(`  ${vp}: cart not filled (${cartsStopped() ? 'stopped, a cart would not empty' : hasPending(opts.out, host, vp) ? 'this store already holds one' : `${waiting} carts wait to be emptied`})`);
+    const held = opts.cartStates?.[vp];
+    const r = await captureViewport(browser, url, vp, pageDir, opts, polite, { fill, held });
+    if (r.cart) {
+      await notePending(opts.out, host, vp, r.cart);
+      result.cart = { ...result.cart, [vp]: r.cart };
+    }
+    if (held) {
+      if (r.empty?.ok) {
+        await clearPending(opts.out, host, vp);
+        result.emptied = [...(result.emptied ?? []), vp];
+        result.lines.push(`  ${vp}: cart emptied and checked`);
+      } else if (r.empty?.rateLimited) {
+        // Shopify's rate limit (429), not a refusal: written down, tried again after a quiet spell (cart-session.ts).
+        if (!hasPending(opts.out, host, vp)) await notePending(opts.out, host, vp, held);
+        await noteTry(opts.out, host, vp);
+        result.lines.push(`  ${vp}: cart not emptied yet (Shopify rate limit); kept in ${path.join(opts.out, '_carts')}, tried again after 10 quiet minutes`);
+      } else {
+        stopCarts(host);
+        result.lines.push(`  ${vp}: CART NOT EMPTIED, kept in ${path.join(opts.out, '_carts')} to try again`);
+      }
+    }
     result.ms[vp] = r.ms;
     if (!r.ok) {
       manifest.viewports[vp] = { error: r.error, status: r.status };
@@ -431,6 +557,11 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     if (result.emptyText === null && r.emptyText !== null) result.emptyText = r.emptyText;
     manifest.blocks.push(...r.blocks);
     result.blocks += okBlocks;
+    if (manifest.moments) {
+      manifest.moments.push(...r.moments);
+      const said = r.moments.map((m) => `${m.kind} ${m.confidence === 'high' ? (m.response ?? 'ok') : m.error}`);
+      result.lines.push(`  ${vp} moments: ${said.length ? said.join(', ') : 'none'}${r.momentNotes.length ? ' · ' + r.momentNotes.join('; ') : ''}`);
+    }
   }
 
   if (okCount > 0) await writeFile(path.join(pageDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');

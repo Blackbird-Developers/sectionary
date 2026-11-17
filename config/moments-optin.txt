@@ -1,0 +1,2 @@
+# Stores that gave written permission to have a product added to a cart and photographed
+# (`--moments-cart-scope optin`). One host per line, as in own-sites.txt.

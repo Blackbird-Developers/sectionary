@@ -20,6 +20,8 @@
     "review-sheets": "tsx src/review-sheets.ts",
     "wall-check": "tsx src/wall-check.ts",
     "type-hint-check": "tsx src/type-hint-check.ts",
+    "moments-check": "tsx src/moments-check.ts",
+    "clips-try": "tsx src/clips-try.ts",
     "retype-blocks": "tsx src/retype-blocks.ts",
     "prune-seeds": "tsx src/prune-seeds.ts",
     "test": "tsx --test src/*.test.ts",
