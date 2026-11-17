@@ -34,6 +34,13 @@ export type Block = {
   videos: number;
   /** First 400 characters of the block's visible text. */
   text: string;
+  /** Set when the block is the panel a moment revealed ("cart-drawer", "menu-open" ...). Absent for blocks of the page at rest. */
+  moment?: string;
+  /** A short silent looping recording of the block, when it moves by itself. The screenshot is its poster. */
+  clip?: BlockClip;
 };
+
+/** `src` is a path or absolute URL that resolves like `Block.src`; `w` and `h` are the file's pixels, `ms` its length. */
+export type BlockClip = { kind: string; src: string; w: number; h: number; ms: number };
 
 export type BlockSet = { generatedAt: string; blocks: Block[] };
