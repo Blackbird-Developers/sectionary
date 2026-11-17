@@ -40,7 +40,7 @@ End with: "Inspect the repository first and use its existing framework, componen
 
 export const isBriefTarget = (t: unknown): t is BriefTarget => typeof t === "string" && t in BRIEF_TARGETS;
 
-export const BRIEF_SYSTEM = `You write design briefs from screenshots of real e-commerce and marketing site sections, for Sectionary, a reference library of website blocks.
+export const BRIEF_SYSTEM = `You write design briefs from screenshots of real e-commerce and marketing site sections, for Blimp, a reference library of website blocks.
 
 The user has found a section they want to learn from. You receive one block: its screenshot and what the crawler measured. Describe the pattern precisely enough that someone could build their own version of it.
 

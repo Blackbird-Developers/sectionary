@@ -15,9 +15,9 @@ import showcase from "./showcase.json";
 export const metadata: Metadata = {
   title: { absolute: "Blimp · The aerial view of ecommerce" },
   description:
-    "A reference library of real online stores, cut into blocks: hero, buy box, reviews, cart. Desktop and phone side by side, with the platform, theme and apps behind each one. Join the waitlist.",
-  openGraph: { title: "Every storefront, cut into blocks", siteName: "Blimp", type: "website", url: "/welcome" },
-  twitter: { card: "summary_large_image", title: "Every storefront, cut into blocks" },
+    "See every store from above: real online stores, cut into the sections you design. Hero, buy box, reviews, cart, on desktop and phone, with the platform, theme and apps behind each one. Join the waitlist.",
+  openGraph: { title: "See every store from above", siteName: "Blimp", type: "website", url: "/welcome" },
+  twitter: { card: "summary_large_image", title: "See every store from above" },
 };
 
 // Everything on this page is real. The pictures are one store from the
@@ -106,7 +106,7 @@ const AUDIENCE = [
   },
   {
     who: "In-house design and CRO",
-    job: "Benchmark competitors, brief a redesign, and prove a pattern exists before anyone builds it.",
+    job: "Know what to change before you redesign: benchmark competitors, brief the work, and check a pattern exists before anyone builds it.",
   },
   {
     who: "Theme and app developers",
@@ -123,14 +123,15 @@ export default async function Welcome() {
     <>
       <Reveal />
       {/* ─── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
+      <section className="sky overflow-hidden">
         <div className="mx-auto grid max-w-[1200px] items-center gap-12 px-4 pt-14 pb-16 sm:px-6 md:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:gap-10 lg:pb-24">
           <div className="max-w-[560px]">
-            <h1 className="hero-rise font-heading text-[44px] leading-[0.98] font-semibold tracking-[-0.025em] text-balance sm:text-[64px] lg:text-[72px]">
-              Every storefront, cut into blocks.
+            <p className="hero-rise mb-5 font-mono text-[12px] tracking-wider text-link uppercase">The aerial view of ecommerce</p>
+            <h1 className="hero-rise font-heading text-[44px] leading-[0.98] font-extrabold tracking-[-0.045em] text-balance sm:text-[64px] lg:text-[72px]">
+              See every store from above.
             </h1>
             <p className="hero-rise mt-6 max-w-[34em] text-[17px] leading-relaxed text-muted-foreground text-pretty" style={rise(150)}>
-              Real online stores, sliced into the parts you design: hero, buy box, reviews, cart. Desktop and phone side
+              Real online stores, cut into the sections you design: hero, buy box, reviews, cart. Desktop and phone side
               by side, with the platform, theme and apps behind every one.
             </p>
             <div id="join" className="hero-rise mt-8 max-w-[480px] scroll-mt-24" style={rise(300)}>
@@ -159,8 +160,8 @@ export default async function Welcome() {
       {/* ─── The wedge, in one screen ─────────────────────────────────────── */}
       <section aria-labelledby="wedge" className="mx-auto max-w-[1200px] px-4 py-20 sm:px-6 md:py-28">
         <div data-reveal className="max-w-[640px]">
-          <h2 id="wedge" className="font-heading text-[34px] leading-[1.05] font-semibold tracking-[-0.02em] text-balance sm:text-[44px]">
-            One block, and everything behind it.
+          <h2 id="wedge" className="font-heading text-[34px] leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-[44px]">
+            One section, and everything behind it.
           </h2>
           <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground text-pretty">
             Galleries show you a pretty screenshot. Blimp tells you what it is, where it lives, how it looks on a
@@ -170,10 +171,10 @@ export default async function Welcome() {
         <Anatomy desktop={data.buyBox.desktop} mobile={data.buyBox.mobile} captured={captured} />
         <ol data-reveal-stagger className="mt-16 grid gap-x-10 gap-y-8 border-t pt-10 sm:grid-cols-2 lg:grid-cols-4">
           {[
-            ["Named like a store", "Buy box, variant picker, cart drawer, upsell. The blocks commerce is built from, not just hero and footer."],
-            ["Tech stack on every block", `Platform, theme and version, page builder, and ${stats.apps} apps and pixels, detected when the page is captured.`],
+            ["Named like a store", "Buy box, variant picker, cart drawer, upsell. The sections commerce is built from, not just hero and footer."],
+            ["Tech stack on every section", `Platform, theme and version, page builder, and ${stats.apps} apps and pixels, detected when the page is captured.`],
             ["Phone and desktop, paired", "Every page is captured at 1440 and 390 pixels wide, so the mobile version is never a guess."],
-            ["Captured, not curated", "A polite crawler does the collecting, so the library grows by thousands of stores instead of a few hundred."],
+            ["Captured, not curated", "A polite crawler does the collecting, so the library keeps growing without anyone picking favourites."],
           ].map(([title, body], i) => (
             <li key={title} className="space-y-2">
               <span className="font-mono text-[12px] text-link">{String(i + 1).padStart(2, "0")}</span>
@@ -188,11 +189,11 @@ export default async function Welcome() {
       <section aria-labelledby="find" className="border-t bg-card/40">
         <div className="mx-auto grid max-w-[1200px] gap-12 px-4 py-20 sm:px-6 md:py-28 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <div data-reveal>
-            <h2 id="find" className="font-heading text-[34px] leading-[1.05] font-semibold tracking-[-0.02em] text-balance sm:text-[44px]">
-              Ask for the exact pattern.
+            <h2 id="find" className="font-heading text-[34px] leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-[44px]">
+              Find any section in seconds.
             </h2>
             <p className="mt-4 max-w-[30em] text-[16px] leading-relaxed text-muted-foreground text-pretty">
-              Filter by block, page, platform, theme and app at once. The question you would ask a colleague is a
+              Filter by section, page, platform, theme and app at once. The question you would ask a colleague is a
               search here.
             </p>
             <Link
@@ -217,7 +218,7 @@ export default async function Welcome() {
               </div>
             </figure>
             <div>
-              <p className="font-mono text-[11px] tracking-wider text-muted-foreground uppercase">Blocks you can ask for</p>
+              <p className="font-mono text-[11px] tracking-wider text-muted-foreground uppercase">Sections you can ask for</p>
               <ul className="mt-3 flex flex-wrap gap-1.5">
                 {TAXONOMY.map((t) => (
                   <li key={t} className="inline-flex h-8 items-center rounded-lg border bg-background px-3 text-[13px] dark:border-input dark:bg-input/30">
@@ -230,24 +231,24 @@ export default async function Welcome() {
         </div>
       </section>
 
-      {/* ─── Flows ────────────────────────────────────────────────────────── */}
+      {/* ─── Journeys (the app's Flows) ───────────────────────────────────── */}
       <section aria-labelledby="flows" className="border-t">
         <div className="mx-auto max-w-[1200px] px-4 py-20 sm:px-6 md:py-28">
           <div data-reveal className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-[620px]">
-              <h2 id="flows" className="font-heading text-[34px] leading-[1.05] font-semibold tracking-[-0.02em] text-balance sm:text-[44px]">
-                Follow the whole path to checkout.
+              <h2 id="flows" className="font-heading text-[34px] leading-[1.05] font-extrabold tracking-[-0.04em] text-balance sm:text-[44px]">
+                Follow the path from home page to cart.
               </h2>
               <p className="mt-4 text-[16px] leading-relaxed text-muted-foreground text-pretty">
-                A block makes sense next to the pages around it. Flows line up one store from home to cart, so you see
-                how the pieces hand off.
+                A section makes sense next to the pages around it. Journeys line up one store from home page to cart, so
+                you see how the pieces hand off.
               </p>
             </div>
             <Link
               href="/flows"
               className="inline-flex shrink-0 items-center gap-1.5 rounded-md text-[14px] font-medium text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Open the flows <ArrowRight className="size-4" />
+              See the journeys <ArrowRight className="size-4" />
             </Link>
           </div>
           <ol data-reveal-stagger className="-mx-4 mt-12 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0">
@@ -269,7 +270,7 @@ export default async function Welcome() {
       {/* ─── Who it's for ─────────────────────────────────────────────────── */}
       <section aria-labelledby="for" className="border-t">
         <div className="mx-auto max-w-[1200px] px-4 py-20 sm:px-6 md:py-24">
-          <h2 id="for" data-reveal className="font-heading text-[28px] leading-tight font-semibold tracking-[-0.02em] sm:text-[34px]">
+          <h2 id="for" data-reveal className="font-heading text-[28px] leading-tight font-extrabold tracking-[-0.035em] sm:text-[34px]">
             Built for people who ship stores.
           </h2>
           <dl data-reveal-stagger className="mt-10 divide-y border-y">
@@ -284,13 +285,13 @@ export default async function Welcome() {
       </section>
 
       {/* ─── Closing call ─────────────────────────────────────────────────── */}
-      <section aria-labelledby="cta" className="bg-primary text-primary-foreground">
+      <section aria-labelledby="cta" className="sky-band bg-primary text-primary-foreground">
         <div data-reveal-stagger className="mx-auto grid max-w-[1200px] items-end gap-10 px-4 py-20 sm:px-6 md:py-24 lg:grid-cols-2">
           <div>
-            <h2 id="cta" className="font-heading text-[40px] leading-[1] font-semibold tracking-[-0.025em] text-balance sm:text-[56px]">
+            <h2 id="cta" className="font-heading text-[40px] leading-[1] font-extrabold tracking-[-0.045em] text-balance sm:text-[56px]">
               Get in before the library opens.
             </h2>
-            <p className="mt-5 max-w-[30em] text-[16px] leading-relaxed text-pretty opacity-80">
+            <p className="mt-5 max-w-[30em] text-[16px] leading-relaxed text-pretty">
               Agencies get invites first. We&apos;ll email you once, when yours is ready, and not again unless you ask.
             </p>
           </div>
@@ -335,7 +336,7 @@ function Shot({ block, className, alt, ratio, eager = false }: { block: Pick<Blo
  */
 function HeroCut({ page, phone, host }: { page: { block: Block; label: string; crop?: number }[]; phone: Block; host: string }) {
   return (
-    <figure className="relative mx-auto w-full max-w-[600px] lg:mr-0" aria-label="A store's home page, cut into blocks">
+    <figure className="relative mx-auto w-full max-w-[600px] lg:mr-0" aria-label="A store's home page, cut into sections">
       <div className="space-y-2 pr-8 sm:pr-14">
         {page.map(({ block, label, crop }, i) => (
           <div
@@ -346,7 +347,7 @@ function HeroCut({ page, phone, host }: { page: { block: Block; label: string; c
             <Shot
               block={block}
               eager
-              alt={`${label} block`}
+              alt={`${label} section`}
               ratio={`${block.w} / ${Math.round(block.h * (crop ?? 1))}`}
               className="rounded-md border"
             />
@@ -363,7 +364,7 @@ function HeroCut({ page, phone, host }: { page: { block: Block; label: string; c
         <Shot block={phone} eager alt="The same hero on a phone" ratio="390 / 620" className="rounded-[13px]" />
       </div>
       <figcaption className="sr-only">
-        {host} home page: {page.map(({ label }) => label.toLowerCase()).join(", ")} blocks, with the phone hero.
+        {host} home page: {page.map(({ label }) => label.toLowerCase()).join(", ")} sections, with the phone hero.
       </figcaption>
     </figure>
   );
@@ -372,7 +373,7 @@ function HeroCut({ page, phone, host }: { page: { block: Block; label: string; c
 /** The wedge in one screen: a buy box at both widths, with its record beside it. */
 function Anatomy({ desktop, mobile, captured }: { desktop: Block; mobile: Block; captured: string }) {
   const rows: [string, React.ReactNode][] = [
-    ["Block", "Buy box"],
+    ["Section", "Buy box"],
     ["Page", <>Product page · {desktop.host}</>],
     ["Widths", "Desktop 1440 · Phone 390, captured together"],
     ["Platform", platformLabel(desktop.platform ?? "")],

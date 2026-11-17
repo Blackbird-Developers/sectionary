@@ -1,8 +1,8 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-// Next Level's button recipe on a plain <button>: rust only on the default
-// (primary) variant, hairline outline otherwise, rust ring on focus.
+// Next Level's button recipe on a plain <button>: blue only on the default
+// (primary) variant, hairline outline otherwise, blue ring on focus.
 const buttonVariants = cva(
   "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent text-[13px] font-medium whitespace-nowrap transition-[color,background-color,border-color,scale] duration-150 outline-none active:scale-[0.98] select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
@@ -24,7 +24,7 @@ const buttonVariants = cva(
         "icon-sm": "size-7 touch:size-11",
       },
       active: {
-        // Selected filter or option: rust, with the button text colour on it.
+        // Selected filter or option: blue, with the button text colour on it.
         true: "border-primary bg-primary text-primary-foreground hover:bg-primary/85 hover:text-primary-foreground",
       },
     },
