@@ -8,6 +8,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
+import { isEmptyCartBlock } from './empty-cart.js';
 
 export type ViewportName = 'desktop' | 'mobile';
 
@@ -266,6 +267,9 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     const meta = await page.evaluate(pageMeta);
     const links = opts.wantLinks ? await page.evaluate(collectLinks, 400).catch(() => [] as string[]) : [];
     const collected = await page.evaluate(collectBlocks, { minHeight: opts.minHeight, maxBlocks: opts.maxBlocks });
+    // "Your cart is empty" is a state, not a cart design (src/empty-cart.ts). Before the block files are named.
+    const kind = pageType(new URL(url));
+    for (const b of collected.blocks) if (isEmptyCartBlock(kind, b.typeHint, b.text)) b.typeHint = 'empty-cart';
     // A page with nothing to cut up is a geo-block, a bot wall answering 200, or an empty shell. Keep what it says for the failure report.
     const emptyText = collected.blocks.length
       ? null

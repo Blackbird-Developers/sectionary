@@ -19,6 +19,8 @@
     "sample-seeds": "tsx src/sample-seeds.ts",
     "review-sheets": "tsx src/review-sheets.ts",
     "wall-check": "tsx src/wall-check.ts",
+    "type-hint-check": "tsx src/type-hint-check.ts",
+    "retype-blocks": "tsx src/retype-blocks.ts",
     "prune-seeds": "tsx src/prune-seeds.ts",
     "test": "tsx --test src/*.test.ts",
     "hello-capture": "tsx ops/hello-capture.ts"

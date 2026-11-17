@@ -65,33 +65,142 @@ export function collectBlocks(opts: { minHeight: number; maxBlocks: number }): C
     return r.width >= vw * 0.5 && r.height >= (slim ? 40 : opts.minHeight);
   }
 
+  // A section key or data-section-type that is only an ID names nothing. The theme editor gives a new
+  // section a timestamp key (16359276425da8ce; 1566389874427 in older themes), apps and theme tools give
+  // UUIDs (1148845a-a334-49ac-8a50-943995d6922a), and the clean-up in nameFromKey can leave a stub of one
+  // (nothing at all, a UUID cut short). Until 10 Nov 2026 these came out as block types: 6% of all blocks.
+  function isIdKey(key: string): boolean {
+    const k = key.toLowerCase().replace(/^(?:template|sections)--\d+__/, '');
+    return (
+      k === '' ||
+      /^\d+$/.test(k) ||
+      /^1\d{9}[0-9a-f]*$/.test(k) ||
+      /^[0-9a-f]{8}(?:-[0-9a-f]{4}){1,3}(?:-[0-9a-f]+)?$/.test(k) ||
+      /^(?=.*\d)[0-9a-f-]{12,}$/.test(k)
+    );
+  }
+
+  // hero_banner_kCjXcf -> hero-banner. The tag the theme editor adds to a key is random: it has a capital
+  // or a digit in it, or no vowel (footer_custom_dpdhwt). A plain word is part of the name: image_banner
+  // came out as "image" and featured_collection as "featured" while any 6+ letter tail was cut. "-section"
+  // says nothing (header_section, slideshow-section), and an ID after a name goes too (shogun-custom-html-<uuid>).
+  function nameFromKey(key: string): string {
+    return key
+      .replace(/_(?=[A-Za-z0-9]*[A-Z0-9]|[b-df-hj-np-tv-xz]+$)[A-Za-z0-9]{6,}$/, '')
+      .replace(/[-_]?\d+$/, '')
+      .replace(/_/g, '-')
+      .toLowerCase()
+      .replace(/-(?:[0-9a-f]{8}(?:-[0-9a-f]{4}){1,3}(?:-[0-9a-f]*)?|1\d{9}[0-9a-f]*)$/, '')
+      .replace(/(.)-sections?$/, '$1');
+  }
+
+  // For a section whose key is only an ID: its own name in the wrapper's classes, where themes put the
+  // schema's "class" (section-featured-blog, shopify-section--video, collage-section). Layout words are not names.
+  const notAName = /^(?:group-.*|template-.*|wrapper|padding.*|full-?width|container|inner|outer|content|default|new|spacing.*|spaced|index|home|page|main|custom|(?:custom-)?apps?(?:-wrapper)?|loaded|blocks?|theme-.*|light|dark|wide|narrow|.*bleed|bg-.*|colou?r.*|scheme.*|mobile|desktop|top|bottom|first|last|animate.*|visible|hidden|margin.*|gutter.*|no-.*|with-.*|has-.*|is-.*|vue|module|items?|wrap|global|shopify)$/;
+  function nameFromClasses(cls: string): string | null {
+    for (const c of cls.split(/\s+/)) {
+      const m = /^(?:shopify-)?section-{1,2}([a-z][a-z0-9-]*[a-z0-9])$/.exec(c) || /^([a-z][a-z0-9-]*[a-z0-9])-section$/.exec(c);
+      if (m && !notAName.test(m[1]) && !isIdKey(m[1])) return m[1];
+    }
+    return null;
+  }
+
+  // Words that name a block, found inside class names and ids, most specific first ("featured-collection"
+  // before "feature"). Dawn's section names are here because so many themes are built on it. Review apps
+  // are here for a block that is the app's own element (its star badges carry the same names, see keyInside).
+  const keys: [string, string][] = [
+    ['announcement', 'announcement'], ['hero', 'hero'], ['banner', 'banner'], ['slideshow', 'slideshow'], ['testimonial', 'testimonial'],
+    ['review', 'review'], ['jdgm', 'review'], ['yotpo', 'review'], ['okendo', 'review'], ['loox', 'review'], ['stamped', 'review'],
+    ['faq', 'faq'], ['newsletter', 'newsletter'], ['instafeed', 'instagram'], ['instagram', 'instagram'], ['pricing', 'pricing'],
+    ['image-with-text', 'image-with-text'], ['rich-text', 'rich-text'], ['multicolumn', 'multicolumn'], ['multi-column', 'multicolumn'],
+    ['collapsible-content', 'collapsible-content'], ['collage', 'collage'],
+    ['featured-collection', 'featured-collection'], ['featured-product', 'featured-product'], ['feature', 'feature'], ['logo', 'logo'],
+    ['video', 'video'], ['collection', 'collection'], ['product', 'product'], ['gallery', 'gallery'], ['cta', 'cta'], ['contact', 'contact'],
+    ['team', 'team'], ['blog', 'blog'], ['footer', 'footer'], ['header', 'header'],
+  ];
+  // "preview" is not a review (product-preview, jdgm-preview-badge: the star badge on a product card).
+  const keyIn = (words: string, skip: string[] = []): string | null => {
+    const w = words.replace(/preview/g, ' ');
+    for (const [k, type] of keys) if (!skip.includes(k) && w.includes(k)) return type;
+    return null;
+  };
+  // Inside a block only the first few levels count, nearest first and in page order: Dawn-style sections
+  // say what they are on their first child (<div class="banner ...">, <div class="collection ...">), while
+  // deeper down every product card has a star rating. From inside, "header" and "footer" are a section's
+  // own title row or a footer's logo, and a review app's name is its star badge, so those never count.
+  const notFromInside = ['header', 'footer', 'jdgm', 'yotpo', 'okendo', 'loox', 'stamped'];
+  function keyInside(el: Element, skip: string[]): string | null {
+    let level = Array.from(el.children).slice(0, 40);
+    for (let depth = 1; depth <= 3 && level.length; depth++) {
+      for (const c of level) {
+        const k = keyIn(((typeof c.className === 'string' ? c.className : '') + ' ' + (c.getAttribute('id') || '')).toLowerCase(), [...notFromInside, ...skip]);
+        if (k) return k;
+      }
+      level = level.flatMap((c) => Array.from(c.children)).slice(0, 40);
+    }
+    return null;
+  }
+  // App widgets that are a block's whole point, at any depth (star badges in product cards do not match).
+  const widgets: [string, string][] = [
+    ['#judgeme_product_reviews, .jdgm-review-widget, .jdgm-all-reviews-widget, .jdgm-carousel-wrapper, .yotpo-main-widget, #shopify-product-reviews, .spr-container, [data-oke-widget], .okeReviews-reviewsWidget, #looxReviews, .loox-reviews-default, #stamped-main-widget, .stamped-main-widget', 'review'],
+    ['[class*="instafeed"], [id*="instafeed"], [class*="instagram-feed"], .fs-timeline, iframe[src*="instagram.com"], iframe[src*="lightwidget.com"], iframe[src*="snapwidget.com"]', 'instagram'],
+  ];
+  // The heading, last and only for words that leave no doubt.
+  const headings: [RegExp, string][] = [
+    [/\b(faqs?|frequently asked|questions)\b/i, 'faq'],
+    [/\b(reviews?|testimonials?|what (our )?customers (say|are saying))\b/i, 'review'],
+    [/\b(instagram|tiktok|follow us)\b|(^|\s)@[a-z0-9_.]{3,}/i, 'instagram'],
+    // Not "subscribe" or "sign up" alone: on a subscription store those are the plans.
+    [/\b(newsletter|mailing list|join our (list|community)|sign up for (our )?(emails?|updates|newsletter))\b/i, 'newsletter'],
+    [/\b(blog|journal|articles)\b/i, 'blog'],
+    [/\b(as seen (in|on)|featured in|in the press)\b/i, 'logo'],
+    [/\b(you may also like|recommended for you|related products|complete the look)\b/i, 'product-recommendations'],
+    [/\b(best ?sellers?|new arrivals?|top picks|trending now)\b/i, 'featured-collection'],
+    [/\b(shop by (category|collection)|our collections)\b/i, 'collection-list'],
+  ];
+
   // `own`: only what the element says about itself. For something that was split into pieces a marker
   // found somewhere inside it would be wrong for most pieces (grenson.com: the body's first marked
   // descendant is the footer, and the hero came out as "footer-webpages-part").
   function typeHintFor(el: Element, own = false): string {
-    const inner = own ? null : el.querySelector('[data-section-type]');
-    const dst = (inner && inner.getAttribute('data-section-type')) || el.getAttribute('data-section-type');
-    if (dst) return dst.toLowerCase();
+    const marked = own ? [el] : [el, ...Array.from(el.querySelectorAll('[data-section-type]'))];
+    for (const n of marked) {
+      const dst = n.getAttribute('data-section-type');
+      if (dst && !isIdKey(dst)) return dst.toLowerCase();
+    }
     // getAttribute, not el.id: on a <form> holding <input name="id"> (Shopify's
     // product form) el.id is that input, and id.match threw on a product page.
     const id = el.getAttribute('id') || '';
+    const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase();
     // Shopify ids: shopify-section-template--123__hero_banner_kCjXcf | shopify-section-sections--123__header
     const m = id.match(/^shopify-section-(?:template--\d+__|sections--\d+__)?(.+)$/);
     if (m) {
-      return m[1]
-        .replace(/_[A-Za-z0-9]{6,}$/, '')
-        .replace(/[-_]?\d+$/, '')
-        .replace(/_/g, '-')
-        .toLowerCase();
+      const name = nameFromKey(m[1]);
+      if (!isIdKey(m[1]) && !isIdKey(name)) return name;
+      const named = nameFromClasses(cls);
+      if (named) return named;
     }
     const tag = el.tagName.toLowerCase();
     if (tag === 'header') return 'header';
     if (tag === 'footer') return 'footer';
     if (tag === 'nav') return 'navigation';
-    const cls = (typeof el.className === 'string' ? el.className : '').toLowerCase() + ' ' + id.toLowerCase();
-    const keys = ['announcement', 'hero', 'banner', 'slideshow', 'testimonial', 'review', 'faq', 'newsletter', 'pricing',
-      'feature', 'logo', 'video', 'collection', 'product', 'gallery', 'cta', 'contact', 'team', 'blog', 'footer', 'header'];
-    for (const k of keys) if (cls.includes(k)) return k;
+    // A section group (shopify-section-group-footer-group) only says where a section sits: it comes last.
+    const group = /(?:^|\s)shopify-section-group-(\S+)/.exec(cls);
+    // An announcement bar is a thin strip. A tall block that says "announcement" is a theme's content row
+    // (beatific.co: box__announcement, 435px).
+    const skip = el.getBoundingClientRect().height > 200 ? ['announcement'] : [];
+    const k = keyIn(cls.replace(/(?:^|\s)shopify-section-group-\S+/g, ' ') + ' ' + id.toLowerCase(), skip);
+    if (k) return k;
+    if (!own) {
+      for (const [sel, type] of widgets) if (el.querySelector(sel)) return type;
+      const inside = keyInside(el, skip);
+      if (inside) return inside;
+      const h = el.querySelector('h1, h2, h3');
+      const heading = h ? (h.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      for (const [re, type] of headings) if (re.test(heading)) return type;
+    }
+    if (group && group[1].includes('header')) return 'header';
+    if (group && group[1].includes('footer')) return 'footer';
     return 'unknown';
   }
 
