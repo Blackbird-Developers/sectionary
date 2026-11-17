@@ -1,6 +1,18 @@
-export type { Block, BlockSet, Viewport } from "./block";
+export type { Block, BlockClip, BlockSet, Viewport } from "./block";
 export type { Store, StoreSet } from "./store";
-export type { Manifest, ManifestBlock, ManifestPage, ManifestSite, ManifestViewport } from "./manifest";
+export type {
+  Manifest,
+  ManifestBlock,
+  ManifestClip,
+  ManifestMoment,
+  ManifestPage,
+  ManifestSite,
+  ManifestViewport,
+  MomentFrame,
+  MomentKind,
+  MomentResponse,
+  MotionKind,
+} from "./manifest";
 export { CONTRACT_VERSION } from "./api";
 export type {
   Account,

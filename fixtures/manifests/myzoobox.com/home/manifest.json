@@ -95,7 +95,22 @@
       "videos": 1,
       "bg": "rgb(15, 59, 60)",
       "viewport": "desktop",
-      "file": "blocks/d-02-hero.jpg"
+      "file": "blocks/d-02-hero.jpg",
+      "motionHint": "video",
+      "clip": {
+        "kind": "video",
+        "file": "blocks/d-02-hero.mp4",
+        "width": 720,
+        "height": 346,
+        "durationMs": 6000,
+        "bytes": 498000,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1440,
+          "height": 691
+        }
+      }
     },
     {
       "ref": "b3",
@@ -536,7 +551,22 @@
       "videos": 1,
       "bg": "rgb(15, 59, 60)",
       "viewport": "mobile",
-      "file": "blocks/m-02-hero.jpg"
+      "file": "blocks/m-02-hero.jpg",
+      "motionHint": "video",
+      "clip": {
+        "kind": "video",
+        "file": "blocks/m-02-hero.mp4",
+        "width": 720,
+        "height": 1144,
+        "durationMs": 6000,
+        "bytes": 612000,
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 390,
+          "height": 620
+        }
+      }
     },
     {
       "ref": "b3",

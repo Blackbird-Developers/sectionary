@@ -38,6 +38,8 @@ data/myzoobox.com/home/
   desktop.jpg            full page at 1440px, 2x (2880 pixels wide)
   mobile.jpg             full page at 390px, 2x
   blocks/d-02-hero.jpg   d = desktop, m = mobile; index; type hint
+  blocks/d-02-hero.mp4   optional: a clip of a block that moves by itself (see "Moments and clips")
+  moments/d-menu-open-after.jpg   optional: a moment's before or after frame (see "Moments and clips")
 ```
 
 - `site`: host, origin, detected platform, theme (`name`, `schema_name`,
@@ -152,3 +154,65 @@ path, without `capturedAt`. If a recapture is written to the same folder as
 the previous one, both captures point at the same image and the time machine
 compares identical pictures. The layout in the manifest section below
 (`sites/<host>/<capturedAt>/...`) avoids that.
+
+## Moments and clips (additive)
+
+Two optional additions to the capture manifest and to `Block`, from the
+moments brief and the video-sections brief (17 Nov 2026). The crawler writes
+them only when asked (`--moments`, `--clips`). A capture without them is
+exactly what it is today: no `moments` key and no `moment`, `motionHint` or
+`clip` field. `CONTRACT_VERSION` stays 1. The shapes are in `manifest.ts` and
+`block.ts`.
+
+**Moments** are what a store does when a shopper uses it: the first-visit
+popup, the open menu, a sticky add-to-cart bar, a changed product option, a
+quick view, the answer to an add to cart, the cart drawer (`MomentKind`).
+
+- `moments[]` on the manifest holds one `ManifestMoment` per moment and
+  viewport: what the crawler did (`trigger`), up to three `frames` (`before`,
+  `after`, `panel`), for an add to cart the `response` (drawer, modal, toast,
+  redirect, inline or none), `confidence` and `ms`. Only
+  `confidence: "high"` is for display; `low` is kept to tune detection.
+- The panel a moment reveals is also written as an ordinary block with
+  `moment` set. Its `typeHint` is `popup`, `menu`, `sticky-add-to-cart`,
+  `quick-view`, `cart-drawer` or `add-to-cart-<response>`. It continues the
+  viewport's block indexes, with at most six per viewport, so the image
+  pipeline, importer, tagger and wall take it as they are. `panelRef` names
+  that block, and the `panel` frame points at the same image (one file,
+  referenced twice).
+- `before` and `after` are screen-sized shots, saved as
+  `moments/<d|m>-<kind>-<role>.jpg`. `variant-change` has no panel: it is a
+  before and after pair.
+
+**Clips** are 3 to 8 second silent loops of blocks that move by themselves:
+background video, slideshows that play on their own, scrolling text and
+animation (`MotionKind`). The crawler's own browser records them in the same
+visit, before animations are switched off for the screenshots. The store's
+video files are never downloaded.
+
+- `motionHint` on a block says why the crawler looked at it. It is present
+  whenever the crawler looked, even when nothing was recorded (most
+  slideshows do not play on their own).
+- `clip` on a block is the recording: `file` (an MP4 next to the block's
+  image, null when recording or encoding failed), its pixel size (at most
+  720 wide), `durationMs`, `bytes` and the `rect` of the block that was
+  recorded. The block's screenshot is the clip's poster.
+
+`Block`, the API's item, gains `moment` (the kind, on a panel block) and
+`clip` (`{ kind, src, w, h, ms }`, where `src` resolves like the image's
+`src`).
+
+Examples, written by hand until the crawler writes real ones:
+`fixtures/manifests/myzoobox.com/products-zoologist-club-sibling-kit-easy-reader-3-month-plan`
+has four desktop moments (a sticky add-to-cart bar, an option change, an add
+to cart answered by a drawer, and the drawer itself) and their two panel
+blocks. `fixtures/manifests/myzoobox.com/home` has a clip on the hero at
+each width. `index.json` marks them `example:moments` and `example:clip`.
+Re-running `scripts/make-fixtures.mjs` replaces them.
+
+These come later, with the work that needs them:
+
+- `_moment` in `src/contract-check.ts`, with the crawler's moment type;
+- the database columns and importer (Lane B);
+- `moment` and `motion` filters on `GET /api/blocks`;
+- the cards, viewer and flows (Lane C).
