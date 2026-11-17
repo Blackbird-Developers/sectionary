@@ -3,14 +3,16 @@
 // (crawl.ts). The manifest it writes is a cross-lane contract:
 // web/src/contracts/manifest.ts, guarded by src/contract-check.ts.
 import type { Browser, BrowserContext, Page } from 'playwright';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
 import { measureStyles, STYLE_THRESHOLDS, type BlockStyleC, type OutlineNodeC, type PageStylesC, type StyleResult } from './style-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
 import { isEmptyCartBlock } from './empty-cart.js';
-import type { MomentKind } from '../web/src/contracts/manifest.js';
+import type { ManifestClip, MomentKind, MotionKind } from '../web/src/contracts/manifest.js';
+import { recordClips, type RawClip } from './clips.js';
+import { encodeClip } from './clip-encode.js';
 import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
 import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
@@ -48,9 +50,19 @@ export type CaptureOptions = {
   cartStates?: Partial<Record<ViewportName, HeldCart>>;
   /** Measure design metadata (SEC-31): pageStyles per viewport, style and outline per block. Off by default while it is proven. */
   styles?: boolean;
+  /**
+   * Record short silent clips of blocks that move by themselves (video-sections brief; src/clips.ts): motion stays on
+   * until they are recorded, then the stills are taken exactly as without clips. Off by default.
+   */
+  clips?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false };
+
+/** At most this many clips per page and viewport (the clips test: 4). */
+const CLIPS_PER_PAGE = 4;
+/** Motion switched off for the stills: CSS animations and transitions end at once. */
+const ZERO_MOTION_CSS = '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;scroll-behavior:auto!important}';
 
 let analyticsHosts: string[] | null = null;
 const ANALYTICS_HOSTS = () => (analyticsHosts ??= loadLines('config/analytics-hosts.txt'));
@@ -76,10 +88,10 @@ async function cartGate(polite: Politeness, url: string, host: string, opts: Cap
 type CartJob = { fill: boolean; held?: HeldCart };
 
 /** `moment` is set on the panel a moment revealed (a popup, an open menu), written after the page's own blocks. */
-export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[] };
+export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[]; motionHint?: MotionKind; clip?: ManifestClip };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[] }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -270,9 +282,8 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     if (status !== null && status >= 400) return { ok: false, status, error: `http-${status}`, ms: Date.now() - t0 };
     await page.waitForLoadState('load', { timeout: 20_000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-    await page
-      .addStyleTag({ content: '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;scroll-behavior:auto!important}' + HIDE_CONSENT_CSS })
-      .catch(() => {});
+    // With clips, motion stays on until they are recorded (after the blocks are found); otherwise it goes now.
+    await page.addStyleTag({ content: (opts.clips ? '' : ZERO_MOTION_CSS) + HIDE_CONSENT_CSS }).catch(() => {});
     await page.waitForTimeout(1200);
     // A wall instead of the store (human check, access denied, geo-block),
     // usually served as 200 OK. Some browser checks clear by themselves within
@@ -338,6 +349,31 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     const emptyText = collected.blocks.length
       ? null
       : await page.evaluate(() => (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)).catch(() => '');
+
+    // Clips: blocks that move by themselves (hero videos, slideshows) are recorded now, while motion is on; the
+    // frames wait on disk and are encoded after the page (captureViewport). Then motion goes off and the recorded
+    // videos are rewound, so every still below is taken exactly as without clips. A failure never fails the page.
+    let rawClips: RawClip[] = [];
+    if (opts.clips && collected.blocks.length) {
+      rawClips = await recordClips(page, { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: CLIPS_PER_PAGE, log: () => {} }).catch(() => [] as RawClip[]);
+      await page.emulateMedia({ reducedMotion: 'reduce' }).catch(() => {});
+      await page.addStyleTag({ content: ZERO_MOTION_CSS }).catch(() => {});
+      await page
+        .evaluate((refs) => {
+          for (const ref of refs) {
+            for (const v of Array.from(document.querySelectorAll(`[data-secref="${ref}"] video`))) {
+              try {
+                (v as HTMLVideoElement).currentTime = 0;
+              } catch {
+                /* not seekable */
+              }
+            }
+          }
+        }, rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref))
+        .catch(() => {});
+      await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+      await page.waitForTimeout(800);
+    }
 
     const fullFile = `${vp}.jpg`;
     const fullPath = path.join(pageDir, fullFile);
@@ -419,7 +455,7 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       moments = done.moments;
       momentNotes = done.notes;
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError };
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
@@ -443,7 +479,8 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
       userAgent: v.userAgent,
       locale: 'en-US',
       colorScheme: 'light',
-      reducedMotion: 'reduce',
+      // With clips the page moves until they are recorded; captureViewportInner turns reduced motion on after.
+      reducedMotion: opts.clips ? 'no-preference' : 'reduce',
       ignoreHTTPSErrors: true,
       ...(job.held ? { storageState: job.held.state } : {}),
     });
@@ -456,7 +493,7 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<ViewportResult>((resolve) => {
     // Moments add up to 6 s before the blocks and 35 s after them; filling a cart up to 20 s more.
-    const extra = opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0;
+    const extra = (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) + (opts.clips ? CLIPS_PER_PAGE * 16_000 + 10_000 : 0);
     timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
   let r: ViewportResult;
@@ -475,7 +512,36 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
   } finally {
     await context.close().catch(() => {});
   }
+  // Clips are encoded after the page, so encoding never counts against it; the frames go once encoded.
+  if (opts.clips) {
+    if (r.ok && r.clips?.length) await attachClips(r, pageDir, vp);
+    await rm(path.join(pageDir, '_frames', vp), { recursive: true, force: true }).catch(() => {});
+  }
   return { ...r, ...(cart ? { cart } : {}), ...(empty ? { empty } : {}) };
+}
+
+/**
+ * Encode one viewport's recorded clips into blocks/<d|m>-<NN>-<type>.mp4, next to the block's still (its poster),
+ * and put them on the blocks: clip (ManifestClip) and motionHint. A clip that will not encode keeps file null and
+ * its error, as the contract says. A candidate that turned out not to move only gets its motionHint.
+ */
+async function attachClips(r: Extract<ViewportResult, { ok: true }>, pageDir: string, vp: ViewportName): Promise<void> {
+  const byRef = new Map(r.blocks.map((b) => [b.ref, b]));
+  for (const raw of r.clips ?? []) {
+    const block = byRef.get(raw.ref);
+    if (!block) continue;
+    block.motionHint = raw.motionHint;
+    if (raw.verdict !== 'recorded' || !raw.frames || !raw.framesDir || !raw.rect || !raw.block || !raw.viewportWidth) continue;
+    const stem = block.file ? block.file.replace(/\.jpe?g$/i, '') : `blocks/${vp[0]}-${String(block.index).padStart(2, '0')}-${block.typeHint}`;
+    const file = `${stem}.mp4`;
+    const rect = { x: Math.round(raw.rect.x - raw.block.x), y: Math.round(raw.rect.y - raw.block.y), width: Math.round(raw.rect.width), height: Math.round(raw.rect.height) };
+    const res = await encodeClip({ framesDir: raw.framesDir, frames: raw.frames, rect: raw.rect, viewportWidth: raw.viewportWidth, frameRegion: raw.frameRegion, recordedMs: raw.recordedMs || 5000, outFile: path.join(pageDir, file) }).catch(
+      (e: Error) => ({ ok: false as const, error: e.message.split('\n')[0] }),
+    );
+    block.clip = res.ok
+      ? { kind: raw.motionHint, file, width: res.width, height: res.height, durationMs: res.durationMs, bytes: res.bytes, rect }
+      : { kind: raw.motionHint, file: null, width: 0, height: 0, durationMs: 0, bytes: 0, rect, error: res.error };
+  }
 }
 
 /** Capture one page at the requested viewports and write its manifest. Never throws. */
@@ -580,9 +646,16 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
       const said = r.moments.map((m) => `${m.kind} ${m.confidence === 'high' ? (m.response ?? 'ok') : m.error}`);
       result.lines.push(`  ${vp} moments: ${said.length ? said.join(', ') : 'none'}${r.momentNotes.length ? ' · ' + r.momentNotes.join('; ') : ''}`);
     }
+    if (opts.clips) {
+      const clipped = r.blocks.filter((b) => b.clip?.file).map((b) => `${b.typeHint} ${b.clip!.kind} ${(b.clip!.durationMs / 1000).toFixed(1)}s ${Math.round(b.clip!.bytes / 1024)}KB`);
+      const tried = (r.clips ?? []).filter((c) => c.verdict !== 'recorded').map((c) => `${c.motionHint} ${c.verdict}`);
+      result.lines.push(`  ${vp} clips: ${clipped.length ? clipped.join(', ') : 'none'}${tried.length ? ` · not recorded: ${tried.join(', ')}` : ''}`);
+    }
   }
 
   if (okCount > 0) await writeFile(path.join(pageDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  // The clip frames are gone once encoded (captureViewport); their now empty folder goes too.
+  if (opts.clips) await rm(path.join(pageDir, '_frames'), { recursive: true, force: true }).catch(() => {});
   // Kept so page discovery can be improved and re-run later without visiting the store again.
   if (opts.wantLinks && result.links.length) await writeFile(path.join(pageDir, 'links.json'), JSON.stringify(result.links, null, 1), 'utf8');
   result.status = okCount === vps.length ? 'captured' : okCount > 0 ? 'partial' : 'failed';

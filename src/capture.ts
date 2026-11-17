@@ -24,7 +24,7 @@ type Options = CaptureOptions & { urls: string[]; discover: boolean; seeds: stri
 
 function usage(): never {
   console.log(`Usage: npm run capture -- <url|host> [...] [--discover] [--seeds file] [--only desktop|mobile]
-                          [--out data] [--max-blocks 40] [--min-height 80] [--quality 88] [--headed] [--styles]
+                          [--out data] [--max-blocks 40] [--min-height 80] [--quality 88] [--headed] [--styles] [--clips]
                           [--moments first-visit-popup,menu-open,sticky-atc | safe | all] [--moments-cart-scope own|optin|all]
 
   --discover     for a bare host, enumerate Shopify pages via /products.json and /collections.json
@@ -44,6 +44,7 @@ function parseArgs(argv: string[]): Options {
     if (a === '--discover') o.discover = true;
     else if (a === '--headed') o.headed = true;
     else if (a === '--styles') o.styles = true;
+    else if (a === '--clips') o.clips = true;
     else if (a === '--seeds') o.seeds = argv[++i];
     else if (a === '--out') o.out = argv[++i];
     else if (a === '--only') o.only = argv[++i] as ViewportName;
