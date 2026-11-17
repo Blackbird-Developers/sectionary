@@ -185,6 +185,22 @@ test("a page uploads every asset and an images.json consumers can rebuild it fro
   assert.equal(local.images["blocks/d-00-hero.jpg"].webpKey, "shop.com/home/blocks/d-00-hero.webp");
 });
 
+test("a block's clip goes up as an MP4 beside its picture and is listed under clips", async () => {
+  const { root, manifestPath, page } = await captureDir({ "blocks/d-02-hero.jpg": await plainJpeg(1440, 600), "blocks/d-02-hero.mp4": Buffer.from("not really a video") }, ["blocks/d-02-hero.jpg"], null);
+  // The helper names only the picture; give the block its clip, as capture-page.ts attachClips does.
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.blocks[0].clip = { kind: "video", file: "blocks/d-02-hero.mp4", width: 1080, height: 450, durationMs: 5000, bytes: 18, rect: { x: 0, y: 0, width: 1440, height: 600 } };
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  const { storage, objects } = memoryStorage();
+  const audit = emptyAudit(DEFAULT_SLICE_HEIGHT);
+  await processManifest(manifestPath, root, storage, audit);
+  assert.deepEqual(audit.failures, []);
+  assert.deepEqual(audit.clips, { total: 1, ok: 1, failed: 0 });
+  assert.equal(objects.get("shop.com/home/blocks/d-02-hero.mp4")?.contentType, "video/mp4");
+  const local = JSON.parse(await readFile(join(page, "images.json"), "utf8")) as PageImages;
+  assert.deepEqual(local.clips, { "blocks/d-02-hero.mp4": { source: "shop.com/home/blocks/d-02-hero.mp4", key: "shop.com/home/blocks/d-02-hero.mp4", bytes: 18 } });
+});
+
 test("read, conversion and upload failures are counted and reported, the rest still upload", async () => {
   const { root, manifestPath, page } = await captureDir({
     "blocks/d-00-ok.jpg": await plainJpeg(400, 300),
