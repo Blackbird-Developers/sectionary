@@ -9,9 +9,9 @@ import { StoreIcon } from "@/components/store-icon";
 import { cn } from "@/lib/utils";
 import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 import { assetUrl } from "@/lib/data-source";
-import { loadSiteView } from "@/lib/load-blocks";
+import { loadPageBlocks, loadSiteView } from "@/lib/load-blocks";
 import { labelFor, PAGE_TYPE_LABEL } from "@/lib/blocks";
-import { cutBlocks, flowOf, pageView, FLOW_STEPS, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
+import { cartStateOf, cutBlocks, flowOf, pageView, FLOW_STEPS, type CartState, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
 
@@ -189,6 +189,7 @@ export function FlowView({ host }: { host: string }) {
             return (
               <li key={step.type} className="flex min-w-0 flex-col gap-2 min-[900px]:w-[340px] min-[900px]:shrink-0">
                 <StepColumn
+                  host={host}
                   step={step}
                   number={i + 1}
                   at={at}
@@ -259,7 +260,34 @@ function ViewportSwitch({ value, onChange }: { value: Viewport; onChange: (v: Vi
 /** Frame shared by pages and gaps: capped on phones, a column-high scroller from 900px. */
 const FRAME = "relative overflow-hidden rounded-lg border bg-muted/40 min-[900px]:h-[calc(100dvh-15rem)] min-[900px]:min-h-80";
 
+/**
+ * What the cart step's page shows (lib/flows.ts cartStateOf): from the page's blocks when the source
+ * has them, otherwise from one request for that page's blocks. Null for every other step.
+ */
+function useCartState(host: string, page: ProfilePage | null): CartState | "loading" | null {
+  const own = page ? (page.desktopBlocks.length ? page.desktopBlocks : page.mobileBlocks) : [];
+  const [fetched, setFetched] = useState<{ url: string; value: CartState } | null>(null);
+  const url = page?.url ?? null;
+  const needsFetch = Boolean(url) && own.length === 0;
+  useEffect(() => {
+    if (!url || !needsFetch) return;
+    let alive = true;
+    loadPageBlocks(host, url).then(
+      (blocks) => alive && setFetched({ url, value: cartStateOf(blocks.desktop.length ? blocks.desktop : blocks.mobile) }),
+      // Could not tell: show the page as before rather than hide it.
+      () => alive && setFetched({ url, value: "filled" }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [host, url, needsFetch]);
+  if (!page) return null;
+  if (own.length) return cartStateOf(own);
+  return fetched && fetched.url === page.url ? fetched.value : "loading";
+}
+
 function StepColumn({
+  host,
   step,
   number,
   at,
@@ -271,6 +299,7 @@ function StepColumn({
   regionRef,
   onLeave,
 }: {
+  host: string;
   step: FlowStep;
   number: number;
   /** Which of the step's pages is shown. */
@@ -291,6 +320,11 @@ function StepColumn({
   const shown = page ? pageView(page, viewport) : null;
   const tall = shown ? shown.ratio > PREVIEW_RATIO : false;
   const cap = tall && cut ? PREVIEW_RATIO : null;
+  // The cart step: every cart captured so far is empty, or the store sends /cart elsewhere. Such a cart is
+  // "not available", in its own frame, and can still be opened on request.
+  const cart = useCartState(host, step.type === "cart" ? page : null);
+  const [showAnyway, setShowAnyway] = useState(false);
+  const unavailable = (cart === "empty" || cart === "not-a-cart") && !showAnyway;
 
   return (
     <>
@@ -299,7 +333,7 @@ function StepColumn({
           aria-hidden
           className={cn(
             "flex size-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-medium tabular-nums",
-            page ? "bg-primary text-primary-foreground" : "border border-dashed text-muted-foreground",
+            page && !unavailable ? "bg-primary text-primary-foreground" : "border border-dashed text-muted-foreground",
           )}
         >
           {number}
@@ -329,6 +363,20 @@ function StepColumn({
           <p className="max-w-56 text-[12px] text-muted-foreground">
             Not captured for this store.
           </p>
+        </div>
+      ) : cart === "loading" ? (
+        <div aria-busy className={cn(FRAME, "aspect-[4/3] animate-pulse min-[900px]:aspect-auto")} />
+      ) : unavailable ? (
+        <div className={cn(FRAME, "flex aspect-[4/3] flex-col items-center justify-center gap-2 border-dashed bg-transparent p-6 text-center min-[900px]:aspect-auto")}>
+          <p className="text-[13px] font-medium">Not available</p>
+          <p className="max-w-60 text-[12px] text-muted-foreground">
+            {cart === "empty"
+              ? "This store's cart was empty when we visited. Our crawler never adds products to other stores' carts."
+              : "This store's cart link opens another page, so there is no cart page to show."}
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => setShowAnyway(true)}>
+            {cart === "empty" ? "Show the empty cart" : "Show what it opens"}
+          </Button>
         </div>
       ) : (
         <>

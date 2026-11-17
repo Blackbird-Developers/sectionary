@@ -95,6 +95,29 @@ function byFlow(a: FlowSummary, b: FlowSummary): number {
   );
 }
 
+/**
+ * What a captured cart page shows. The crawler opens every cart in a fresh browser and never adds
+ * products to other stores' carts, so every cart captured so far is empty (771 blocks labelled
+ * "empty-cart" on 17 Nov 2026), and many stores send /cart to their home page (the cart is a drawer).
+ * Flows shows the cart step as "not available" unless the page really shows products in a cart.
+ */
+export type CartState = "filled" | "empty" | "not-a-cart";
+
+/** Blocks around every page: a closed cart drawer in the header can carry cart words on any page. */
+const FRAME_BLOCK = /(^|-)(header|footer|navigation|announcement)(-|$)/;
+/** A price that is not zero: "$40.00", "€15", "1.299 kr". */
+const MONEY = /[$€£¥₹]\s?(?!0[.,]00\b)\d|\d[\d.,]*\s?(?:USD|EUR|GBP|kr|zł)\b/;
+
+export function cartStateOf(blocks: Block[]): CartState {
+  const body = blocks.filter((b) => !FRAME_BLOCK.test(b.typeHint));
+  if (body.some((b) => b.typeHint === "empty-cart")) return "empty";
+  const lineItems = (b: Block) => MONEY.test(b.text) && /\b(sub-?total|quantity|qty|remove)\b/i.test(b.text) && /\b(cart|basket|bag|check ?out)\b/i.test(b.text);
+  if (body.some(lineItems)) return "filled";
+  // Something that calls itself a cart but shows no products counts as empty.
+  if (body.some((b) => /cart|basket|bag/i.test(b.typeHint) || /\b(your|shopping|my) (cart|basket|bag)\b/i.test(b.text))) return "empty";
+  return "not-a-cart";
+}
+
 /** The numbers the SEC-20 Done when is read from. */
 export function flowCounts(summaries: FlowSummary[]): { complete: number; withCart: number; captured: number } {
   const complete = summaries.filter((s) => s.flow.complete);
