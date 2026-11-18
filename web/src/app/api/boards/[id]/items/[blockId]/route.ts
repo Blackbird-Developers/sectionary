@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 type Ctx = { params: Promise<{ id: string; blockId: string }> };
 
-/** PATCH { note } sets the note shown under the block on the shared board. */
+/** PATCH { note } sets the note shown under the item on the shared board. `blockId` is the item key: a block id, or a site host (migration 16). */
 export async function PATCH(request: Request, { params }: Ctx) {
   try {
     const { id, blockId } = await params;

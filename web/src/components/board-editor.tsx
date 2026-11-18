@@ -3,21 +3,32 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, GripVertical, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Check, Copy, ExternalLink, GripVertical, LayoutGrid, ListOrdered, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { StoreIcon } from "@/components/store-icon";
+import { InlineBlockViewer } from "@/components/inline-block-viewer";
+import { SavedBlockCard, SavedSiteCard, SavedTabs } from "@/components/saved-frames";
+import { EmptyTab, GRID } from "@/components/saved-library";
 import { cn } from "@/lib/utils";
 import { assetUrl } from "@/lib/data-source";
-import { boardStore } from "@/lib/boards";
-import { labelFor } from "@/lib/blocks";
+import { boardStore, itemKey, tabOf, type SavedTab } from "@/lib/boards";
+import { labelFor, type Block } from "@/lib/blocks";
 import { markReturn } from "@/lib/return-to";
 import type { Board, BoardItem } from "@/contracts/api";
 
 const fieldClass =
   "w-full rounded-lg border bg-background px-2.5 outline-none placeholder:text-muted-foreground focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
-/** One board: rename it, brief it, order the blocks, note each one, and share it. */
+/**
+ * One folder: rename it, brief it, and share it. Its saves show the way Boards
+ * does (Web, Mobile and Sites pills, each in its own screen); "Arrange & notes"
+ * is the list where they are put in order and noted for the client.
+ */
 export function BoardEditor({ id }: { id: string }) {
   const [board, setBoard] = useState<Board | null>(null);
+  const [view, setView] = useState<"grid" | "arrange">("grid");
+  const [tab, setTab] = useState<SavedTab | null>(null);
+  const [viewing, setViewing] = useState<{ list: Block[]; at: number } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [saving, setSaving] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -80,8 +91,18 @@ export function BoardEditor({ id }: { id: string }) {
     const [moved] = items.splice(from, 1);
     items.splice(to, 0, moved);
     const next = { ...board, items: items.map((it, position) => ({ ...it, position })) };
-    save(() => boardStore.update(board.id, { order: items.map((i) => i.blockId) }), next);
+    save(() => boardStore.update(board.id, { order: items.map(itemKey) }), next);
   };
+
+  const counts: Record<SavedTab, number> = { web: 0, mobile: 0, sites: 0 };
+  for (const item of board.items) {
+    const t = tabOf(item);
+    if (t) counts[t]++;
+  }
+  // Open on the first tab that has something, until one is picked.
+  const shownTab: SavedTab = tab ?? (counts.web ? "web" : counts.mobile ? "mobile" : counts.sites ? "sites" : "web");
+  const shown = board.items.filter((i) => tabOf(i) === shownTab);
+  const blocks = shown.flatMap((i) => (i.block ? [i.block] : []));
 
   return (
     <div className="mx-auto flex w-full max-w-[1100px] flex-col gap-5">
@@ -99,7 +120,7 @@ export function BoardEditor({ id }: { id: string }) {
           <BlurInput
             key={`n-${board.updatedAt}`}
             value={board.name}
-            label="Board name"
+            label="Folder name"
             className={cn(fieldClass, "h-10 font-heading text-[20px] font-semibold")}
             onCommit={(name) => name.trim() && name !== board.name && save(() => boardStore.update(board.id, { name }))}
           />
@@ -117,25 +138,87 @@ export function BoardEditor({ id }: { id: string }) {
         <SharePanel board={board} onShared={(shared) => save(() => boardStore.update(board.id, { shared }), { ...board, shared })} />
       </div>
 
-      {board.items.length === 0 ? (
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {view === "grid" && <SavedTabs value={shownTab} onChange={setTab} counts={counts} />}
+        <div role="radiogroup" aria-label="Layout" className="ml-auto inline-flex rounded-full border bg-muted/60 p-1">
+          {(
+            [
+              ["grid", "Grid", LayoutGrid],
+              ["arrange", "Arrange & notes", ListOrdered],
+            ] as const
+          ).map(([value, label, Icon]) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={view === value}
+              onClick={() => setView(value)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-[12px] font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ring touch:h-11",
+                view === value ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="size-3.5" aria-hidden /> {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === "grid" ? (
+        shown.length === 0 ? (
+          <EmptyTab tab={shownTab} note={`Press Save on anything and tick "${board.name}" to put it here.`} />
+        ) : (
+          <ul className={GRID[shownTab]}>
+            {shown.map((item) => {
+              const key = itemKey(item);
+              const remove = (
+                <Button
+                  variant="secondary"
+                  size="icon-sm"
+                  aria-label="Remove from this folder"
+                  title="Remove from this folder"
+                  className="size-8 rounded-full shadow-md"
+                  onClick={() => save(() => boardStore.removeItem(board.id, key), { ...board, items: board.items.filter((i) => itemKey(i) !== key) })}
+                >
+                  <X />
+                </Button>
+              );
+              return (
+                <li key={key}>
+                  {item.block ? (
+                    <SavedBlockCard block={item.block} onOpen={() => setViewing({ list: blocks, at: blocks.indexOf(item.block!) })} actions={remove} />
+                  ) : item.site ? (
+                    <SavedSiteCard store={item.site} actions={remove} />
+                  ) : (
+                    <div className="grid aspect-[16/11] place-items-center rounded-xl border border-dashed text-[12px] text-muted-foreground">No longer in the library</div>
+                  )}
+                  {item.note && <p className="mt-1.5 line-clamp-2 px-0.5 text-[12px] text-muted-foreground">“{item.note}”</p>}
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : board.items.length === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
-          <p>No blocks on this board yet.</p>
+          <p>Nothing in this folder yet.</p>
           <p className="mt-1 text-[12px]">
             Open any block on the{" "}
             <Link href="/" className="text-primary underline-offset-4 hover:underline">
               wall
             </Link>
-            , press Save and tick this board.
+            , press Save and tick this folder.
           </p>
         </div>
       ) : (
         <ItemList
           items={board.items}
           onMove={reorder}
-          onNote={(blockId, note) => save(() => boardStore.setNote(board.id, blockId, note))}
-          onRemove={(blockId) => save(() => boardStore.removeItem(board.id, blockId), { ...board, items: board.items.filter((i) => i.blockId !== blockId) })}
+          onNote={(key, note) => save(() => boardStore.setNote(board.id, key, note))}
+          onRemove={(key) => save(() => boardStore.removeItem(board.id, key), { ...board, items: board.items.filter((i) => itemKey(i) !== key) })}
         />
       )}
+
+      <InlineBlockViewer viewing={viewing} onViewing={setViewing} />
 
       <div className="border-t pt-4">
         <Button
@@ -143,7 +226,7 @@ export function BoardEditor({ id }: { id: string }) {
           size="sm"
           className="text-destructive"
           onClick={async () => {
-            if (!confirm(`Delete "${board.name}"? Its share link stops working.`)) return;
+            if (!confirm(`Delete "${board.name}"? Its share link stops working. Saves stay in Saved.`)) return;
             try {
               await boardStore.remove(board.id);
               router.push("/boards");
@@ -152,7 +235,7 @@ export function BoardEditor({ id }: { id: string }) {
             }
           }}
         >
-          <Trash2 /> Delete board
+          <Trash2 /> Delete folder
         </Button>
       </div>
     </div>
@@ -261,8 +344,9 @@ function ItemList({
 }: {
   items: BoardItem[];
   onMove: (from: number, to: number) => void;
-  onNote: (blockId: string, note: string) => void;
-  onRemove: (blockId: string) => void;
+  /** `key`: a block's id, or a site's host. */
+  onNote: (key: string, note: string) => void;
+  onRemove: (key: string) => void;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
@@ -271,21 +355,23 @@ function ItemList({
   const move = (from: number, to: number) => {
     onMove(from, to);
     const item = items[from];
-    if (live.current && item?.block) live.current.textContent = `${labelFor(item.block.typeHint)} moved to position ${to + 1} of ${items.length}.`;
+    const name = item?.block ? labelFor(item.block.typeHint) : item?.site?.brand;
+    if (live.current && name) live.current.textContent = `${name} moved to position ${to + 1} of ${items.length}.`;
   };
 
   return (
     <>
       <p ref={live} className="sr-only" aria-live="polite" />
       <p className="text-[12px] text-muted-foreground">
-        {items.length} block{items.length === 1 ? "" : "s"} · drag to reorder, or use the arrows. The client sees them in this order.
+        {items.length} save{items.length === 1 ? "" : "s"} · drag to reorder, or use the arrows. The client sees them in this order.
       </p>
       <ol className="flex flex-col gap-2">
         {items.map((it, i) => {
           const b = it.block;
+          const key = itemKey(it);
           return (
             <li
-              key={it.blockId}
+              key={key}
               draggable
               onDragStart={(e) => {
                 setDrag(i);
@@ -329,6 +415,14 @@ function ItemList({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={assetUrl(b.src)} alt="" loading="lazy" className="block max-h-40 w-full object-cover object-top" />
                 </Link>
+              ) : it.site ? (
+                <Link
+                  href={`/sites/${encodeURIComponent(it.site.host)}`}
+                  aria-label={`Open ${it.site.brand}`}
+                  className="grid h-20 w-24 shrink-0 place-items-center rounded-md border bg-muted outline-none transition-colors duration-150 hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring sm:w-44"
+                >
+                  <StoreIcon host={it.site.host} brand={it.site.brand} size={36} className="rounded-xl" />
+                </Link>
               ) : (
                 <div className="w-24 shrink-0 overflow-hidden rounded-md border sm:w-44">
                   <div className="grid h-20 place-items-center text-[11px] text-muted-foreground">Removed from library</div>
@@ -336,29 +430,29 @@ function ItemList({
               )}
               <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-[12px]">
-                  <span className="font-medium">{b ? labelFor(b.typeHint) : "Block"}</span>
+                  <span className="font-medium">{b ? labelFor(b.typeHint) : it.site ? it.site.brand : "Block"}</span>
                   <span className="min-w-0 truncate text-muted-foreground">
-                    {b?.host} · {b?.viewport}
+                    {b ? `${b.host} · ${b.viewport === "mobile" ? "mobile" : "web"}` : it.site ? `${it.site.host} · site` : ""}
                   </span>
                 </div>
                 <BlurInput
-                  key={`${it.blockId}-${it.note ?? ""}`}
+                  key={`${key}-${it.note ?? ""}`}
                   multiline
                   value={it.note ?? ""}
-                  label={`Note for block ${i + 1}`}
+                  label={`Note for save ${i + 1}`}
                   placeholder="Note for the client: what to look at here"
                   className={cn(fieldClass, "min-h-14 flex-1 py-1.5 text-[12px]")}
-                  onCommit={(note) => note !== (it.note ?? "") && onNote(it.blockId, note)}
+                  onCommit={(note) => note !== (it.note ?? "") && onNote(key, note)}
                 />
               </div>
               <div className="flex shrink-0 flex-col gap-0.5">
-                <Button variant="ghost" size="icon-sm" aria-label={`Move block ${i + 1} up`} disabled={i === 0} onClick={() => move(i, i - 1)}>
+                <Button variant="ghost" size="icon-sm" aria-label={`Move save ${i + 1} up`} disabled={i === 0} onClick={() => move(i, i - 1)}>
                   <ArrowUp />
                 </Button>
-                <Button variant="ghost" size="icon-sm" aria-label={`Move block ${i + 1} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)}>
+                <Button variant="ghost" size="icon-sm" aria-label={`Move save ${i + 1} down`} disabled={i === items.length - 1} onClick={() => move(i, i + 1)}>
                   <ArrowDown />
                 </Button>
-                <Button variant="ghost" size="icon-sm" aria-label={`Remove block ${i + 1}`} onClick={() => onRemove(it.blockId)}>
+                <Button variant="ghost" size="icon-sm" aria-label={`Remove save ${i + 1}`} onClick={() => onRemove(key)}>
                   <X />
                 </Button>
               </div>

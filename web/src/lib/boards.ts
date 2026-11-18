@@ -1,7 +1,8 @@
 "use client";
 
-import type { Board, BoardCreated, BoardPatch } from "@/contracts/api";
+import type { Board, BoardCreated, BoardItem, BoardPatch } from "@/contracts/api";
 import type { Block } from "@/contracts/block";
+import type { Store } from "@/contracts/store";
 import { API_MODE } from "@/lib/data-source";
 
 // Boards on the client. Two stores behind one interface:
@@ -16,7 +17,36 @@ import { API_MODE } from "@/lib/data-source";
 //   board, so it works with no database. It is a snapshot: copy it again after
 //   changes.
 
-export type BoardSummary = { id: string; name: string; blockIds: string[]; cover: Block | null; updatedAt: string };
+/** What can be saved: a block (shown as Web or Mobile by its viewport) or a whole site. */
+export type SavedTarget = { kind: "block"; block: Block } | { kind: "site"; store: Store };
+
+/** The key an item goes by in the store and the routes: a block's id, or a site's host. */
+export const targetKey = (t: SavedTarget) => (t.kind === "block" ? t.block.id : t.store.host);
+export const itemKey = (i: BoardItem) => i.blockId ?? i.host ?? "";
+export const isSiteItem = (i: BoardItem) => i.kind === "site" || (!i.blockId && Boolean(i.host));
+export const isFolder = (b: { kind?: Board["kind"] }) => b.kind !== "library";
+
+/** The three tabs on Boards: Web and Mobile blocks, and whole sites. */
+export type SavedTab = "web" | "mobile" | "sites";
+export const tabOf = (i: BoardItem): SavedTab | null =>
+  isSiteItem(i) ? "sites" : i.block ? (i.block.viewport === "mobile" ? "mobile" : "web") : null;
+
+export type BoardSummary = {
+  id: string;
+  kind: "folder" | "library";
+  name: string;
+  /** Block ids only (what the older list and the wall read). */
+  blockIds: string[];
+  /** Every item's key: block ids and site hosts. */
+  keys: string[];
+  cover: Block | null;
+  /** The first few items that can be drawn, for a folder's cover. */
+  covers: BoardItem[];
+  counts: Record<SavedTab, number>;
+  /** Every item, blocks and sites, in board order. */
+  items: BoardItem[];
+  updatedAt: string;
+};
 
 export interface BoardStore {
   /** "live" links follow later edits; "snapshot" links freeze the board when copied. */
@@ -24,11 +54,15 @@ export interface BoardStore {
   list(): Promise<BoardSummary[]>;
   get(id: string): Promise<Board>;
   create(name: string, description?: string | null): Promise<Board>;
+  /** The Saved list: the account's (or this browser's) library, made on first use. */
+  library(): Promise<Board>;
   update(id: string, patch: BoardPatch): Promise<Board>;
   remove(id: string): Promise<void>;
-  add(id: string, block: Block): Promise<Board>;
-  removeItem(id: string, blockId: string): Promise<Board>;
-  setNote(id: string, blockId: string, note: string): Promise<Board>;
+  /** Save a block or a site. A Block is accepted as before, for callers that only save blocks. */
+  add(id: string, target: SavedTarget | Block): Promise<Board>;
+  /** `key` is the item's: a block's id, or a site's host. */
+  removeItem(id: string, key: string): Promise<Board>;
+  setNote(id: string, key: string, note: string): Promise<Board>;
   /** Absolute share URL, or null while sharing is off. */
   shareUrl(board: Board): string | null;
 }
@@ -65,10 +99,24 @@ function write(key: string, value: unknown) {
   }
 }
 
-const summary = (b: Board): BoardSummary => ({
-  id: b.id, name: b.name, updatedAt: b.updatedAt,
-  blockIds: b.items.map((i) => i.blockId), cover: b.items.find((i) => i.block)?.block ?? null,
-});
+const asTarget = (t: SavedTarget | Block): SavedTarget => ("kind" in t && (t.kind === "block" || t.kind === "site") ? t : { kind: "block", block: t as Block });
+
+function summary(b: Board): BoardSummary {
+  const counts: Record<SavedTab, number> = { web: 0, mobile: 0, sites: 0 };
+  for (const i of b.items) {
+    const tab = tabOf(i);
+    if (tab) counts[tab]++;
+  }
+  return {
+    id: b.id, kind: b.kind === "library" ? "library" : "folder", name: b.name, updatedAt: b.updatedAt,
+    blockIds: b.items.flatMap((i) => (i.blockId ? [i.blockId] : [])),
+    keys: b.items.map(itemKey),
+    cover: b.items.find((i) => i.block)?.block ?? null,
+    covers: b.items.filter((i) => i.block || i.site).slice(0, 3),
+    counts,
+    items: b.items,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // API store
@@ -86,6 +134,38 @@ async function call<T>(path: string, init: RequestInit & { token?: string } = {}
     throw Object.assign(new Error(err?.error ?? `HTTP ${res.status}`), { status: res.status, code: err?.code });
   }
   return (res.status === 204 ? undefined : await res.json()) as T;
+}
+
+/**
+ * A server from before migration 16 sends boards with no `kind` and ignores
+ * `kind: "library"`, so asking it for the Saved list would make an ordinary
+ * folder called "Saved" on every press. Refuse instead, and say why.
+ */
+const OLD_SERVER = "Saved needs the database update that comes with this release (migration 0016), which this server does not have yet. Folders still work.";
+
+let pendingLibrary: Promise<Board> | null = null;
+
+async function findOrMakeLibrary(): Promise<Board> {
+  // Signed in, the account's boards; signed out, the ones this browser holds a token for.
+  const owned = await call<{ items: Board[] }>("/api/boards").then((r) => r.items, (e: { status?: number }) => (e.status === 401 ? [] : Promise.reject(e)));
+  const held = await Promise.all(
+    Object.keys(tokens())
+      .filter((id) => !owned.some((b) => b.id === id))
+      .map((id) => call<Board>(`/api/boards/${id}`, { token: tokens()[id] }).catch(() => null)),
+  );
+  const all = [...owned, ...held.filter((b): b is Board => b !== null)];
+  if (all.some((b) => !("kind" in b))) throw new Error(OLD_SERVER);
+  const mine = all.filter((b) => b.kind === "library").sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+  if (mine) return mine;
+
+  const { board, token } = await call<BoardCreated>("/api/boards", { method: "POST", body: JSON.stringify({ name: "Saved", kind: "library" }) });
+  if (board.kind !== "library") {
+    // An old server made a plain folder: take it back out, so nothing is left behind.
+    await call<void>(`/api/boards/${board.id}`, { method: "DELETE", token }).catch(() => undefined);
+    throw new Error(OLD_SERVER);
+  }
+  if (token) write(TOKENS, { ...tokens(), [board.id]: token });
+  return board;
 }
 
 const apiStore: BoardStore = {
@@ -111,6 +191,11 @@ const apiStore: BoardStore = {
     write(TOKENS, { ...tokens(), [board.id]: token });
     return changed(board);
   },
+  library() {
+    // One lookup at a time: two Save presses in a row must not make two lists.
+    pendingLibrary ??= findOrMakeLibrary().finally(() => (pendingLibrary = null));
+    return pendingLibrary;
+  },
   update: async (id, patch) => changed(await call<Board>(`/api/boards/${id}`, { method: "PATCH", token: tokens()[id], body: JSON.stringify(patch) })),
   async remove(id) {
     await call<void>(`/api/boards/${id}`, { method: "DELETE", token: tokens()[id] });
@@ -119,9 +204,13 @@ const apiStore: BoardStore = {
     write(TOKENS, t);
     changed(null);
   },
-  add: async (id, block) => changed(await call<Board>(`/api/boards/${id}/items`, { method: "POST", token: tokens()[id], body: JSON.stringify({ blockId: block.id }) })),
-  removeItem: async (id, blockId) => changed(await call<Board>(`/api/boards/${id}/items/${blockId}`, { method: "DELETE", token: tokens()[id] })),
-  setNote: async (id, blockId, note) => changed(await call<Board>(`/api/boards/${id}/items/${blockId}`, { method: "PATCH", token: tokens()[id], body: JSON.stringify({ note }) })),
+  async add(id, t) {
+    const target = asTarget(t);
+    const body = target.kind === "block" ? { blockId: target.block.id } : { host: target.store.host };
+    return changed(await call<Board>(`/api/boards/${id}/items`, { method: "POST", token: tokens()[id], body: JSON.stringify(body) }));
+  },
+  removeItem: async (id, key) => changed(await call<Board>(`/api/boards/${id}/items/${encodeURIComponent(key)}`, { method: "DELETE", token: tokens()[id] })),
+  setNote: async (id, key, note) => changed(await call<Board>(`/api/boards/${id}/items/${encodeURIComponent(key)}`, { method: "PATCH", token: tokens()[id], body: JSON.stringify({ note }) })),
   shareUrl: (b) => (b.shared ? `${location.origin}/b/${b.shareSlug}` : null),
 };
 
@@ -151,16 +240,24 @@ const localStore: BoardStore = {
   },
   async create(name, description) {
     const now = new Date().toISOString();
-    const board: Board = { id: crypto.randomUUID(), name: name.trim().slice(0, 120), description: description?.trim() || null, shareSlug: "", shared: true, createdAt: now, updatedAt: now, items: [] };
+    const board: Board = { id: crypto.randomUUID(), kind: "folder", name: name.trim().slice(0, 120), description: description?.trim() || null, shareSlug: "", shared: true, createdAt: now, updatedAt: now, items: [] };
     write(LOCAL, [board, ...localBoards()]);
     return changed(board);
+  },
+  async library() {
+    const mine = localBoards().find((b) => b.kind === "library");
+    if (mine) return mine;
+    const now = new Date().toISOString();
+    const board: Board = { id: crypto.randomUUID(), kind: "library", name: "Saved", description: null, shareSlug: "", shared: false, createdAt: now, updatedAt: now, items: [] };
+    write(LOCAL, [...localBoards(), board]);
+    return board;
   },
   update: async (id, patch) =>
     saveLocal(id, (b) => {
       let items = b.items;
       if (patch.order) {
         const rank = new Map(patch.order.map((x, i) => [x, i]));
-        items = renumber([...items].sort((x, y) => (rank.get(x.blockId) ?? 1e9) - (rank.get(y.blockId) ?? 1e9)));
+        items = renumber([...items].sort((x, y) => (rank.get(itemKey(x)) ?? 1e9) - (rank.get(itemKey(y)) ?? 1e9)));
       }
       return {
         ...b, items,
@@ -172,15 +269,27 @@ const localStore: BoardStore = {
     write(LOCAL, localBoards().filter((b) => b.id !== id));
     changed(null);
   },
-  add: async (id, block) =>
-    saveLocal(id, (b) => (b.items.some((i) => i.blockId === block.id) ? b : { ...b, items: renumber([...b.items, { blockId: block.id, note: null, position: 0, block }]) })),
-  removeItem: async (id, blockId) => saveLocal(id, (b) => ({ ...b, items: renumber(b.items.filter((i) => i.blockId !== blockId)) })),
-  setNote: async (id, blockId, note) =>
-    saveLocal(id, (b) => ({ ...b, items: b.items.map((i) => (i.blockId === blockId ? { ...i, note: note.trim().slice(0, 2000) || null } : i)) })),
+  add: async (id, t) => {
+    const target = asTarget(t);
+    const key = targetKey(target);
+    const item: BoardItem =
+      target.kind === "block"
+        ? { kind: "block", blockId: target.block.id, host: null, note: null, position: 0, block: target.block, site: null }
+        : { kind: "site", blockId: null, host: target.store.host, note: null, position: 0, block: null, site: target.store };
+    return saveLocal(id, (b) => (b.items.some((i) => itemKey(i) === key) ? b : { ...b, items: renumber([...b.items, item]) }));
+  },
+  removeItem: async (id, key) => saveLocal(id, (b) => ({ ...b, items: renumber(b.items.filter((i) => itemKey(i) !== key)) })),
+  setNote: async (id, key, note) =>
+    saveLocal(id, (b) => ({ ...b, items: b.items.map((i) => (itemKey(i) === key ? { ...i, note: note.trim().slice(0, 2000) || null } : i)) })),
   shareUrl: (b) => `${location.origin}/share#${encodeSnapshot(b)}`,
 };
 
-export const boardStore: BoardStore = API_MODE ? apiStore : localStore;
+// Development only: NEXT_PUBLIC_BOARDS_STORE=local keeps boards in this browser while the
+// rest of the app reads the live API (DEV_API_PROXY), so trying Save on localhost never
+// writes to the production database.
+const DEV_LOCAL_BOARDS = process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_BOARDS_STORE === "local";
+
+export const boardStore: BoardStore = API_MODE && !DEV_LOCAL_BOARDS ? apiStore : localStore;
 
 // ---------------------------------------------------------------------------
 // Snapshot links: the board travels in the URL fragment, which never reaches a server.
@@ -199,7 +308,9 @@ function fromBase64Url(s: string) {
 }
 
 export function encodeSnapshot(b: Board) {
-  return toBase64Url(JSON.stringify({ v: 1, n: b.name, d: b.description, i: b.items.map((i) => (i.note ? [i.blockId, i.note] : [i.blockId])) }));
+  // Blocks only: the share page has no way to show a whole site yet.
+  const blocks = b.items.filter((i) => i.blockId);
+  return toBase64Url(JSON.stringify({ v: 1, n: b.name, d: b.description, i: blocks.map((i) => (i.note ? [i.blockId, i.note] : [i.blockId])) }));
 }
 
 export function decodeSnapshot(hash: string): Snapshot | null {

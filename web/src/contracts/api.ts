@@ -47,9 +47,23 @@ export type SiteProfile = {
  * the `x-board-token` header. `shareSlug` is the public read-only link
  * (/b/<slug>), live while `shared` is true.
  */
-export type BoardItem = { blockId: string; note: string | null; position: number; block: Block | null };
+export type BoardItem = {
+  /** What was saved: a block (blockId, block) or, since migration 16, a whole site (host, site). Absent means "block". */
+  kind?: "block" | "site";
+  /** The block's id; null for a site item. */
+  blockId: string | null;
+  /** The saved site's host; null (or absent) for a block item. */
+  host?: string | null;
+  note: string | null;
+  position: number;
+  block: Block | null;
+  /** The saved site's store, null when it has left the library. */
+  site?: Store | null;
+};
 export type Board = {
   id: string;
+  /** "folder": named, ordered, shareable (every board before migration 16). "library": the account's one Saved list. Absent means "folder". */
+  kind?: "folder" | "library";
   name: string;
   description: string | null;
   shareSlug: string;
@@ -58,13 +72,16 @@ export type Board = {
   updatedAt: string;
   items: BoardItem[];
 };
-/** POST /api/boards body. The response is BoardCreated (201). */
-export type BoardCreate = { name: string; description?: string | null };
+/** POST /api/boards body. The response is BoardCreated (201). `kind: "library"` returns the account's Saved list, made if it has none. */
+export type BoardCreate = { name: string; description?: string | null; kind?: "folder" | "library" };
 export type BoardCreated = { board: Board; token: string };
-/** PATCH /api/boards/[id]. `order` is the complete list of block ids in their new order. */
+/** PATCH /api/boards/[id]. `order` is the complete list of item keys (a block's id, a site's host) in their new order. */
 export type BoardPatch = { name?: string; description?: string | null; shared?: boolean; order?: string[] };
-/** POST /api/boards/[id]/items adds a block (idempotent); PATCH /api/boards/[id]/items/[blockId] sets its note. */
-export type BoardItemAdd = { blockId: string; note?: string | null };
+/**
+ * POST /api/boards/[id]/items adds a block, or a site by `host` (idempotent). PATCH and DELETE
+ * /api/boards/[id]/items/[key] take the item's key: a block's id, or a site's host.
+ */
+export type BoardItemAdd = { blockId?: string; host?: string; note?: string | null };
 /** GET /api/share/[slug] · what a client sees: no ids, no tokens, only shared boards. */
 export type SharedBoard = { name: string; description: string | null; updatedAt: string; items: { note: string | null; block: Block }[] };
 
