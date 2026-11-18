@@ -25,7 +25,8 @@ This page covers what is built.
 - **Auth:** a bearer key from `api_keys` (migration 13). Only the SHA-256 is
   stored, like session tokens. At most 5 active keys per account.
 - **Plan:** the `"mcp"` feature. With `PLAN_GATES=on`, Pro and Team (and the
-  trial); Free gets 402. Owner decision pending (brief section 12, item 2).
+  7-day trial); Free gets 402. Owner decision, 18 Nov 2026 (brief section 12,
+  item 2): it stays in Pro and Team, no separate plan or metering.
 - **Limits:** 120 requests a minute per key, 5,000 a day per account, in the
   shared `rate_limits` table. Over the limit: 429 with `Retry-After`.
 
@@ -89,8 +90,8 @@ and data can answer, not that a given model picks the right calls.
 - Design data in production fills in as stores are recaptured with
   `--styles` (brief section 7.5). `--styles` stays off by default until
   the 20-store accuracy check (brief section 10) passes.
-- Owner decisions in brief section 12: who gets the MCP (item 2), thumbnails
-  or full screenshots for agents (item 3).
+- Owner decision in brief section 12 item 3: thumbnails or full screenshots
+  for agents (today: thumbnails plus the screenshot URL).
 
 ## Checking it locally
 

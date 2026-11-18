@@ -31,7 +31,8 @@ pushed. No migration.
 - Waiting: the 20-store accuracy check (a person with dev tools, brief
   section 10), then `--styles` on by default and a recapture; production runs
   of the tagger, `profile-sites`, `benchmarks` and `embed`; owner decisions in
-  brief section 12 (who gets the MCP, thumbnails or full screenshots);
+  brief section 12 item 3 (thumbnails or full screenshots; item 2 decided:
+  the MCP stays in Pro and Team);
   `blimp_compare_stores` after the compare pilot.
 
 ## 2026-10-28 · Buna (Lane B)
