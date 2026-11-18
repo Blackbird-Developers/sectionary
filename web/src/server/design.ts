@@ -1,3 +1,4 @@
+import type { SiteDesign } from "@/contracts/api";
 import type { Viewport } from "@/contracts/block";
 import type { Benchmark, StoreDesignProfile } from "@/contracts/design";
 import type { PageStyles } from "@/contracts/manifest";
@@ -50,6 +51,21 @@ export async function storeDesign(host: string): Promise<StoreDesign | null> {
     design, built_at: site.design_profile_at ? (site.design_profile_at as Date).toISOString() : null,
     ...(design ? {} : { design_note: DESIGN_NOTE }),
   };
+}
+
+/**
+ * GET /api/sites/[host]/design (brief section 8): the same profile in the
+ * HTTP API's spelling. Signed out, the store's own accessibility signals are
+ * left out (brief section 12 item 5).
+ */
+export async function siteDesign(host: string, signedIn: boolean): Promise<SiteDesign | null> {
+  const found = await storeDesign(host);
+  if (!found) return null;
+  const base = { host: found.host, brand: found.brand, industry: found.industry, builtAt: found.built_at };
+  if (!found.design) return { ...base, design: null, note: found.design_note };
+  if (signedIn) return { ...base, design: found.design };
+  const { accessibility_note, ...design } = withoutAccessibility(found.design);
+  return { ...base, design, accessibilityNote: accessibility_note };
 }
 
 export type PageProfile = {

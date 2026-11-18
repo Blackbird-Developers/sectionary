@@ -16,7 +16,11 @@
 // Scripted calls, not a model: this proves the data and the tools can answer,
 // not that a given model will choose the right calls.
 //
-// Exit 0 when every question passes.
+// Then the HTTP API of brief section 8 is checked against the same answers.
+// `npm run mcp:eval -- --write-fixtures` also writes its responses to
+// fixtures/api/ as the contract's examples.
+//
+// Exit 0 when every question and check passes.
 
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
@@ -209,6 +213,71 @@ const v2 = ["blimp_find_similar_blocks", "blimp_get_benchmark", "blimp_get_page_
 const missing = v2.filter((t) => !tools.includes(t));
 console.log(`${missing.length ? "FAIL" : "PASS"}  the five v2 tools are listed${missing.length ? `; missing ${missing.join(", ")}` : ""}`);
 if (missing.length) failed++;
+
+// ---------------------------------------------------------------- the HTTP API serves the same numbers (brief section 8)
+
+const api = {
+  block: await import("@/app/api/blocks/[id]/route"),
+  design: await import("@/app/api/sites/[host]/design/route"),
+  benchmarks: await import("@/app/api/benchmarks/route"),
+  taxonomy: await import("@/app/api/taxonomy/route"),
+};
+const session = await accounts.createSession(userId, "mcp-eval");
+const signedIn = { cookie: `${accounts.SESSION_COOKIE}=${session.token}` };
+const get = async <P extends object>(handler: { GET: (r: Request, c: { params: Promise<P> }) => Promise<Response> }, path: string,
+  params = {} as P, headers: Record<string, string> = {}) => {
+  const res = await handler.GET(new Request(`http://app.test${path}`, { headers }), { params: Promise.resolve(params) });
+  const body = await res.json() as Data;
+  calls.push(JSON.stringify(body));
+  return { status: res.status, cache: res.headers.get("cache-control") ?? "", body };
+};
+function check(name: string, ok: boolean, detail = "") {
+  console.log(`${ok ? "PASS" : "FAIL"}  ${name}${!ok && detail ? `: ${detail}` : ""}`);
+  if (!ok) failed++;
+}
+
+const mcpDesign = (await call("blimp_get_store_design", { host: "myzoobox.com" })).data;
+const pub = await get(api.design, "/api/sites/myzoobox.com/design", { host: "myzoobox.com" });
+const own = await get(api.design, "/api/sites/myzoobox.com/design", { host: "myzoobox.com" }, signedIn);
+console.log("");
+check("/api/sites/[host]/design: the MCP's summary, fonts and accent",
+  pub.body.design?.summary === mcpDesign.design?.summary && pub.body.design?.typography?.heading === expected.q1.font && pub.body.design?.accent?.colour === expected.q2);
+check("/api/sites/[host]/design: accessibility only when signed in, never cached then",
+  pub.body.design?.accessibility === null && Boolean(pub.body.accessibilityNote) && pub.cache.startsWith("public") &&
+  own.body.design?.accessibility !== null && own.body.design?.accessibility !== undefined && own.cache.includes("no-store"));
+check("/api/sites/[host]/design: unknown store is 404", (await get(api.design, "/api/sites/nope.example/design", { host: "nope.example" })).status === 404);
+
+const bench = await get(api.benchmarks, "/api/benchmarks?page=home&metric=blocks");
+const blocksRow = (bench.body.items as { metric: string; n: number; p50: number }[]).find((i) => i.metric === "blocks");
+check("/api/benchmarks: the MCP's home page median, with n", blocksRow?.n === expected.q4.n && blocksRow?.p50 === expected.q4.median && bench.body.minN === 10);
+check("/api/benchmarks: an unknown metric is 400 and names the valid ones",
+  (await get(api.benchmarks, "/api/benchmarks?metric=fonts")).status === 400);
+
+const tax = await get(api.taxonomy, "/api/taxonomy");
+const mcpTax = (await call("blimp_list_taxonomy")).data;
+check("/api/taxonomy: the MCP's lists", tax.body.blockTypes?.length === mcpTax.block_types?.length && tax.body.blockTypes.length > 40 &&
+  tax.body.platforms?.find((p: { value: string }) => p.value === "shopify")?.stores === expected.q9);
+
+const styled = (await call("blimp_search_blocks", { store: "myzoobox.com", page_type: "product", viewport: "desktop", limit: 1 })).data.items[0];
+const detail = await get(api.block, `/api/blocks/${styled.id}`, { id: styled.id });
+check("/api/blocks/[id]: the Block plus style and outline", detail.body.id === styled.id && typeof detail.body.src === "string" &&
+  detail.body.style !== null && Array.isArray(detail.body.outline) && "blockType" in detail.body && "taggerVersion" in detail.body);
+
+// `--write-fixtures` keeps these real responses as the contract's examples (docs/CONTRACTS.md).
+if (process.argv.includes("--write-fixtures")) {
+  const { writeFile } = await import("node:fs/promises");
+  const out = resolve(here, "../../fixtures/api");
+  const write = (name: string, body: unknown) => writeFile(join(out, name), `${JSON.stringify(body, null, 2)}\n`);
+  await write("block.detail.json", detail.body);
+  await write("site.design.json", pub.body);
+  await write("benchmarks.json", (await get(api.benchmarks, "/api/benchmarks?page=home")).body);
+  await write("taxonomy.json", tax.body);
+  console.log("Wrote fixtures/api/block.detail.json, site.design.json, benchmarks.json, taxonomy.json");
+}
+
+const allCalls = calls.join("\n");
+const apiLeaks = ["\"classes\"", "\"tag\"", "\"elementId\"", "\"html\"", "\"css\"", "<div", "class="].filter((s) => allCalls.includes(s));
+check(`no source in any API response either (${calls.length} responses in all)`, !apiLeaks.length, apiLeaks.join(", "));
 
 await client.close();
 await local.stop();

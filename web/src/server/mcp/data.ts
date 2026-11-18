@@ -6,6 +6,8 @@ import { assetUrl } from "@/lib/data-source";
 import { bucketFor } from "@/lib/colour";
 import { clip, MAX_TEXT } from "@/server/mcp/shape";
 import { DESIGN_NOTE } from "@/server/design";
+import { ECOMMERCE_BLOCK_TYPES, GLOBAL_BLOCK_TYPES, INDUSTRIES, PAGE_ROLES, PROMPT_VERSION, STYLE_TAGS } from "@/server/mcp/taxonomy";
+import type { Taxonomy } from "@/contracts/api";
 
 // What the MCP tools read (SEC-31, brief section 9). The same tables, joins
 // and filters as the wall and the API, so an agent and a person see the same
@@ -220,6 +222,24 @@ export async function libraryFacts(): Promise<{
     pageTypes: pageTypes.map((r) => ({ value: String(r.value), pages: Number(r.n) })),
     platforms: platforms.map((r) => ({ value: String(r.value), stores: Number(r.n) })),
     blocks: Number(counts.blocks), tagged: Number(counts.tagged),
+  };
+}
+
+/** The closed filter lists with meanings, plus what the library holds: GET /api/taxonomy and blimp_list_taxonomy (brief sections 8 and 9.2). */
+export async function libraryTaxonomy(): Promise<Taxonomy> {
+  const facts = await libraryFacts();
+  return {
+    blockTypes: [
+      ...Object.entries(GLOBAL_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "global" as const, meaning })),
+      ...Object.entries(ECOMMERCE_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "ecommerce" as const, meaning })),
+    ],
+    pageRoles: Object.entries(PAGE_ROLES).map(([value, meaning]) => ({ value, meaning })),
+    styleTags: [...STYLE_TAGS],
+    industries: [...INDUSTRIES],
+    pageTypes: facts.pageTypes,
+    platforms: facts.platforms,
+    viewports: ["desktop", "mobile"],
+    tagging: { blocks: facts.blocks, tagged: facts.tagged, taggerVersion: PROMPT_VERSION },
   };
 }
 

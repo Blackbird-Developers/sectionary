@@ -3,6 +3,8 @@
 
 /** Never more than this many items in one response. */
 export const MAX_ITEMS = 20;
+/** Page types the crawler assigns (pageType in src/capture-page.ts), for checking filters. */
+export const PAGE_TYPES = ["home", "collection", "collection-list", "product", "cart", "checkout", "search", "account", "article", "blog", "page", "other"];
 /** Characters of a block's visible text an agent gets, the same as the API. */
 export const MAX_TEXT = 400;
 

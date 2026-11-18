@@ -1,9 +1,9 @@
 import * as z from "zod";
 import { McpServer } from "@modelcontextprotocol/server";
 import type { BlockFilters } from "@/server/blocks";
-import { BLOCK_TYPES, ECOMMERCE_BLOCK_TYPES, GLOBAL_BLOCK_TYPES, INDUSTRIES, PAGE_ROLES, PROMPT_VERSION, STYLE_TAGS } from "@/server/mcp/taxonomy";
-import { decodeCursor, encodeCursor, MAX_ITEMS, unknownValue, withoutSource } from "@/server/mcp/shape";
-import { appName, findBlocks, findStores, getBlock, getStore, isTypeHint, libraryFacts, similarBlocks, STYLE_NOTE, type McpBlock } from "@/server/mcp/data";
+import { BLOCK_TYPES, INDUSTRIES, STYLE_TAGS } from "@/server/mcp/taxonomy";
+import { decodeCursor, encodeCursor, MAX_ITEMS, PAGE_TYPES, unknownValue, withoutSource } from "@/server/mcp/shape";
+import { appName, findBlocks, findStores, getBlock, getStore, isTypeHint, libraryTaxonomy, similarBlocks, STYLE_NOTE, type McpBlock } from "@/server/mcp/data";
 import { benchmarks, PAGE_STYLE_NOTE, pageProfile, storeDesign, storeFlow } from "@/server/design";
 import { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "@/contracts/design";
 
@@ -15,7 +15,6 @@ import { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "@/c
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const VIEWPORTS = ["desktop", "mobile"] as const;
-const PAGE_TYPES = ["home", "collection", "collection-list", "product", "cart", "checkout", "search", "account", "article", "blog", "page", "other"];
 
 // ---------------------------------------------------------------- output shapes
 
@@ -98,28 +97,20 @@ export function blimpServer(origin: string): McpServer {
       annotations: READ_ONLY,
     },
     async () => {
-      const facts = await libraryFacts();
-      const share = facts.blocks ? Math.round((facts.tagged / facts.blocks) * 1000) / 1000 : 0;
+      const t = await libraryTaxonomy();
+      const share = t.tagging.blocks ? Math.round((t.tagging.tagged / t.tagging.blocks) * 1000) / 1000 : 0;
       const out = {
-        block_types: [
-          ...Object.entries(GLOBAL_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "global" as const, meaning })),
-          ...Object.entries(ECOMMERCE_BLOCK_TYPES).map(([value, meaning]) => ({ value, group: "ecommerce" as const, meaning })),
-        ],
-        page_roles: Object.entries(PAGE_ROLES).map(([value, meaning]) => ({ value, meaning })),
-        style_tags: [...STYLE_TAGS],
-        industries: [...INDUSTRIES],
-        page_types: facts.pageTypes,
-        platforms: facts.platforms,
-        viewports: [...VIEWPORTS],
+        block_types: t.blockTypes, page_roles: t.pageRoles, style_tags: t.styleTags, industries: t.industries,
+        page_types: t.pageTypes, platforms: t.platforms, viewports: t.viewports,
         tagging: {
-          blocks: facts.blocks, tagged: facts.tagged, share, tagger_version: PROMPT_VERSION,
+          blocks: t.tagging.blocks, tagged: t.tagging.tagged, share, tagger_version: t.tagging.taggerVersion,
           note: share < 0.95
             ? "Most blocks are not tagged yet. block_type, page_role, style_tag, has_price and has_reviews filters only match tagged blocks; use query for the rest. A block_type filter also accepts a theme's own section name (type_hint)."
             : "Tagging is complete enough to filter on.",
         },
       };
-      return ok(out, `${out.block_types.length} block types, ${out.industries.length} industries, ${facts.pageTypes.length} page types. ` +
-        `${facts.tagged} of ${facts.blocks} blocks tagged (${Math.round(share * 100)}%). Full lists in the structured result.`);
+      return ok(out, `${out.block_types.length} block types, ${out.industries.length} industries, ${t.pageTypes.length} page types. ` +
+        `${t.tagging.tagged} of ${t.tagging.blocks} blocks tagged (${Math.round(share * 100)}%). Full lists in the structured result.`);
     },
   );
 
