@@ -18,20 +18,20 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import postgres from "postgres";
 import type { Viewport } from "../../web/src/contracts/block.js";
-import { MIN_BENCHMARK_N } from "../../web/src/contracts/design.js";
+import {
+  CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS, type CategoricalBenchmark, type NumericBenchmark,
+} from "../../web/src/contracts/design.js";
 import type { PageStyles } from "../../web/src/contracts/manifest.js";
 import { median } from "./design-profile.js";
 
 /** CSS viewport heights the crawler captures at (src/capture-page.ts), for page length without page styles. */
 const VIEWPORT_HEIGHT: Record<Viewport, number> = { desktop: 900, mobile: 844 };
 
-export const NUMERIC_METRICS = [
-  "body-size", "largest-heading-size", "screens", "blocks", "words-per-screen", "images-per-screen",
-  "button-height", "button-radius", "grid-columns", "contrast-pass", "alt-share",
-] as const;
-export const CATEGORICAL_METRICS = ["heading-family-class", "radius-label", "uppercase-headings", "button-case"] as const;
-export type NumericMetric = (typeof NUMERIC_METRICS)[number];
-export type CategoricalMetric = (typeof CATEGORICAL_METRICS)[number];
+/** The metric names live in the contract, so the MCP server validates against the same list. */
+export const NUMERIC_METRICS = Object.keys(NUMERIC_BENCHMARKS) as NumericBenchmark[];
+export const CATEGORICAL_METRICS = Object.keys(CATEGORICAL_BENCHMARKS) as CategoricalBenchmark[];
+export type NumericMetric = NumericBenchmark;
+export type CategoricalMetric = CategoricalBenchmark;
 
 /** One captured page at one viewport, as the job reads it. */
 export type PageFacts = {

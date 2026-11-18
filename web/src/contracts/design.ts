@@ -105,6 +105,33 @@ export type StoreDesignProfile = {
 /** A benchmark is published only from this many stores. */
 export const MIN_BENCHMARK_N = 10;
 
+/**
+ * Numeric benchmark metrics, with their unit. Page length, block count and
+ * images per screen come from every capture; the rest needs page styles.
+ */
+export const NUMERIC_BENCHMARKS = {
+  "body-size": "body text size, CSS px",
+  "largest-heading-size": "largest heading on the page, CSS px",
+  screens: "page length, in viewport heights",
+  blocks: "sections on the page",
+  "words-per-screen": "words per viewport height",
+  "images-per-screen": "images per viewport height",
+  "button-height": "primary button height, CSS px",
+  "button-radius": "primary button corner radius, CSS px",
+  "grid-columns": "columns of the largest product grid",
+  "contrast-pass": "share of text characters meeting WCAG AA, 0 to 1",
+  "alt-share": "share of images with alt text, 0 to 1",
+} as const;
+/** Categorical benchmark metrics, with their values. */
+export const CATEGORICAL_BENCHMARKS = {
+  "heading-family-class": "serif, sans, display, or other (a family not on the known list)",
+  "radius-label": "sharp, soft, rounded, pill",
+  "uppercase-headings": "yes, no",
+  "button-case": "none, uppercase, lowercase, capitalize",
+} as const;
+export type NumericBenchmark = keyof typeof NUMERIC_BENCHMARKS;
+export type CategoricalBenchmark = keyof typeof CATEGORICAL_BENCHMARKS;
+
 /** L4: one benchmark row (brief section 4.5). `benchmarks` table. */
 export type Benchmark = {
   /** An industry key, or "all". */

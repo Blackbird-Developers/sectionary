@@ -1,9 +1,11 @@
 import { database, pgArray } from "@/server/db";
-import { blockJoins, blockWhere, UUID, withColours, type BlockFilters } from "@/server/blocks";
+import { blockJoins, blockWhere, LATEST, UUID, withColours, type BlockFilters } from "@/server/blocks";
 import { searchBlocks, type ExtraWhere } from "@/server/search";
 import { latestPages, toStore } from "@/server/sites";
 import { assetUrl } from "@/lib/data-source";
+import { bucketFor } from "@/lib/colour";
 import { clip, MAX_TEXT } from "@/server/mcp/shape";
+import { DESIGN_NOTE } from "@/server/design";
 
 // What the MCP tools read (SEC-31, brief section 9). The same tables, joins
 // and filters as the wall and the API, so an agent and a person see the same
@@ -90,7 +92,7 @@ function toMcpBlock(r: Record<string, unknown>, origin: string, full: boolean): 
   };
 }
 
-async function byIds(sql: Sql, ids: string[], origin: string, full: boolean): Promise<McpBlock[]> {
+export async function byIds(sql: Sql, ids: string[], origin: string, full: boolean): Promise<McpBlock[]> {
   if (!ids.length) return [];
   const rows = await sql`SELECT ${MCP_COLUMNS(sql)} FROM ${blockJoins(sql)} WHERE b.id=ANY(${pgArray(ids)}::uuid[])`;
   const byId = new Map(rows.map((r) => [String(r.id), toMcpBlock(r, origin, full)]));
@@ -177,8 +179,9 @@ export type McpStoreDetail = McpStore & {
   title: string | null;
   pages: { url: string; type: string; captured_at: string; blocks: number; desktop_thumbnail_url: string | null; mobile_thumbnail_url: string | null }[];
   captures: { captured_at: string; pages: number }[];
-  design: null;
-  design_note: string;
+  /** The store design profile's summary (blimp_get_store_design has the rest), or null with a note. */
+  design: string | null;
+  design_note?: string;
   blimp_url: string;
 };
 
@@ -197,7 +200,8 @@ export async function getStore(host: string, origin: string): Promise<McpStoreDe
     pages: (pages.get(site.id) ?? []).map((p) => ({ url: p.url, type: p.type, captured_at: p.capturedAt, blocks: p.blocks,
       desktop_thumbnail_url: shot(p.desktop), mobile_thumbnail_url: shot(p.mobile) })),
     captures: captures.map((c) => ({ captured_at: (c.captured_at as Date).toISOString(), pages: Number(c.pages) })),
-    design: null, design_note: STYLE_NOTE, blimp_url: `${origin}/sites/${site.host}`,
+    design: (site.design_profile as { summary?: string } | null)?.summary ?? null,
+    ...(site.design_profile ? {} : { design_note: DESIGN_NOTE }), blimp_url: `${origin}/sites/${site.host}`,
   };
 }
 
@@ -217,4 +221,55 @@ export async function libraryFacts(): Promise<{
     platforms: platforms.map((r) => ({ value: String(r.value), stores: Number(r.n) })),
     blocks: Number(counts.blocks), tagged: Number(counts.tagged),
   };
+}
+
+export type Similar = { source: McpBlock; basis: "embedding" | "section"; items: McpBlock[] };
+
+/**
+ * Blocks like this one from other stores, one per store, at the latest capture
+ * and the same viewport. With an embedding, the nearest by meaning; without
+ * one, the same kind of section (block type, else the theme's section name)
+ * scored like the block viewer's "See similar" (lib/block-detail.ts): same
+ * colour family, same page type, same platform, similar shape.
+ */
+export async function similarBlocks(id: string, limit: number, origin: string): Promise<Similar | null> {
+  if (!UUID.test(id)) return null;
+  const sql = database();
+  const [me] = await sql`SELECT b.id, b.viewport, b.block_type, b.type_hint, b.background, b.width, b.height, p.type AS page_type,
+      s.host, s.platform, b.embedding IS NOT NULL AS has_vector
+    FROM ${blockJoins(sql)} WHERE b.id=${id}`;
+  if (!me) return null;
+  const [source] = await byIds(sql, [id], origin, false);
+
+  if (me.has_vector) {
+    const rows = await sql`SELECT id FROM (
+        SELECT DISTINCT ON (s.host) b.id, b.embedding <=> (SELECT embedding FROM blocks WHERE id=${id}) AS d
+        FROM ${blockJoins(sql)}
+        WHERE ${LATEST(sql)} AND b.viewport=${me.viewport} AND s.host<>${me.host} AND b.embedding IS NOT NULL
+        ORDER BY s.host, d) t
+      ORDER BY d LIMIT ${limit}`;
+    return { source, basis: "embedding", items: await byIds(sql, rows.map((r) => String(r.id)), origin, false) };
+  }
+
+  const section = String(me.block_type ?? me.type_hint).replace(/-part$/, "");
+  const rows = await sql`SELECT b.id, s.host, s.platform, p.type AS page_type, b.background, b.width, b.height
+    FROM ${blockJoins(sql)}
+    WHERE ${LATEST(sql)} AND b.viewport=${me.viewport} AND s.host<>${me.host}
+      AND regexp_replace(coalesce(b.block_type, b.type_hint), '-part$', '')=${section}
+    ORDER BY b.id LIMIT 500`;
+  const bucket = bucketFor(String(me.background));
+  const ratio = Number(me.height) / Number(me.width);
+  const scored = rows.map((r) => ({
+    id: String(r.id), host: String(r.host),
+    score: (bucket && bucketFor(String(r.background)) === bucket ? 4 : 0) + (r.page_type === me.page_type ? 2 : 0)
+      + (r.platform && r.platform === me.platform ? 1 : 0) + Math.max(0, 1 - Math.abs(Math.log2(Number(r.height) / Number(r.width) / ratio))),
+  })).sort((a, b) => b.score - a.score || a.id.localeCompare(b.id));
+  const hosts = new Set<string>(), ids: string[] = [];
+  for (const c of scored) {
+    if (hosts.has(c.host)) continue;
+    hosts.add(c.host);
+    ids.push(c.id);
+    if (ids.length >= limit) break;
+  }
+  return { source, basis: "section", items: await byIds(sql, ids, origin, false) };
 }
