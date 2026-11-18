@@ -213,7 +213,12 @@ quick view, the answer to an add to cart, the cart drawer (`MomentKind`).
 background video, slideshows that play on their own, scrolling text and
 animation (`MotionKind`). The crawler's own browser records them in the same
 visit, before animations are switched off for the screenshots. The store's
-video files are never downloaded.
+video files are never downloaded. The page is slowed down while it is
+recorded and the clip is sped back up, so it plays at the page's real speed
+(src/time-warp.ts). With `--sliders`, a slideshow that only moves when pressed
+gets a clip too: after the screenshots, the crawler presses the slideshow's
+own next arrow (or its dots, or scrolls it) three times while recording. Its
+`clip.kind` is `carousel`; nothing else in the contract changes.
 
 - `motionHint` on a block says why the crawler looked at it. It is present
   whenever the crawler looked, even when nothing was recorded (most

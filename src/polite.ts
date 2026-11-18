@@ -35,7 +35,8 @@ export type Robots = {
 export const robotsParser = robotsParserModule as unknown as (url: string, contents: string) => Robots;
 
 export const BOT_NAME = 'SectionaryBot';
-export const BOT_VERSION = '0.4';
+// 0.5 (18 Nov 2026): records short clips of moving sections and moves slideshows to their next slide.
+export const BOT_VERSION = '0.5';
 /** Set SECTIONARY_BOT_URL once the /bot page exists on the real domain. */
 export const BOT_INFO_URL = process.env.SECTIONARY_BOT_URL || '';
 export const BOT_TOKEN = `${BOT_NAME}/${BOT_VERSION}${BOT_INFO_URL ? ` (+${BOT_INFO_URL})` : ''}`;

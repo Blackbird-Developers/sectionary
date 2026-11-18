@@ -1,6 +1,7 @@
-// Clips brief section 6.5: turn the screencast frames of one block into a small silent MP4.
+// Clips brief section 6.5: turn the recorded frames of one block into a small silent MP4.
 // ffmpeg is a system tool (on the PATH); frames are JPEGs with timestamps, joined with the concat demuxer so
-// a frame stays on screen for as long as it did in the page (the screencast only sends a frame on change).
+// a frame stays on screen for as long as it did in the page. A recording made in slow motion (time-warp.ts)
+// has its timestamps divided by the slowdown, so the clip plays at the page's real speed.
 import { spawn } from 'node:child_process';
 import { rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -32,8 +33,13 @@ export type EncodeInput = {
   viewportWidth: number;
   /** Frames that show only part of the viewport (phone screenshot loop): that part in viewport CSS pixels. */
   frameRegion?: { x: number; y: number; width: number; height: number };
-  /** How long the recording ran (ms), so the last frame gets its share. */
+  /** How long the recording ran (ms, real time), so the last frame gets its share. */
   recordedMs: number;
+  /**
+   * How many times slower than real the page ran while recorded (time-warp.ts); the frame times are divided by
+   * it, so the clip plays at the page's real speed. Absent or 1 = recorded in real time.
+   */
+  slowdown?: number;
   outFile: string;
 };
 
@@ -81,14 +87,16 @@ async function encodeInner(input: EncodeInput): Promise<EncodeResult> {
   const cw = Math.max(2, Math.min(fw - cx, Math.round(input.rect.width * scale)));
   const ch = Math.max(2, Math.min(fh - cy, Math.round(input.rect.height * scale)));
 
-  // Per-frame durations from the timestamps. The last frame stays until the recording ended (at most 1 s).
+  // Per-frame durations from the timestamps, in page time (a slowed recording is sped back up). The last frame
+  // stays until the recording ended (at most 1 s).
+  const k = input.slowdown && input.slowdown > 1 ? input.slowdown : 1;
   const t0 = frames[0].ts;
   const lines: string[] = [];
   let total = 0;
   for (let i = 0; i < frames.length; i++) {
     let d: number;
-    if (i < frames.length - 1) d = frames[i + 1].ts - frames[i].ts;
-    else d = Math.min(1, Math.max(1 / ENCODE_LIMITS.fps, t0 + input.recordedMs / 1000 - frames[i].ts));
+    if (i < frames.length - 1) d = (frames[i + 1].ts - frames[i].ts) / k;
+    else d = Math.min(1, Math.max(1 / ENCODE_LIMITS.fps, (t0 + input.recordedMs / 1000 - frames[i].ts) / k));
     d = Math.max(0.001, d);
     total += d;
     lines.push(`file '${frames[i].file}'`, `duration ${d.toFixed(4)}`);
