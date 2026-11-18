@@ -4,7 +4,7 @@ import { Contact, LegalPage, type LegalSection } from "@/components/legal-page";
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "What Sectionary collects (very little), why, who helps us run it, and how to have it deleted.",
+  description: "What Blimp collects (very little), why, who helps us run it, and how to have it deleted.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -20,7 +20,7 @@ const sections: LegalSection[] = [
       <ul>
         <li>We collect your email address when you join the waitlist, and almost nothing else.</li>
         <li>We use it to send your invite. We don&apos;t sell it, share it for advertising or add you to other lists.</li>
-        <li>There are no analytics, ad pixels or tracking cookies on Sectionary.</li>
+        <li>There are no analytics, ad pixels or tracking cookies on Blimp.</li>
         <li>
           Write to <Contact subject="Privacy" /> and we&apos;ll show you what we hold or delete it.
         </li>
@@ -62,7 +62,7 @@ const sections: LegalSection[] = [
   },
   {
     id: "providers",
-    title: "Who helps us run Sectionary",
+    title: "Who helps us run Blimp",
     body: (
       <>
         <p>We use a small number of providers who handle data only on our instructions:</p>
@@ -83,7 +83,7 @@ const sections: LegalSection[] = [
     title: "How long we keep it",
     body: (
       <p>
-        Your waitlist entry stays until you have an account or ask us to remove it. If Sectionary never opens to you, we
+        Your waitlist entry stays until you have an account or ask us to remove it. If Blimp never opens to you, we
         delete the waitlist when the beta ends.
       </p>
     ),
@@ -129,7 +129,7 @@ export default function PrivacyPage() {
       title="We collect an email address, and that's about it."
       lede={
         <p>
-          Sectionary is built by Blackbird. This page covers the site and the waitlist during the private beta, in
+          Blimp is built by Blackbird. This page covers the site and the waitlist during the private beta, in
           plain words.
         </p>
       }

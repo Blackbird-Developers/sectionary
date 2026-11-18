@@ -51,7 +51,7 @@ export function SharedBoardView({
       </header>
       <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 sm:py-10">
         <div className="mb-6 max-w-2xl sm:mb-10">
-          <h1 className="font-heading text-[26px] leading-tight font-semibold text-balance sm:text-[34px]">{name}</h1>
+          <h1 className="font-heading text-[26px] leading-tight font-extrabold tracking-[-0.035em] text-balance sm:text-[34px]">{name}</h1>
           {description && <p className="mt-3 text-[15px] leading-relaxed whitespace-pre-line text-muted-foreground">{description}</p>}
           <p className="mt-3 font-mono text-[11px] tabular-nums text-muted-foreground">
             {items.length} reference{items.length === 1 ? "" : "s"}

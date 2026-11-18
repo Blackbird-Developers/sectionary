@@ -2,7 +2,7 @@
 // gaps, and that mock blocks never count. No network:  npm run flow-check
 import { readFileSync } from "node:fs";
 import { buildIndex } from "../src/lib/block-source.ts";
-import { cutBlocks, flowCounts, flowOf, flowSummaries, pageView, FLOW_STEPS } from "../src/lib/flows.ts";
+import { cartStateOf, cutBlocks, flowCounts, flowOf, flowSummaries, pageView, FLOW_STEPS } from "../src/lib/flows.ts";
 import { pagesFromBlocks } from "../src/lib/site-profile.ts";
 import { expandBlocks } from "../src/lib/mock-blocks.ts";
 import type { Block } from "../src/contracts/block.ts";
@@ -106,6 +106,16 @@ const atScale = flowSummaries(buildIndex(scaled, stores));
 const ms = performance.now() - started;
 const scaleCounts = flowCounts(atScale);
 check(`scale: ${scaleCounts.complete} of ${scaleCounts.captured} stores complete in ${Math.round(ms)} ms`, scaleCounts.complete >= 200 && ms < 1500);
+
+// 9. What a cart page shows: only a cart with products in it is "available" in Flows.
+const cartPage = (...parts: [string, string][]) => parts.map(([typeHint, text]) => block("cart.test", "cart", "/cart", { typeHint, text }));
+const header: [string, string] = ["header", "Menu Search Your cart is empty"];
+check("an empty-cart block makes the cart empty", cartStateOf(cartPage(header, ["empty-cart", "Your cart is currently empty. Continue shopping"], ["product-recommendations", "You may also like Socks $18.00 Add to cart"])) === "empty");
+check("line items with a subtotal make it filled", cartStateOf(cartPage(header, ["main-cart-items", "Your cart Merino socks $18.00 Quantity 1 Remove Subtotal $18.00 Check out"])) === "filled");
+check("a cart that shows nothing counts as empty", cartStateOf(cartPage(header, ["cart-items", "Your cart"])) === "empty");
+check("$0.00 is no line item", cartStateOf(cartPage(["main", "My Cart Product Price Quantity Subtotal $0.00 Check out"])) === "empty");
+check("a /cart that shows the home page is no cart", cartStateOf(cartPage(header, ["hero", "Summer sale. Shop now"], ["featured-collection", "Best sellers $40.00"])) === "not-a-cart");
+check("words in the header never count", cartStateOf(cartPage(["header", "Your cart Socks $18.00 Quantity 1 Remove Subtotal $18.00"])) === "not-a-cart");
 
 console.log(bad ? `\n${bad} failed` : "\nall passed");
 process.exit(bad ? 1 : 0);

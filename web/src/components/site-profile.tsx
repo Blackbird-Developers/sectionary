@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, ExternalLink, Route } from "lucide-react";
+import { ArrowRight, ExternalLink, Route } from "lucide-react";
 import { StoreIcon } from "@/components/store-icon";
 import { BlockViewer } from "@/components/block-viewer";
 import { ViewportSwitch } from "@/components/viewport-switch";
@@ -14,6 +14,7 @@ import { assetUrl } from "@/lib/data-source";
 import { loadPageBlocks, loadSimilarPages, loadSiteView, prefetchSimilarPages, wallSource, type SimilarPage } from "@/lib/load-blocks";
 import { flowOf } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
+import { BackLink } from "@/components/back-link";
 import { PAGE_TYPE_LABEL, type Block } from "@/lib/blocks";
 import { industryLabel, platformLabel, rankLabel } from "@/lib/stores";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
@@ -131,16 +132,12 @@ export function SiteProfileView({ host }: { host: string }) {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
-        <Link
-          href="/sites"
-          className="inline-flex w-fit items-center gap-1 rounded-md text-[12px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:-my-3 touch:h-11 touch:pr-3"
-        >
-          <ArrowLeft className="size-3.5" /> Sites
-        </Link>
+        {/* Back to wherever the person came from (a flow, a search, the wall); Sites when opened directly. */}
+        <BackLink fallbackHref="/sites" fallbackLabel="Sites" />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <StoreIcon key={store.host} host={store.host} brand={store.brand} size={44} className="rounded-lg" />
           <div className="min-w-0">
-            <h1 className="font-heading text-[22px] leading-tight font-semibold">{store.brand}</h1>
+            <h1 className="font-heading text-[22px] leading-tight font-extrabold tracking-[-0.03em]">{store.brand}</h1>
             <a
               href={`https://${store.host}/`}
               target="_blank"

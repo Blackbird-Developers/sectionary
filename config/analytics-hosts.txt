@@ -1,0 +1,23 @@
+# Analytics and advertising hosts the crawler blocks while it fills a cart (src/cart-session.ts), so a
+# store's add-to-cart numbers are not inflated by us. One host per line; a line with a path matches that
+# path only. The store's own server still records that a cart was created: that we cannot and should not hide.
+google-analytics.com
+analytics.google.com
+googletagmanager.com
+doubleclick.net
+googleadservices.com
+facebook.com/tr
+connect.facebook.net
+analytics.tiktok.com
+ads.tiktok.com
+ct.pinterest.com
+sc-static.net
+tr.snapchat.com
+bat.bing.com
+clarity.ms
+hotjar.com
+a.klaviyo.com
+api.segment.io
+cdn.heapanalytics.com
+api.amplitude.com
+monorail-edge.shopifysvc.com

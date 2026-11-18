@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight, ExternalLink, Lock, Maximize2, Tag, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Lock, Maximize2, Tag, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { Stack } from "@/components/site-profile";
@@ -15,8 +15,10 @@ import { assetUrl } from "@/lib/data-source";
 import { loadPageBlocks, loadSiteView } from "@/lib/load-blocks";
 import { labelFor, PAGE_TYPE_LABEL, type Block } from "@/lib/blocks";
 import { platformLabel } from "@/lib/stores";
-import { flowOf, pageView, FLOW_STEPS, type Flow, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
+import { cartStateOf, flowOf, pageView, FLOW_STEPS, type CartState, type Flow, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
+import { BackLink } from "@/components/back-link";
+import { BlockClip } from "@/components/block-clip";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
 
 /** From here up the screens share the row's width; below, the row scrolls sideways a screen at a time. */
@@ -157,17 +159,13 @@ export function FlowView({ host }: { host: string }) {
   return (
     <div className="flex flex-col gap-5">
       <header className="flex flex-col gap-3">
-        <Link
-          href={`/sites/${encodeURIComponent(store.host)}`}
-          className="inline-flex w-fit items-center gap-1 rounded-md text-[12px] text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:-my-3 touch:h-11 touch:pr-3"
-        >
-          <ArrowLeft className="size-3.5" /> {store.brand}
-        </Link>
+        {/* Back to wherever the person came from (Flows, a search, the store); the store page when opened directly. */}
+        <BackLink fallbackHref={`/sites/${encodeURIComponent(store.host)}`} fallbackLabel={store.brand} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-3">
           <StoreIcon key={store.host} host={store.host} brand={store.brand} size={44} className="rounded-xl" />
           {/* The basis lets the switch drop to its own line on phones instead of squeezing the title. */}
           <div className="min-w-0 flex-1 basis-52">
-            <h1 className="font-heading text-[22px] leading-tight font-semibold">
+            <h1 className="font-heading text-[22px] leading-tight font-extrabold tracking-[-0.03em]">
               {store.brand} <span className="font-medium text-muted-foreground">flow</span>
             </h1>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-muted-foreground">
@@ -291,6 +289,34 @@ function StepBadge({ number, captured, className }: { number: number; captured: 
 }
 
 /**
+ * What the cart step's page shows (lib/flows.ts cartStateOf): from the page's
+ * blocks when the source has them, otherwise from one request for that page's
+ * blocks. Null for every other step.
+ */
+function useCartState(host: string, page: ProfilePage | null): CartState | "loading" | null {
+  const own = page ? (page.desktopBlocks.length ? page.desktopBlocks : page.mobileBlocks) : [];
+  const [fetched, setFetched] = useState<{ url: string; value: CartState } | null>(null);
+  const url = page?.url ?? null;
+  const needsFetch = Boolean(url) && own.length === 0 && (page?.blockCount ?? 0) > 0;
+  useEffect(() => {
+    if (!url || !needsFetch) return;
+    let alive = true;
+    loadPageBlocks(host, url).then(
+      ({ desktop, mobile }) => alive && setFetched({ url, value: cartStateOf(desktop.length ? desktop : mobile) }),
+      // Could not tell: show the page as before rather than hide it.
+      () => alive && setFetched({ url, value: "filled" }),
+    );
+    return () => {
+      alive = false;
+    };
+  }, [host, url, needsFetch]);
+  if (!page) return null;
+  if (own.length) return cartStateOf(own);
+  if (!needsFetch) return "filled";
+  return fetched && fetched.url === page.url ? fetched.value : "loading";
+}
+
+/**
  * One screen of the strip: the step's name and number, then the top of its
  * page in a frame the shape of the viewport, then its path and block count.
  * The frame is a button into the viewer. A step with several pages (two
@@ -321,6 +347,11 @@ function StepScreen({
   // The frame follows the switch, not the capture: a desktop-only page still
   // sits in a phone frame on Mobile, with a note saying what it is.
   const mobile = viewport === "mobile";
+  // The cart step: a cart captured empty, or a store that sends /cart
+  // elsewhere, is "not available" in its own frame, and can still be shown.
+  const cart = useCartState(host, step.type === "cart" ? page : null);
+  const [showAnyway, setShowAnyway] = useState(false);
+  const unavailable = (cart === "empty" || cart === "not-a-cart") && !showAnyway;
 
   return (
     <article
@@ -331,8 +362,8 @@ function StepScreen({
       )}
     >
       <div className="flex min-h-7 items-center gap-2">
-        <StepBadge number={number} captured={Boolean(page)} />
-        <h2 className={cn("truncate text-[14px] font-semibold", !page && "text-muted-foreground")}>{label}</h2>
+        <StepBadge number={number} captured={Boolean(page) && !unavailable} />
+        <h2 className={cn("truncate text-[14px] font-semibold", (!page || unavailable) && "text-muted-foreground")}>{label}</h2>
         {step.pages.length > 1 && (
           <div className="ml-auto flex items-center gap-0.5">
             <Button variant="ghost" size="icon-sm" aria-label={`Previous ${label.toLowerCase()}`} disabled={at === 0} onClick={() => onAt(at - 1)}>
@@ -358,6 +389,24 @@ function StepScreen({
               Not captured
               {step.type === "cart" ? ": cart is captured when the store's robots.txt lets us in." : " for this store."}
             </span>
+          </span>
+        </Screen>
+      ) : cart === "loading" ? (
+        <Screen viewport={viewport} host={host} path={path ?? "/"}>
+          <span aria-busy className="block h-full animate-pulse bg-muted" />
+        </Screen>
+      ) : unavailable ? (
+        <Screen viewport={viewport} host={host} path={path ?? "/"} dashed>
+          <span className="flex h-full flex-col items-center justify-center gap-2 p-5 text-center">
+            <span className="text-[13px] font-medium">Not available</span>
+            <span className="max-w-48 text-[12px] text-muted-foreground">
+              {cart === "empty"
+                ? "This store's cart was empty when we visited. We only add a product where the store's robots.txt allows it."
+                : "This store's cart link opens another page, so there is no cart page to show."}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setShowAnyway(true)}>
+              {cart === "empty" ? "Show the empty cart" : "Show what it opens"}
+            </Button>
           </span>
         </Screen>
       ) : (
@@ -825,6 +874,8 @@ function PageBody({ page, shown, markers, onLeave }: { page: ProfilePage; shown:
                 decoding="async"
                 className={cn("block h-full w-full", preview && PREVIEW_BLUR)}
               />
+              {/* A block that moves plays its clip while it is on screen (never over a blurred preview). */}
+              <BlockClip block={b} mode="view" hidden={preview} />
               {/* Where the block starts and ends, on hover or focus. */}
               <span className="pointer-events-none absolute inset-0 opacity-0 ring-2 ring-primary ring-inset transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100" />
               {/* The marker names the link, so what is read out is what is shown. */}

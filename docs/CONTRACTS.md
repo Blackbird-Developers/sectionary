@@ -267,19 +267,26 @@ quick view, the answer to an add to cart, the cart drawer (`MomentKind`).
 background video, slideshows that play on their own, scrolling text and
 animation (`MotionKind`). The crawler's own browser records them in the same
 visit, before animations are switched off for the screenshots. The store's
-video files are never downloaded.
+video files are never downloaded. The page is slowed down while it is
+recorded and the clip is sped back up, so it plays at the page's real speed
+(src/time-warp.ts). With `--sliders`, a slideshow that only moves when pressed
+gets a clip too: after the screenshots, the crawler presses the slideshow's
+own next arrow (or its dots, or scrolls it) three times while recording. Its
+`clip.kind` is `carousel`; nothing else in the contract changes.
 
 - `motionHint` on a block says why the crawler looked at it. It is present
   whenever the crawler looked, even when nothing was recorded (most
   slideshows do not play on their own).
 - `clip` on a block is the recording: `file` (an MP4 next to the block's
   image, null when recording or encoding failed), its pixel size (at most
-  720 wide), `durationMs`, `bytes` and the `rect` of the block that was
-  recorded. The block's screenshot is the clip's poster.
+  1080 wide on desktop, 780 on a phone), `durationMs`, `bytes` and the `rect`
+  of the block that was recorded. The block's screenshot is the clip's poster.
 
 `Block`, the API's item, gains `moment` (the kind, on a panel block) and
-`clip` (`{ kind, src, w, h, ms }`, where `src` resolves like the image's
-`src`).
+`clip` (`{ kind, src, w, h, ms, rect? }`, where `src` resolves like the
+image's `src` and `rect` is the recorded part of the block in CSS pixels from
+its top-left corner, `{ x, y, w, h }`; absent means the whole block). The web
+app draws the clip over exactly that part of the screenshot.
 
 Examples, written by hand until the crawler writes real ones:
 `fixtures/manifests/myzoobox.com/products-zoologist-club-sibling-kit-easy-reader-3-month-plan`

@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import sharp from "sharp";
 import { encode as blurhashEncode } from "blurhash";
+import { clipOf, type UploadedClip } from "./clips.js";
 import type { Manifest, ManifestBlock, PageStyles } from "../../web/src/contracts/manifest.js";
 import { bucketFor } from "../../web/src/lib/colour.js";
 import { blocks, captures, pages, sites, siteTech, captureDiffs } from "./schema.js";
@@ -88,11 +89,12 @@ type UploadedImage = {
   width: number; height: number; webpKey: string | null; thumbnailKey: string; blurhash: string;
   slices: { index: number; key: string; top: number; width: number; height: number }[];
 };
-async function uploadedImages(manifestPath: string): Promise<Record<string, UploadedImage>> {
+async function uploadedFiles(manifestPath: string): Promise<{ images: Record<string, UploadedImage>; clips: Record<string, UploadedClip> }> {
   try {
-    return (JSON.parse(await readFile(resolve(dirname(manifestPath), "images.json"), "utf8")) as { images: Record<string, UploadedImage> }).images;
+    const index = JSON.parse(await readFile(resolve(dirname(manifestPath), "images.json"), "utf8")) as { images: Record<string, UploadedImage>; clips?: Record<string, UploadedClip> };
+    return { images: index.images, clips: index.clips ?? {} };
   } catch (e) {
-    if ((e as { code?: string }).code === "ENOENT") return {};
+    if ((e as { code?: string }).code === "ENOENT") return { images: {}, clips: {} };
     throw e;
   }
 }
@@ -112,11 +114,11 @@ function thumbnailKey(imageKey: string | null): string | null {
   return imageKey.replace(/\.webp$/, "_thumb.webp");
 }
 
-async function blockRow(captureId: string, block: ManifestBlock, manifestPath: string, root: string, images: Record<string, UploadedImage>) {
+async function blockRow(captureId: string, block: ManifestBlock, manifestPath: string, root: string, images: Record<string, UploadedImage>, clips: Record<string, UploadedClip>) {
   const uploaded = block.file ? images[block.file] : undefined;
   if (uploaded) {
     return {
-      ...blockFields(captureId, block),
+      ...blockFields(captureId, block, clips),
       imageKey: publicSrc(uploaded.webpKey ?? uploaded.slices[0].key), thumbnailKey: publicSrc(uploaded.thumbnailKey),
       blurhash: uploaded.blurhash, imageWidth: uploaded.width, imageHeight: uploaded.height, imageSlices: slicesOf(uploaded),
     };
@@ -139,17 +141,18 @@ async function blockRow(captureId: string, block: ManifestBlock, manifestPath: s
   const iKey = imageKey(manifestPath, root, block.file);
   const tKey = thumbnailKey(iKey);
 
-  return { ...blockFields(captureId, block), imageKey: iKey, thumbnailKey: tKey, blurhash, imageWidth, imageHeight, imageSlices: null };
+  return { ...blockFields(captureId, block, clips), imageKey: iKey, thumbnailKey: tKey, blurhash, imageWidth, imageHeight, imageSlices: null };
 }
 
-function blockFields(captureId: string, block: ManifestBlock) {
+function blockFields(captureId: string, block: ManifestBlock, clips: Record<string, UploadedClip>) {
   return {
     captureId, ref: block.ref, blockIndex: block.index, viewport: block.viewport, typeHint: block.typeHint,
     parentType: block.parentType, tag: block.tag, elementId: block.id, classes: block.classes,
     top: Math.round(block.top), height: Math.round(block.height), width: Math.round(block.width),
     text: block.text, textLength: block.textLength, headline: block.headline || null,
     buttons: block.buttons, images: block.images, videos: block.videos, background: block.bg,
-    style: block.style ?? null, outline: block.outline ?? null, updatedAt: new Date(),
+    style: block.style ?? null, outline: block.outline ?? null,
+    motionHint: block.motionHint ?? null, clip: clipOf(block, clips, publicSrc), updatedAt: new Date(),
   };
 }
 
@@ -205,7 +208,7 @@ const failed: string[] = [];
 try {
   for (const manifestPath of manifestPaths) try {
     const manifest = JSON.parse(await readFile(manifestPath, "utf8"), withoutNul) as Manifest;
-    const images = await uploadedImages(manifestPath);
+    const { images, clips } = await uploadedFiles(manifestPath);
     await db.transaction(async (tx) => {
       const tf = themeFields(manifest.site.theme);
       const [site] = await tx.insert(sites).values({
@@ -249,7 +252,7 @@ try {
 
       // Insert/update blocks
       for (const block of manifest.blocks) {
-        const row = await blockRow(capture.id, block, manifestPath, root, images);
+        const row = await blockRow(capture.id, block, manifestPath, root, images, clips);
         await tx.insert(blocks).values(row).onConflictDoUpdate({
           target: [blocks.captureId, blocks.viewport, blocks.blockIndex], set: row,
         });

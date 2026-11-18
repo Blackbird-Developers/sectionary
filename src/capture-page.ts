@@ -3,12 +3,19 @@
 // (crawl.ts). The manifest it writes is a cross-lane contract:
 // web/src/contracts/manifest.ts, guarded by src/contract-check.ts.
 import type { Browser, BrowserContext, Page } from 'playwright';
-import { mkdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { collectBlocks, collectLinks, detectSite, detectWall, hidePinned, pageMeta, restorePinned, type BlockInfo, type SiteInfo, type PageMeta } from './page-script.js';
 import { measureStyles, STYLE_THRESHOLDS, type BlockStyleC, type OutlineNodeC, type PageStylesC, type StyleResult } from './style-script.js';
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
+import { isEmptyCartBlock } from './empty-cart.js';
+import type { ManifestClip, MomentKind, MotionKind } from '../web/src/contracts/manifest.js';
+import { CLIP_THRESHOLDS, SLIDER_THRESHOLDS, recordClips, recordSliderClips, type RawClip } from './clips.js';
+import { encodeClip } from './clip-encode.js';
+import { TIME_WARP_SCRIPT, setPageRate } from './time-warp.js';
+import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
+import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
 export type ViewportName = 'desktop' | 'mobile';
 
@@ -32,16 +39,66 @@ export type CaptureOptions = {
   host?: string;
   /** Platform lane for the robots.txt request (Shopify throttles per IP across stores). */
   lane?: Lane;
+  /** Moments to capture (src/moments.ts). Empty, the default, changes nothing about a capture. */
+  moments: MomentKind[];
+  /**
+   * Who may have a product put in a cart by add-to-cart (src/cart-session.ts). own = config/own-sites.txt;
+   * optin = also config/moments-optin.txt (stores that said yes); all = any store whose robots.txt allows the
+   * cart, and only with MOMENTS_CART_ALL=I_HAVE_SIGN_OFF (why it stays locked: CART_ALL_ENV in cart-session.ts).
+   */
+  momentsCartScope: CartScope;
+  /** On a store's cart page: the cookies of the cart a product page filled, per viewport, so it shows its line item. */
+  cartStates?: Partial<Record<ViewportName, HeldCart>>;
   /** Measure design metadata (SEC-31): pageStyles per viewport, style and outline per block. Off by default while it is proven. */
   styles?: boolean;
+  /**
+   * Record short silent clips of blocks that move by themselves (video-sections brief; src/clips.ts): motion stays on
+   * until they are recorded, then the stills are taken exactly as without clips. Off by default.
+   */
+  clips?: boolean;
+  /**
+   * With clips: sliders that only move when pressed get a clip too. After every still and moment, each slider's
+   * own "next" arrow (or dots, or track) is pressed a few times while recording (src/clips.ts recordSliderClips).
+   * Off by default.
+   */
+  sliders?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, styles: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false };
 
-export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; style?: BlockStyleC; outline?: OutlineNodeC[] };
+/** At most this many clips per page and viewport (the clips test: 4). */
+const CLIPS_PER_PAGE = 4;
+/** Motion switched off for the stills: CSS animations and transitions end at once. */
+const ZERO_MOTION_CSS = '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;scroll-behavior:auto!important}';
+
+let analyticsHosts: string[] | null = null;
+const ANALYTICS_HOSTS = () => (analyticsHosts ??= loadLines('config/analytics-hosts.txt'));
+let optinHosts: string[] | null = null;
+const OPTIN_HOSTS = () => (optinHosts ??= loadLines('config/moments-optin.txt'));
+
+/** Whether this store may have a product put in its cart: scope first, then robots.txt for every cart path we use. */
+async function cartGate(polite: Politeness, url: string, host: string, opts: CaptureOptions): Promise<{ ok: boolean; reason: string }> {
+  if (cartsStopped()) return { ok: false, reason: `stopped, a cart would not empty (${cartsStopped()})` };
+  if (polite.isOwn(host)) return { ok: true, reason: 'own site' };
+  if (opts.momentsCartScope === 'own') return { ok: false, reason: 'scope own' };
+  if (opts.momentsCartScope === 'optin' && !OPTIN_HOSTS().includes(host)) return { ok: false, reason: 'scope optin' };
+  if (opts.momentsCartScope === 'all' && process.env[CART_ALL_ENV] !== CART_ALL_VALUE) return { ok: false, reason: `scope all needs ${CART_ALL_ENV}=${CART_ALL_VALUE}` };
+  const origin = new URL(url).origin;
+  for (const p of ['/cart', '/cart/add.js', '/cart/clear.js', '/cart.js']) {
+    const v = await polite.allowed(origin + p, opts.lane);
+    if (!v.ok) return { ok: false, reason: `robots.txt: ${p}` };
+  }
+  return { ok: true, reason: 'robots.txt allows the cart' };
+}
+
+/** What one viewport does with a cart: fill it on a product page, or open a filled one on the cart page and empty it after. */
+type CartJob = { fill: boolean; held?: HeldCart };
+
+/** `moment` is set on the panel a moment revealed (a popup, an open menu), written after the page's own blocks. */
+export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[]; motionHint?: MotionKind; clip?: ManifestClip };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; ms: number; pageStyles: PageStylesC | null; stylesError: string | null }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[] }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -61,6 +118,10 @@ export type PageResult = {
   /** When no block was found at all: what the page says instead ("Restricted Access. Sorry, you cannot visit our store from your current location."). */
   emptyText: string | null;
   lines: string[];
+  /** A product page that filled the store's cart: its cookies per viewport, for the cart page (also kept in <out>/_carts until emptied). */
+  cart?: Partial<Record<ViewportName, HeldCart>>;
+  /** A cart page opened with a filled cart: the viewports whose cart was emptied again and checked. */
+  emptied?: ViewportName[];
 };
 
 // A leading language or region segment: /gl, /en-us, /us/en, /en_GB.
@@ -135,7 +196,9 @@ const HIDE_CONSENT_CSS = `
 { display: none !important; visibility: hidden !important; }
 `;
 
-async function dismissOverlays(page: Page): Promise<void> {
+// `escape: false` for moments: a store can answer the key itself. myzoobox.com shows a small fallback list
+// instead of its mega menu when the menu is hovered just after Escape.
+async function dismissOverlays(page: Page, escape = true): Promise<void> {
   // A hidden consent dialog can leave the page scroll-locked; without scrolling nothing lazy-loads.
   await page
     .evaluate(() => {
@@ -155,7 +218,7 @@ async function dismissOverlays(page: Page): Promise<void> {
       }
     })
     .catch(() => {});
-  await page.keyboard.press('Escape').catch(() => {});
+  if (escape) await page.keyboard.press('Escape').catch(() => {});
   await page
     .evaluate(() => {
       // Close (never accept) newsletter popups, modals and cookie banners.
@@ -208,11 +271,14 @@ async function autoScroll(page: Page): Promise<void> {
     .catch(() => {});
 }
 
-async function captureViewportInner(context: BrowserContext, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness): Promise<ViewportResult> {
+async function captureViewportInner(context: BrowserContext, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness, fill: { origin: string | null } | null = null): Promise<ViewportResult> {
   // tsx/esbuild wraps inner functions in a __name() helper that only exists in
   // Node. Functions we ship into the page via page.evaluate still contain the
   // call, so define a no-op shim in the page before any script runs.
   await context.addInitScript('globalThis.__name = globalThis.__name || ((f) => f);');
+  // Clips are recorded in slow motion (src/time-warp.ts): a page clock whose speed can change, in every frame
+  // before the page's own scripts. At normal speed, which is always except while a clip records, nothing changes.
+  if (opts.clips) await context.addInitScript(TIME_WARP_SCRIPT);
   const page = await context.newPage();
   page.setDefaultTimeout(45_000);
   const t0 = Date.now();
@@ -226,9 +292,8 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     if (status !== null && status >= 400) return { ok: false, status, error: `http-${status}`, ms: Date.now() - t0 };
     await page.waitForLoadState('load', { timeout: 20_000 }).catch(() => {});
     await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
-    await page
-      .addStyleTag({ content: '*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important;scroll-behavior:auto!important}' + HIDE_CONSENT_CSS })
-      .catch(() => {});
+    // With clips, motion stays on until they are recorded (after the blocks are found); otherwise it goes now.
+    await page.addStyleTag({ content: (opts.clips ? '' : ZERO_MOTION_CSS) + HIDE_CONSENT_CSS }).catch(() => {});
     await page.waitForTimeout(1200);
     // A wall instead of the store (human check, access denied, geo-block),
     // usually served as 200 OK. Some browser checks clear by themselves within
@@ -239,6 +304,12 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       wall = await page.evaluate(detectWall).catch(() => null);
     }
     if (wall) return { ok: false, status, error: `wall:${wall.kind}: "${wall.text}"`, ms: Date.now() - t0 };
+    const kind = pageType(new URL(url));
+    // Hook A: the first-visit popup can only be caught before dismissOverlays closes it.
+    const mctx: MomentContext = { vp, pageDir, quality: opts.quality, pageType: kind, kinds: opts.moments, dismiss: (p: Page) => dismissOverlays(p, false) };
+    // add-to-cart runs only when capturePage cleared this store and viewport for it (cartGate, one cart per run).
+    if (fill) mctx.cart = { context, analyticsHosts: ANALYTICS_HOSTS(), pace: () => polite.waitFor(url, opts.lane), onFill: (origin) => (fill.origin = origin) };
+    const popup: MomentResult | null = opts.moments.length ? await runPopupWatch(page, mctx) : null;
     await dismissOverlays(page);
     await autoScroll(page);
     await page.waitForTimeout(600);
@@ -266,9 +337,12 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     await page.waitForTimeout(500);
 
     const site = await page.evaluate(detectSite);
+    mctx.platform = site.platform;
     const meta = await page.evaluate(pageMeta);
     const links = opts.wantLinks ? await page.evaluate(collectLinks, 400).catch(() => [] as string[]) : [];
     const collected = await page.evaluate(collectBlocks, { minHeight: opts.minHeight, maxBlocks: opts.maxBlocks });
+    // "Your cart is empty" is a state, not a cart design (src/empty-cart.ts). Before the block files are named.
+    for (const b of collected.blocks) if (isEmptyCartBlock(kind, b.typeHint, b.text)) b.typeHint = 'empty-cart';
     // Design metadata, while every block still carries its data-secref and nothing is hidden yet.
     // A measuring failure never fails the page: the capture carries on without the new fields.
     let styled: StyleResult | null = null;
@@ -285,6 +359,34 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     const emptyText = collected.blocks.length
       ? null
       : await page.evaluate(() => (document.body?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 160)).catch(() => '');
+
+    // Clips: blocks that move by themselves (hero videos, slideshows) are recorded now, while motion is on; the
+    // frames wait on disk and are encoded after the page (captureViewport). Then motion goes off and the recorded
+    // videos are rewound, so every still below is taken exactly as without clips. A failure never fails the page.
+    let rawClips: RawClip[] = [];
+    let zeroMotion: Awaited<ReturnType<Page['addStyleTag']>> | null = null;
+    if (opts.clips && collected.blocks.length) {
+      rawClips = await recordClips(page, { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: CLIPS_PER_PAGE, log: () => {} }).catch(() => [] as RawClip[]);
+      // Normal speed again, even if a recording was cut off before it could put the speed back.
+      await setPageRate(page, null, 1);
+      await page.emulateMedia({ reducedMotion: 'reduce' }).catch(() => {});
+      zeroMotion = await page.addStyleTag({ content: ZERO_MOTION_CSS }).catch(() => null);
+      await page
+        .evaluate((refs) => {
+          for (const ref of refs) {
+            for (const v of Array.from(document.querySelectorAll(`[data-secref="${ref}"] video`))) {
+              try {
+                (v as HTMLVideoElement).currentTime = 0;
+              } catch {
+                /* not seekable */
+              }
+            }
+          }
+        }, rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref))
+        .catch(() => {});
+      await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+      await page.waitForTimeout(800);
+    }
 
     const fullFile = `${vp}.jpg`;
     const fullPath = path.join(pageDir, fullFile);
@@ -353,14 +455,43 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
         blocks.push({ ...b, viewport: vp, file: null, error: (e as Error).message.split('\n')[0], ...styled?.blocks[b.ref] });
       }
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError };
+    // Hook B: moments that change the page (open a menu, scroll to a sticky bar), now that every block is on disk.
+    let moments: CrawlerMoment[] = [];
+    let momentNotes: string[] = [];
+    if (opts.moments.length) {
+      // A popup that opened while the blocks were being shot would cover every frame (sisterlylab.com's
+      // sign-up form on a product page), so close late popups first, by their close buttons only.
+      await dismissOverlays(page, false);
+      const later = await runMoments(page, mctx);
+      const done = await finalizeMoments(popup ? [popup, later] : [later], pageDir, vp, collected.blocks.length + 1);
+      blocks.push(...done.panels);
+      moments = done.moments;
+      momentNotes = done.notes;
+    }
+    // Sliders that only move when pressed (Ben, 18 Nov 2026), last of all: every still and moment is on disk, so
+    // pressing them changes nothing already captured. Motion comes back on for them. The bot page says the
+    // crawler moves slideshows to their next slide (released together, BOT_VERSION 0.5).
+    if (opts.clips && opts.sliders && collected.blocks.length) {
+      await dismissOverlays(page, false);
+      await zeroMotion?.evaluate((s) => (s as Element).remove()).catch(() => {});
+      await page.emulateMedia({ reducedMotion: 'no-preference' }).catch(() => {});
+      await page.waitForTimeout(300);
+      const skip = new Set(rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref));
+      const env = { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: SLIDER_THRESHOLDS.maxPerPage, touch: vp === 'mobile', log: () => {} };
+      rawClips = [...rawClips, ...(await recordSliderClips(page, env, skip).catch(() => [] as RawClip[]))];
+    }
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
 }
 
-/** One viewport with a hard ceiling: when time runs out the context is closed, which unblocks anything still waiting on the page. */
-async function captureViewport(browser: Browser, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness): Promise<ViewportResult> {
+/**
+ * One viewport with a hard ceiling: when time runs out the context is closed, which unblocks anything still
+ * waiting on the page. Before it closes: the cookies of a cart add-to-cart filled (even when the page timed
+ * out mid-moment), and on a cart page opened with a filled cart's cookies, the cart is emptied and checked.
+ */
+async function captureViewport(browser: Browser, url: string, vp: ViewportName, pageDir: string, opts: CaptureOptions, polite: Politeness, job: CartJob = { fill: false }): Promise<ViewportResult & { cart?: HeldCart; empty?: { ok: boolean; rateLimited: boolean } }> {
   const v = VIEWPORTS[vp];
   const t0 = Date.now();
   let context: BrowserContext;
@@ -373,21 +504,72 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
       userAgent: v.userAgent,
       locale: 'en-US',
       colorScheme: 'light',
-      reducedMotion: 'reduce',
+      // With clips the page moves until they are recorded; captureViewportInner turns reduced motion on after.
+      reducedMotion: opts.clips ? 'no-preference' : 'reduce',
       ignoreHTTPSErrors: true,
+      ...(job.held ? { storageState: job.held.state } : {}),
     });
+    // A filled cart's page never reaches a checkout, and its "viewed cart" never reaches the store's analytics.
+    if (job.held) await installGuards(context, ANALYTICS_HOSTS());
   } catch (e) {
     return { ok: false, status: null, error: `browser: ${(e as Error).message.split('\n')[0]}`, ms: Date.now() - t0 };
   }
+  const fill = job.fill ? { origin: null as string | null } : null;
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<ViewportResult>((resolve) => {
-    timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs);
+    // Moments add up to 6 s before the blocks and 35 s after them; filling a cart up to 20 s more.
+    // Clips: the clip step's own budget plus one candidate that started just before it ran out; sliders the same.
+    const extra =
+      (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) +
+      (opts.clips ? CLIP_THRESHOLDS.pageMs + CLIP_THRESHOLDS.candidateMs + 10_000 : 0) +
+      (opts.clips && opts.sliders ? SLIDER_THRESHOLDS.pageMs + SLIDER_THRESHOLDS.candidateMs : 0);
+    timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
+  let r: ViewportResult;
   try {
-    return await Promise.race([captureViewportInner(context, url, vp, pageDir, opts, polite), timeout]);
+    r = await Promise.race([captureViewportInner(context, url, vp, pageDir, opts, polite, fill), timeout]);
   } finally {
     if (timer) clearTimeout(timer);
+  }
+  let cart: HeldCart | undefined;
+  let empty: { ok: boolean; rateLimited: boolean } | undefined;
+  try {
+    if (fill?.origin) cart = { origin: fill.origin, state: await context.storageState() };
+    if (job.held) empty = await emptyCart(context, job.held.origin);
+  } catch {
+    if (job.held) empty = { ok: false, rateLimited: false };
+  } finally {
     await context.close().catch(() => {});
+  }
+  // Clips are encoded after the page, so encoding never counts against it; the frames go once encoded.
+  if (opts.clips) {
+    if (r.ok && r.clips?.length) await attachClips(r, pageDir, vp);
+    await rm(path.join(pageDir, '_frames', vp), { recursive: true, force: true }).catch(() => {});
+  }
+  return { ...r, ...(cart ? { cart } : {}), ...(empty ? { empty } : {}) };
+}
+
+/**
+ * Encode one viewport's recorded clips into blocks/<d|m>-<NN>-<type>.mp4, next to the block's still (its poster),
+ * and put them on the blocks: clip (ManifestClip) and motionHint. A clip that will not encode keeps file null and
+ * its error, as the contract says. A candidate that turned out not to move only gets its motionHint.
+ */
+async function attachClips(r: Extract<ViewportResult, { ok: true }>, pageDir: string, vp: ViewportName): Promise<void> {
+  const byRef = new Map(r.blocks.map((b) => [b.ref, b]));
+  for (const raw of r.clips ?? []) {
+    const block = byRef.get(raw.ref);
+    if (!block) continue;
+    block.motionHint = raw.motionHint;
+    if (raw.verdict !== 'recorded' || !raw.frames || !raw.framesDir || !raw.rect || !raw.block || !raw.viewportWidth) continue;
+    const stem = block.file ? block.file.replace(/\.jpe?g$/i, '') : `blocks/${vp[0]}-${String(block.index).padStart(2, '0')}-${block.typeHint}`;
+    const file = `${stem}.mp4`;
+    const rect = { x: Math.round(raw.rect.x - raw.block.x), y: Math.round(raw.rect.y - raw.block.y), width: Math.round(raw.rect.width), height: Math.round(raw.rect.height) };
+    const res = await encodeClip({ framesDir: raw.framesDir, frames: raw.frames, rect: raw.rect, viewportWidth: raw.viewportWidth, frameRegion: raw.frameRegion, recordedMs: raw.recordedMs || 5000, slowdown: raw.slowdown, outFile: path.join(pageDir, file) }).catch(
+      (e: Error) => ({ ok: false as const, error: e.message.split('\n')[0] }),
+    );
+    block.clip = res.ok
+      ? { kind: raw.motionHint, file, width: res.width, height: res.height, durationMs: res.durationMs, bytes: res.bytes, rect }
+      : { kind: raw.motionHint, file: null, width: 0, height: 0, durationMs: 0, bytes: 0, rect, error: res.error };
   }
 }
 
@@ -406,6 +588,14 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     return result;
   }
 
+  // Moments reach other people's stores only in the release that adds the bot page sentence saying the
+  // crawler interacts (moments brief, section 11, approved 17 Nov 2026). Until then: our own stores.
+  // MOMENTS_THIRD_PARTY=yes lets the 50-store pilot through.
+  if (opts.moments.length && !polite.isOwn(host) && process.env.MOMENTS_THIRD_PARTY !== 'yes') {
+    opts = { ...opts, moments: [] };
+    result.lines.push('  moments: skipped, own sites only until the bot page says the crawler interacts');
+  }
+
   const pageDir = path.join(opts.out, host, slug);
   await mkdir(pageDir, { recursive: true });
   const manifest: {
@@ -413,14 +603,49 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     page: { url: string; type: string; slug: string; capturedAt: string } & Partial<PageMeta>;
     viewports: Record<string, unknown>;
     blocks: CapturedBlock[];
+    moments?: CrawlerMoment[];
     pageStyles?: Partial<Record<ViewportName, PageStylesC>>;
   } = { site: { host, origin: u.origin }, page: { url, type, slug, capturedAt: new Date().toISOString() }, viewports: {}, blocks: [] };
+  // Present whenever moments were asked for, even if the store did nothing; absent otherwise, as before.
+  if (opts.moments.length) manifest.moments = [];
+  // Filling a cart (src/cart-session.ts): decided once per product page.
+  let cartOk = false;
+  if (opts.moments.includes('add-to-cart') && type === 'product') {
+    const gate = await cartGate(polite, url, host, opts);
+    cartOk = gate.ok;
+    result.lines.push(`  cart: ${gate.ok ? 'may be filled' : 'not filled'} (${gate.reason})`);
+  }
 
   const vps: ViewportName[] = opts.only ? [opts.only] : ['desktop', 'mobile'];
   let okCount = 0;
   const errors: string[] = [];
   for (const vp of vps) {
-    const r = await captureViewport(browser, url, vp, pageDir, opts, polite);
+    // One cart per store and viewport per run: never when this viewport already holds one, and never while
+    // MAX_WAITING carts wait for Shopify's rate limit to let us empty them.
+    const waiting = cartOk ? waitingCarts(opts.out).length : 0;
+    const fill = cartOk && !hasPending(opts.out, host, vp) && !cartsStopped() && waiting < MAX_WAITING;
+    if (cartOk && !fill) result.lines.push(`  ${vp}: cart not filled (${cartsStopped() ? 'stopped, a cart would not empty' : hasPending(opts.out, host, vp) ? 'this store already holds one' : `${waiting} carts wait to be emptied`})`);
+    const held = opts.cartStates?.[vp];
+    const r = await captureViewport(browser, url, vp, pageDir, opts, polite, { fill, held });
+    if (r.cart) {
+      await notePending(opts.out, host, vp, r.cart);
+      result.cart = { ...result.cart, [vp]: r.cart };
+    }
+    if (held) {
+      if (r.empty?.ok) {
+        await clearPending(opts.out, host, vp);
+        result.emptied = [...(result.emptied ?? []), vp];
+        result.lines.push(`  ${vp}: cart emptied and checked`);
+      } else if (r.empty?.rateLimited) {
+        // Shopify's rate limit (429), not a refusal: written down, tried again after a quiet spell (cart-session.ts).
+        if (!hasPending(opts.out, host, vp)) await notePending(opts.out, host, vp, held);
+        await noteTry(opts.out, host, vp);
+        result.lines.push(`  ${vp}: cart not emptied yet (Shopify rate limit); kept in ${path.join(opts.out, '_carts')}, tried again after 10 quiet minutes`);
+      } else {
+        await noteFailed(opts.out, host, vp);
+        result.lines.push(`  ${vp}: CART NOT EMPTIED, kept in ${path.join(opts.out, '_carts')} to try again`);
+      }
+    }
     result.ms[vp] = r.ms;
     if (!r.ok) {
       manifest.viewports[vp] = { error: r.error, status: r.status };
@@ -445,9 +670,30 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     if (result.emptyText === null && r.emptyText !== null) result.emptyText = r.emptyText;
     manifest.blocks.push(...r.blocks);
     result.blocks += okBlocks;
+    if (manifest.moments) {
+      manifest.moments.push(...r.moments);
+      const said = r.moments.map((m) => `${m.kind} ${m.confidence === 'high' ? (m.response ?? 'ok') : m.error}`);
+      result.lines.push(`  ${vp} moments: ${said.length ? said.join(', ') : 'none'}${r.momentNotes.length ? ' · ' + r.momentNotes.join('; ') : ''}`);
+    }
+    if (opts.clips) {
+      const raws = new Map((r.clips ?? []).filter((c) => c.verdict === 'recorded').map((c) => [c.ref, c]));
+      const clipped = r.blocks
+        .filter((b) => b.clip?.file)
+        .map((b) => {
+          const raw = raws.get(b.ref);
+          const how = raw ? `${raw.pressed ? ` pressed (${raw.why.replace(/^slider /, '').split(':')[0]})` : ''} x${raw.slowdown ?? 1}${raw.captureFps ? ` (${raw.captureFps} shots/s)` : ''}` : '';
+          return `${b.typeHint} ${b.clip!.kind} ${(b.clip!.durationMs / 1000).toFixed(1)}s ${Math.round(b.clip!.bytes / 1024)}KB${how}`;
+        });
+      const tried = (r.clips ?? [])
+        .filter((c) => c.verdict !== 'recorded')
+        .map((c) => `${c.pressed ? `slider ${c.ref}` : `${c.motionHint} ${c.ref}`} ${c.verdict}${c.error ? ` (${c.error})` : ''}${c.pressed && c.error === 'navigated' ? ` after pressing "${c.why.split(': ').slice(1).join(': ')}"` : ''}`);
+      result.lines.push(`  ${vp} clips: ${clipped.length ? clipped.join(', ') : 'none'}${tried.length ? ` · not recorded: ${tried.join(', ')}` : ''}`);
+    }
   }
 
   if (okCount > 0) await writeFile(path.join(pageDir, 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+  // The clip frames are gone once encoded (captureViewport); their now empty folder goes too.
+  if (opts.clips) await rm(path.join(pageDir, '_frames'), { recursive: true, force: true }).catch(() => {});
   // Kept so page discovery can be improved and re-run later without visiting the store again.
   if (opts.wantLinks && result.links.length) await writeFile(path.join(pageDir, 'links.json'), JSON.stringify(result.links, null, 1), 'utf8');
   result.status = okCount === vps.length ? 'captured' : okCount > 0 ? 'partial' : 'failed';

@@ -186,7 +186,7 @@ export function FilterDrawer({
           )}
         >
           <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4">
-            <h2 id="filters-title" className="font-heading text-[26px] font-semibold tracking-tight">
+            <h2 id="filters-title" className="font-heading text-[26px] font-extrabold tracking-[-0.03em]">
               Filters
             </h2>
             <div className="flex items-center gap-1">

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
@@ -75,7 +76,7 @@ export function FlowsIndex() {
     <div className="flex flex-col gap-4">
       <header className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <div className="min-w-0 flex-1 basis-72">
-          <h1 className="font-heading text-[22px] leading-tight font-semibold">Flows</h1>
+          <h1 className="font-heading text-[22px] leading-tight font-extrabold tracking-[-0.03em]">Flows</h1>
           <p className="mt-1 text-[13px]" aria-live="polite">
             {list ? (
               <>
@@ -94,11 +95,25 @@ export function FlowsIndex() {
             A flow is complete when a store&apos;s home, collection and product pages are captured. Cart joins when the
             store&apos;s robots.txt lets us in.
           </p>
+          {list && all && incomplete > 0 && (
+            <p className="mt-2 inline-flex flex-wrap items-center gap-x-2 rounded-md bg-muted px-2.5 py-1 text-[12px]">
+              <span>
+                Showing all {counts.captured.toLocaleString("en-US")} captured stores, including{" "}
+                <span className="font-semibold tabular-nums">{incomplete.toLocaleString("en-US")}</span> incomplete.
+              </span>
+              <button type="button" onClick={toggle} className="rounded-sm text-link underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                Complete only
+              </button>
+            </p>
+          )}
         </div>
         {list && incomplete > 0 && (
-          <Button variant="outline" size="sm" aria-pressed={all} onClick={toggle}>
-            Show incomplete
-            <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{incomplete.toLocaleString("en-US")}</span>
+          <Button variant="outline" size="sm" active={all} aria-pressed={all} onClick={toggle}>
+            {all && <Check aria-hidden className="size-3.5" strokeWidth={2.5} />}
+            {all ? "Showing incomplete" : "Show incomplete"}
+            <span className={cn("font-mono text-[11px] tabular-nums", all ? "text-primary-foreground" : "text-muted-foreground")}>
+              {incomplete.toLocaleString("en-US")}
+            </span>
           </Button>
         )}
       </header>
@@ -119,11 +134,22 @@ export function FlowsIndex() {
       ) : (
         <>
           <ul className="flex flex-col gap-2">
-            {shown.slice(0, n).map((summary) => (
-              <li key={summary.store.host}>
-                <FlowRow summary={summary} />
-              </li>
-            ))}
+            {shown.slice(0, n).map((summary, i, rows) => {
+              // Complete flows sort first, so the incomplete ones start here.
+              const firstIncomplete = all && !summary.flow.complete && (i === 0 || rows[i - 1].flow.complete);
+              return (
+                <li key={summary.store.host} className="flex flex-col gap-2">
+                  {firstIncomplete && (
+                    <h2 className="mt-4 flex items-baseline gap-2 border-t pt-4 text-[13px] font-semibold">
+                      Incomplete flows
+                      <span className="font-mono text-[11px] font-normal text-muted-foreground tabular-nums">{incomplete.toLocaleString("en-US")}</span>
+                      <span className="text-[12px] font-normal text-muted-foreground">Missing a home, collection or product page</span>
+                    </h2>
+                  )}
+                  <FlowRow summary={summary} />
+                </li>
+              );
+            })}
           </ul>
           {n < shown.length && <div ref={sentinel} aria-hidden className="h-px" />}
         </>
@@ -140,12 +166,20 @@ function FlowRow({ summary }: { summary: FlowSummary }) {
   return (
     <Link
       href={`/sites/${encodeURIComponent(store.host)}/flow`}
-      className="group flex flex-col gap-3 rounded-lg border bg-card p-3 transition-colors duration-150 outline-none hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center"
+      className={cn(
+        "group flex flex-col gap-3 rounded-lg border bg-card p-3 transition-colors duration-150 outline-none hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center",
+        !flow.complete && "border-dashed bg-card/50",
+      )}
     >
       <div className="flex min-w-0 items-center gap-3 sm:w-64 sm:shrink-0">
         <StoreIcon host={store.host} brand={store.brand} size={36} className="rounded-[10px]" />
         <div className="min-w-0">
-          <p className="truncate text-[14px] font-semibold group-hover:text-link">{store.brand}</p>
+          <p className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-[14px] font-semibold group-hover:text-link">{store.brand}</span>
+            {!flow.complete && (
+              <span className="shrink-0 rounded border border-dashed px-1 font-mono text-[10px] leading-4 text-muted-foreground uppercase">Incomplete</span>
+            )}
+          </p>
           <p className="truncate font-mono text-[11px] text-muted-foreground">{store.host}</p>
           {!flow.complete && (
             <p className="text-[12px] text-muted-foreground">

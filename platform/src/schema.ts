@@ -47,6 +47,8 @@ export const blocks = pgTable("blocks", {
   aiDescription: text("ai_description"), aiResponse: jsonb("ai_response"), embedding: vector("embedding"),
   // Manifest style and outline (SEC-31, migration 0014), null without --styles.
   style: jsonb("style"), outline: jsonb("outline"),
+  // Clips (migration 0015), null without --clips: what moves in the block, and its recording (BlockClip, url = the MP4).
+  motionHint: text("motion_hint"), clip: jsonb("clip"),
   // search_tsv (generated, migration 0004) is left out: Drizzle never writes it and the API reads it in SQL.
   embeddingModel: text("embedding_model"), embeddingHash: text("embedding_hash"), embeddedAt: timestamp("embedded_at", { withTimezone: true }),
   // What the current tags were made from (migration 0006), so only new or changed blocks are tagged again.

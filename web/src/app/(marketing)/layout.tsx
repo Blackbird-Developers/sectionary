@@ -3,15 +3,17 @@ import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LEGAL_PAGES } from "@/lib/site";
 
+// Marketing words (brand voice): Blocks are "sections", Flows are "journeys".
+// Same routes as the app's own nav.
 const NAV = [
-  { href: "/", label: "Blocks" },
-  { href: "/flows", label: "Flows" },
+  { href: "/", label: "Sections" },
+  { href: "/flows", label: "Journeys" },
   { href: "/sites", label: "Sites" },
 ];
 
 /**
  * The landing page's frame (SEC-25): the app bar's wordmark and hairline, a
- * little taller, with the waitlist as the one rust action. The legal pages
+ * little taller, with the waitlist as the one blue action. The legal pages
  * (SEC-29) share it.
  */
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -63,7 +65,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
               <span className="font-heading text-[17px] font-extrabold tracking-[-0.045em]">blimp</span>
             </div>
             <p className="text-[13px] leading-relaxed text-muted-foreground">
-              Every block links back to the store it came from. Brand names identify a store; they don&apos;t mean it
+              Every section links back to the store it came from. Brand names identify a store; they don&apos;t mean it
               endorses us. We host our screenshots only, never a store&apos;s code or images.
             </p>
           </div>

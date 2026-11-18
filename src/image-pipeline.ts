@@ -84,5 +84,6 @@ console.log(`\nAudit: ${auditPath}`);
 console.log(`  Manifests: ${audit.manifests.ok}/${audit.manifests.total} ok`);
 console.log(`  Images: ${audit.images.ok}/${audit.images.total} ok, ${audit.images.sliced} sliced into ${audit.images.slices} slices`);
 console.log(`  Uploads: ${audit.uploads.ok}/${audit.uploads.total} ok, ${(audit.uploads.bytes / 1024 / 1024).toFixed(2)} MB`);
+if (audit.clips.total) console.log(`  Clips: ${audit.clips.ok}/${audit.clips.total} ok`);
 for (const f of audit.failures.slice(0, 20)) console.error(`  FAILED ${f.stage} ${f.file}${f.key ? ` -> ${f.key}` : ""}: ${f.error}`);
 process.exit(audit.failures.length ? 1 : 0);

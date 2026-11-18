@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { PlanBadge } from "@/components/plan-badge";
 import { AuthHashRedirect } from "@/components/auth-hash-redirect";
 import { DevPlanSwitch } from "@/components/dev-plan-switch";
+import { NavTracker } from "@/components/back-link";
 
 /**
  * Top bar plus the page. From tablet width up: logo, the four sections, the
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col">
       <AuthHashRedirect />
+      <NavTracker />
       {/* The first thing Tab reaches, so keyboard users can go straight past the bar. */}
       <a
         href="#main"

@@ -78,11 +78,22 @@ export interface ImageRecord {
   thumbnailBytes: number;
 }
 
+/** A block's clip (block.clip.file, an MP4 next to the block's still), uploaded as it is. */
+export interface ClipUpload {
+  /** The source file, relative to the capture root. */
+  source: string;
+  /** The MP4's key, the source path itself (e.g. "shop.com/home/blocks/d-02-hero.mp4"). */
+  key: string;
+  bytes: number;
+}
+
 export interface PageImages {
   version: 1;
   sliceHeight: number;
   /** Keyed by the manifest's own file reference (e.g. "blocks/d-00-hero.jpg", "desktop.jpg"). */
   images: Record<string, ImageRecord>;
+  /** Keyed by the block's clip.file (e.g. "blocks/d-02-hero.mp4"); absent when the page has no clips. */
+  clips?: Record<string, ClipUpload>;
 }
 
 export type Stage = "read" | "convert" | "upload" | "manifest";
@@ -95,6 +106,7 @@ export interface Audit {
   manifests: { total: number; ok: number; failed: number };
   images: { total: number; ok: number; failed: number; sliced: number; slices: number };
   uploads: { total: number; ok: number; failed: number; bytes: number };
+  clips: { total: number; ok: number; failed: number };
   failures: Failure[];
 }
 
@@ -205,6 +217,7 @@ export function emptyAudit(sliceHeight: number): Audit {
     manifests: { total: 0, ok: 0, failed: 0 },
     images: { total: 0, ok: 0, failed: 0, sliced: 0, slices: 0 },
     uploads: { total: 0, ok: 0, failed: 0, bytes: 0 },
+    clips: { total: 0, ok: 0, failed: 0 },
     failures: [],
   };
 }
@@ -276,6 +289,38 @@ export async function processManifest(manifestPath: string, root: string, storag
       audit.images.slices += encoded.record.slices.length;
     }
     page.images[ref] = encoded.record;
+  }
+
+  // Clips: each block's MP4 goes up as it is, under its own path, and is listed under `clips` so the importer can
+  // point the block at its recording. A clip that will not read or upload is left out of the index.
+  for (const b of manifest.blocks) {
+    const file = b.clip?.file;
+    if (!file) continue;
+    audit.clips.total += 1;
+    const path = resolve(dir, file);
+    const key = baseKey(rel(path));
+    let clip: Buffer;
+    try {
+      clip = await readFile(path);
+    } catch (e) {
+      audit.clips.failed += 1;
+      failedHere += 1;
+      audit.failures.push({ file: rel(path), stage: "read", error: errorText(e) });
+      continue;
+    }
+    audit.uploads.total += 1;
+    try {
+      await storage.put(key, clip, "video/mp4");
+      audit.uploads.ok += 1;
+      audit.uploads.bytes += clip.length;
+      audit.clips.ok += 1;
+      (page.clips ??= {})[file] = { source: rel(path), key, bytes: clip.length };
+    } catch (e) {
+      audit.uploads.failed += 1;
+      audit.clips.failed += 1;
+      failedHere += 1;
+      audit.failures.push({ file: rel(path), stage: "upload", key, error: errorText(e) });
+    }
   }
 
   // The index lists only what made it to storage, so a consumer never points at a missing object.

@@ -40,7 +40,10 @@ export type Block = {
   clip?: BlockClip;
 };
 
-/** `src` is a path or absolute URL that resolves like `Block.src`; `w` and `h` are the file's pixels, `ms` its length. */
-export type BlockClip = { kind: string; src: string; w: number; h: number; ms: number };
+/**
+ * `src` is a path or absolute URL that resolves like `Block.src`; `w` and `h` are the file's pixels, `ms` its length.
+ * `rect` is the recorded part of the block in CSS pixels from its top-left corner; absent means the whole block.
+ */
+export type BlockClip = { kind: string; src: string; w: number; h: number; ms: number; rect?: { x: number; y: number; w: number; h: number } };
 
 export type BlockSet = { generatedAt: string; blocks: Block[] };

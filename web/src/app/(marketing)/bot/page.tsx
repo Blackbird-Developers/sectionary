@@ -6,7 +6,7 @@ import { CopyButton } from "@/components/copy-button";
 export const metadata: Metadata = {
   title: "SectionaryBot",
   description:
-    "SectionaryBot is the crawler behind Sectionary. What it captures, what it never touches, and how to stop it with one line of robots.txt.",
+    "SectionaryBot is the crawler behind Blimp. What it captures, what it never touches, and how to stop it with one line of robots.txt.",
   alternates: { canonical: "/bot" },
 };
 
@@ -19,13 +19,17 @@ const DOES = [
   "At most a handful of pages per store: home, a collection or two, a product or two",
   "Desktop and phone width, one page per second at most",
   "Names itself in every request as SectionaryBot/<version>",
+  "Records short silent clips of sections that move, never downloading your videos",
+  "May scroll, open the menu, move a slideshow or pick a product option, and record how the page reacts",
+  "Where robots.txt allows it, adds one product to a cart, photographs it and empties it again",
 ];
 
 const NEVER = [
-  "Signs in, adds to cart or places an order",
+  "Signs in, goes to checkout or places an order",
   "Captures account, checkout or search pages",
   "Collects personal data",
   "Copies your code, images or files",
+  "Types into a field",
 ];
 
 export default function BotPage() {
@@ -35,7 +39,7 @@ export default function BotPage() {
       title: "Who we are",
       body: (
         <p>
-          SectionaryBot is the crawler behind Sectionary, a reference library of real website and online-store designs,
+          SectionaryBot is the crawler behind Blimp, a reference library of real website and online-store designs,
           built by Blackbird.
         </p>
       ),
@@ -46,13 +50,17 @@ export default function BotPage() {
       body: (
         <>
           <p>
-            It visits public pages of online stores the way a browser does, once, and takes screenshots of those pages
-            so designers can study how stores are built.
+            It visits public pages of online stores the way a browser does, once, and takes screenshots of those pages,
+            plus short silent screen recordings of the sections that move (slideshows, background videos, scrolling
+            text), so designers can study how stores are built.
           </p>
           <p>
             It captures at most a handful of pages per store (home, one or two collections, one or two products) at
             desktop and phone width, no more than one page per second, and identifies itself in every request as{" "}
             <code>SectionaryBot/&lt;version&gt;</code> with a link to this page.
+          </p>
+          <p>
+            To show how a page behaves, it may scroll, open the navigation menu, move a slideshow to its next slide, select a product option or open a product preview, and take a screenshot or a short recording of the result. On stores whose robots.txt allows it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
           </p>
         </>
       ),
@@ -62,10 +70,11 @@ export default function BotPage() {
       title: "What it does not do",
       body: (
         <p>
-          It never signs in, never adds anything to a cart or places an order, never captures account, checkout or
-          search pages, never collects personal data, and never copies your code, images or files. The only things
-          stored are our own screenshots plus public facts about the page (its address, the platform it runs on, the
-          apps it loads).
+          It never signs in, never goes to checkout or places an order, never enters any details, never captures account, checkout or
+          search pages, never collects personal data, and never copies your code, images or files. Recordings are made
+          by our own browser as it shows the page; your video files are never downloaded. The only things stored are
+          our own screenshots and short screen recordings, plus public facts about the page (its address, the platform
+          it runs on, the apps it loads).
         </p>
       ),
     },
@@ -85,21 +94,21 @@ export default function BotPage() {
       body: (
         <p>
           Send the store address to <Contact subject="Removal request" />. We add the store to a block list our crawler
-          checks before every run and remove its screenshots within 48 hours.
+          checks before every run and remove its screenshots and recordings within 48 hours.
         </p>
       ),
     },
     {
       id: "attribution",
       title: "Attribution",
-      body: <p>Every screenshot in Sectionary names the store and links to the page it came from.</p>,
+      body: <p>Every screenshot and recording in Blimp names the store and links to the page it came from.</p>,
     },
   ];
 
   return (
     <LegalPage
       eyebrow="For store owners"
-      title="SectionaryBot, the crawler behind Sectionary."
+      title="SectionaryBot, the crawler behind Blimp."
       lede={
         <p>
           If you found <code className="rounded-sm bg-muted px-1 font-mono text-[0.88em]">SectionaryBot</code> in your
