@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { Stack } from "@/components/site-profile";
 import { ViewportSwitch } from "@/components/viewport-switch";
+import { RelatedFlows } from "@/components/related-flows";
 import { INSET } from "@/components/block-viewer";
 import { cn } from "@/lib/utils";
 import { PREVIEW_BLUR, useAccess, usePreviewOnly } from "@/lib/account";
@@ -218,6 +219,8 @@ export function FlowView({ host }: { host: string }) {
           ))}
         </ol>
       )}
+
+      <RelatedFlows store={store} viewport={viewport} picked={picked === "desktop" || picked === "mobile" ? picked : null} />
 
       <StepViewer
         flow={flow}
