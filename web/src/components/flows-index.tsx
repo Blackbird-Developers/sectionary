@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { loadFlowSummaries } from "@/lib/load-blocks";
 import { PAGE_TYPE_LABEL } from "@/lib/blocks";
 import { flowCounts, type FlowSummary } from "@/lib/flows";
+import { BlimpLoader } from "@/components/blimp-loader";
 
 /** Rows rendered per step; more join as the end of the list scrolls into view. */
 const STEP = 40;
@@ -224,7 +225,9 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** Rows with nothing in them, so nothing jumps when the index arrives. */
 export function FlowsSkeleton() {
   return (
-    <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Loading flows">
+    <div className="relative">
+      <BlimpLoader overlay label="Loading flows…" />
+      <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Loading flows">
       {Array.from({ length: 6 }, (_, i) => (
         <li key={i} className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center" aria-hidden>
           <div className="flex items-center gap-3 sm:w-64">
@@ -241,6 +244,7 @@ export function FlowsSkeleton() {
           </div>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   );
 }

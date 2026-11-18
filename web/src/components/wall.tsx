@@ -1,5 +1,6 @@
 "use client";
 
+import { BlimpLoader } from "@/components/blimp-loader";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -520,13 +521,23 @@ export function Wall() {
         onSearch={onSearch}
       />
 
+      {/* A filter or search changed and its results are on the way: the blimp flies over the old ones,
+          held in view as the page scrolls (sticky, no height of its own, so nothing below moves). */}
+      {ready && !settled && !error && (
+        <div className="pointer-events-none sticky top-16 z-20 h-0">
+          <BlimpLoader overlay label={query.q ? "Searching…" : "Filtering blocks…"} className="top-6" />
+        </div>
+      )}
       {error ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           <p>The block set could not be loaded ({error}).</p>
           <p className="mt-1 text-[12px]">Run the capture and export scripts, then reload.</p>
         </div>
       ) : !ready ? (
-        <WallSkeleton mobile={viewport === "mobile"} />
+        <div className="relative">
+          <BlimpLoader overlay label="Loading blocks…" />
+          <WallSkeleton mobile={viewport === "mobile"} />
+        </div>
       ) : total === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           {blame ? (

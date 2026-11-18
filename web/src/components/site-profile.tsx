@@ -1,5 +1,6 @@
 "use client";
 
+import { BlimpLoader } from "@/components/blimp-loader";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,7 @@ import { loadPageBlocks, loadSimilarPages, loadSiteView, prefetchSimilarPages, w
 import { flowOf } from "@/lib/flows";
 import { markReturn } from "@/lib/return-to";
 import { BackLink } from "@/components/back-link";
+import { SaveToBoard } from "@/components/save-to-board";
 import { PAGE_TYPE_LABEL, type Block } from "@/lib/blocks";
 import { industryLabel, platformLabel, rankLabel } from "@/lib/stores";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
@@ -149,6 +151,8 @@ export function SiteProfileView({ host }: { host: string }) {
           </div>
           {blockTotal > 0 && (
             <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
+              {/* The whole site into Saved or a folder (Boards' Sites tab). */}
+              <SaveToBoard target={{ kind: "site", store }} variant="outline" className="h-8 rounded-lg px-2.5 text-[13px] touch:h-11" />
               {hasFlow && (
                 <Link
                   href={`/sites/${encodeURIComponent(store.host)}/flow`}
@@ -554,7 +558,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** The profile's shape with nothing in it, so nothing jumps when it loads. */
 export function SiteProfileSkeleton() {
   return (
-    <div className="flex flex-col gap-5" aria-busy="true" aria-label="Loading site">
+    <div className="relative flex flex-col gap-5" aria-busy="true" aria-label="Loading site">
+      <BlimpLoader overlay label="Loading site…" className="top-24" />
       <div className="flex flex-col gap-3">
         <div className="shimmer h-3 w-12 rounded bg-muted" />
         <div className="shimmer h-6 w-48 rounded bg-muted" />

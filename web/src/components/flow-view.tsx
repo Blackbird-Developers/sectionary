@@ -1,5 +1,6 @@
 "use client";
 
+import { BlimpLoader } from "@/components/blimp-loader";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -8,16 +9,18 @@ import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { Stack } from "@/components/site-profile";
 import { ViewportSwitch } from "@/components/viewport-switch";
+import { RelatedFlows } from "@/components/related-flows";
 import { INSET } from "@/components/block-viewer";
+import { InlineBlockViewer } from "@/components/inline-block-viewer";
 import { cn } from "@/lib/utils";
 import { PREVIEW_BLUR, useAccess, usePreviewOnly } from "@/lib/account";
 import { assetUrl } from "@/lib/data-source";
-import { loadPageBlocks, loadSiteView } from "@/lib/load-blocks";
+import { loadPageBlocks, loadSiteView, wallSource } from "@/lib/load-blocks";
 import { labelFor, PAGE_TYPE_LABEL, type Block } from "@/lib/blocks";
 import { platformLabel } from "@/lib/stores";
 import { cartStateOf, flowOf, pageView, FLOW_STEPS, type CartState, type Flow, type FlowStep, type FlowStepType, type PageView, type Viewport } from "@/lib/flows";
-import { markReturn } from "@/lib/return-to";
 import { BackLink } from "@/components/back-link";
+import { SaveToBoard } from "@/components/save-to-board";
 import { BlockClip } from "@/components/block-clip";
 import type { ProfilePage, SiteView } from "@/lib/site-profile";
 
@@ -87,6 +90,11 @@ function takePlace(host: string): Place | null {
 export function FlowView({ host }: { host: string }) {
   const [state, setState] = useState<{ host: string; view: SiteView | null; error: string | null } | null>(null);
   const [open, setOpen] = useState<FlowStepType | null>(null);
+  // A block opened from the step viewer: shown here, over the page it came
+  // from, rather than on the wall (which loads the whole library first).
+  const [viewing, setViewing] = useState<{ list: Block[]; at: number } | null>(null);
+  // How far down the open page the reader was, saved if a block leads off to the wall.
+  const pageScroll = useRef(0);
   const wide = useWide();
 
   const router = useRouter();
@@ -183,7 +191,10 @@ export function FlowView({ host }: { host: string }) {
               <FlowStatus flow={flow} />
             </p>
           </div>
-          <ViewportSwitch value={viewport} onChange={(v) => setParam("v", v)} size="sm" />
+          <div className="flex items-center gap-2">
+            <SaveToBoard target={{ kind: "site", store }} variant="outline" className="h-9 rounded-full px-3.5 text-[13px] touch:h-11" />
+            <ViewportSwitch value={viewport} onChange={(v) => setParam("v", v)} size="sm" />
+          </div>
         </div>
       </header>
 
@@ -217,6 +228,8 @@ export function FlowView({ host }: { host: string }) {
         </ol>
       )}
 
+      <RelatedFlows store={store} viewport={viewport} picked={picked === "desktop" || picked === "mobile" ? picked : null} />
+
       <StepViewer
         flow={flow}
         host={store.host}
@@ -230,7 +243,16 @@ export function FlowView({ host }: { host: string }) {
         markers={markers}
         onMarkers={(on) => setParam("markers", on ? null : "off")}
         takeScroll={() => (restoring.current && openStep && restoring.current.step === openStep.type ? restoring.current.scroll : 0)}
-        onLeave={(scroll) => savePlace(host, { y: window.scrollY, step: open, scroll })}
+        onBlock={(list, at, scroll) => {
+          pageScroll.current = scroll;
+          setViewing({ list, at });
+        }}
+      />
+
+      <InlineBlockViewer
+        viewing={viewing}
+        onViewing={setViewing}
+        onLeave={() => savePlace(host, { y: window.scrollY, step: open, scroll: pageScroll.current })}
       />
     </div>
   );
@@ -514,7 +536,7 @@ function StepViewer({
   markers,
   onMarkers,
   takeScroll,
-  onLeave,
+  onBlock,
 }: {
   flow: Flow;
   host: string;
@@ -530,8 +552,8 @@ function StepViewer({
   onMarkers: (on: boolean) => void;
   /** How far down the page to start, coming back from a block; asked once as the window opens. */
   takeScroll: () => number;
-  /** Called as a block link is followed, with how far down the page the reader was. */
-  onLeave: (scroll: number) => void;
+  /** A block on the page was clicked: the page's blocks, which one, and how far down the page the reader was. */
+  onBlock: (list: Block[], at: number, scroll: number) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const show = Boolean(step);
@@ -591,7 +613,7 @@ function StepViewer({
           markers={markers}
           onMarkers={onMarkers}
           takeScroll={takeScroll}
-          onLeave={onLeave}
+          onBlock={onBlock}
         />
       )}
     </dialog>
@@ -615,7 +637,7 @@ function Window({
   markers,
   onMarkers,
   takeScroll,
-  onLeave,
+  onBlock,
 }: {
   page: ProfilePage;
   host: string;
@@ -634,7 +656,7 @@ function Window({
   markers: boolean;
   onMarkers: (on: boolean) => void;
   takeScroll: () => number;
-  onLeave: (scroll: number) => void;
+  onBlock: (list: Block[], at: number, scroll: number) => void;
 }) {
   const access = useAccess();
   const scroller = useRef<HTMLDivElement>(null);
@@ -786,7 +808,7 @@ function Window({
             style={{ width: `min(100%, ${width}px)` }}
           >
             {shown ? (
-              <PageBody page={page} shown={shown} markers={markers} onLeave={() => onLeave(scroller.current?.scrollTop ?? 0)} />
+              <PageBody page={page} shown={shown} markers={markers} onBlock={(at) => onBlock(shown.blocks, at, scroller.current?.scrollTop ?? 0)} />
             ) : (
               <p className="p-8 text-center text-[13px] text-muted-foreground">Nothing captured at this viewport.</p>
             )}
@@ -836,7 +858,7 @@ function Window({
  * The page, top to bottom. With blocks, each is a link to its detail view and
  * carries a numbered marker; without, the full-page screenshot stands in.
  */
-function PageBody({ page, shown, markers, onLeave }: { page: ProfilePage; shown: PageView; markers: boolean; onLeave: () => void }) {
+function PageBody({ page, shown, markers, onBlock }: { page: ProfilePage; shown: PageView; markers: boolean; onBlock: (at: number) => void }) {
   // Signed out, or Free after the trial: blurred, like the wall; each block still opens in full.
   const preview = usePreviewOnly();
   if (shown.blocks.length === 0 && shown.full) {
@@ -857,10 +879,13 @@ function PageBody({ page, shown, markers, onLeave }: { page: ProfilePage; shown:
           <li key={b.id}>
             <Link
               href={`/?open=${encodeURIComponent(b.id)}`}
-              onClick={() => {
-                onLeave();
-                markReturn(b.id);
+              onClick={(e) => {
+                // A plain click opens the block here, over this page; Cmd/Ctrl-click still opens it on the wall in a new tab.
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                onBlock(i);
               }}
+              onPointerEnter={() => wallSource().prefetch?.(b)}
               className="group relative block overflow-hidden border-t border-black/10 outline-none first:border-t-0"
               style={{ aspectRatio: `${b.w} / ${b.h}`, background: b.bg }}
             >
@@ -906,7 +931,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** The flow's shape with nothing in it, so nothing jumps when it loads. */
 export function FlowSkeleton() {
   return (
-    <div className="flex flex-col gap-5" aria-busy="true" aria-label="Loading flow">
+    <div className="relative flex flex-col gap-5" aria-busy="true" aria-label="Loading flow">
+      <BlimpLoader overlay label="Loading flow…" className="top-24" />
       <div className="flex flex-col gap-3">
         <div className="shimmer h-3 w-20 rounded bg-muted" />
         <div className="flex items-center gap-3">

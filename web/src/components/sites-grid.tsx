@@ -1,5 +1,6 @@
 "use client";
 
+import { BlimpLoader } from "@/components/blimp-loader";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -378,7 +379,8 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** The directory and grid with nothing in them, so nothing jumps when data arrives. */
 export function SitesGridSkeleton() {
   return (
-    <div className="flex flex-col gap-6" aria-busy="true" aria-label="Loading stores">
+    <div className="relative flex flex-col gap-6" aria-busy="true" aria-label="Loading stores">
+      <BlimpLoader overlay label="Loading sites…" />
       <div className="hidden gap-14 md:flex">
         {[3, 2, 2].map((cols, g) => (
           <div key={g} className="flex flex-col gap-2">
