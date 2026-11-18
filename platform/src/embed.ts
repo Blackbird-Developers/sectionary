@@ -9,21 +9,24 @@
 //
 // A block is embedded from its AI description. Until the tagger has written
 // one, it is embedded from its type, headline and copy instead, so semantic
-// search works from the first import. embedding_hash records exactly what was
-// embedded (model + input), so when a description arrives, or the model
-// changes, the block is embedded again and nothing else is.
+// search works from the first import. Captures made with --styles add the
+// outline's heading and button text and the store's design summary
+// (src/embed-input.ts, SEC-31 brief section 7.4), so run it after
+// profile-sites. embedding_hash records exactly what was embedded (model +
+// input), so when a description, outline or summary arrives or changes, or the
+// model changes, the block is embedded again and nothing else is.
 //
 // Ends by refreshing search_terms, the vocabulary behind typo tolerance.
 
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import postgres from "postgres";
+import { embeddingInput, MAX_INPUT_CHARS, type EmbeddingSource } from "./embed-input.js";
 
 try { process.loadEnvFile(resolve(import.meta.dirname, "../.env")); } catch {}
 
 const DIMENSIONS = 1024; // blocks.embedding is vector(1024), see migration 0004
 const BATCH = 128; // inputs per Voyage request (the API allows 1,000)
-const MAX_INPUT_CHARS = 2000;
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -40,16 +43,7 @@ const endpoint = `${process.env.VOYAGE_BASE_URL?.replace(/\/$/, "") ?? "https://
 
 const sql = postgres(dbUrl, { max: 1, prepare: false });
 
-type Row = { id: string; ai_description: string | null; block_type: string | null; type_hint: string; headline: string | null; text: string; embedding_hash: string | null };
-
-/** What a block is embedded from. The description is the point; the rest is the fallback until it exists. */
-function embeddingInput(b: Omit<Row, "id" | "embedding_hash">): string {
-  const kind = (b.block_type ?? b.type_hint).replace(/-/g, " ");
-  const body = b.ai_description?.trim()
-    ? b.ai_description.trim()
-    : [b.headline?.trim(), b.text.replace(/\s+/g, " ").trim()].filter(Boolean).join(". ");
-  return `${kind} block. ${body}`.slice(0, MAX_INPUT_CHARS);
-}
+type Row = EmbeddingSource & { id: string; embedding_hash: string | null };
 
 const hashOf = (input: string) => createHash("sha256").update(`${model}\n${input}`).digest("hex");
 
@@ -79,8 +73,10 @@ try {
   let after = "00000000-0000-0000-0000-000000000000";
   while (seen < limit) {
     const rows = await sql<Row[]>`
-      SELECT id, ai_description, block_type, type_hint, headline, left(text, ${MAX_INPUT_CHARS}) AS text, embedding_hash
-      FROM blocks WHERE id > ${after} ORDER BY id LIMIT ${Math.min(1000, limit - seen)}`;
+      SELECT b.id, b.ai_description, b.block_type, b.type_hint, b.headline, left(b.text, ${MAX_INPUT_CHARS}) AS text, b.embedding_hash,
+        b.outline, s.design_profile->>'summary' AS design_summary
+      FROM blocks b JOIN captures c ON c.id = b.capture_id JOIN pages p ON p.id = c.page_id JOIN sites s ON s.id = p.site_id
+      WHERE b.id > ${after} ORDER BY b.id LIMIT ${Math.min(1000, limit - seen)}`;
     if (!rows.length) break;
     after = rows[rows.length - 1].id;
     seen += rows.length;
