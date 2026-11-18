@@ -41,5 +41,5 @@
   // - scripts/account-acceptance.mts, the same way (npm run account:acceptance).
   // - src/server/search-intent.test.ts checks the intents against
   //   platform/src/taxonomy.ts; run it from the repo: npx tsx --test src/server/*.test.ts
-  "exclude": ["node_modules", "scripts/search-acceptance.mts", "scripts/account-acceptance.mts", "src/server/search-intent.test.ts"]
+  "exclude": ["node_modules", "scripts/search-acceptance.mts", "scripts/account-acceptance.mts", "scripts/boards-acceptance.mts", "src/server/search-intent.test.ts"]
 }

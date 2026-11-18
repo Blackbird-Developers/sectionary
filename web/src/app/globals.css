@@ -183,28 +183,33 @@
    Blimp-specific
    --------------------------------------------------------------------------- */
 @layer utilities {
-  /* A long list that scrolls inside a panel (the filter groups): a stronger
-     thumb on a visible track, so it reads as scrollable at a glance. Chrome
-     and Firefox take the two standard properties; Safari the -webkit- rules. */
+  /* Long filter lists (Block has thousands of options): a scrollbar that is
+     always there, with a visible track, instead of the hidden overlay one. */
   .scroll-list {
-    scrollbar-width: thin;
-    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 70%, transparent)
-      color-mix(in oklch, var(--muted-foreground) 16%, transparent);
+    overflow-y: scroll;
+    overscroll-behavior: contain;
     scrollbar-gutter: stable;
+    scrollbar-width: auto;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent) color-mix(in oklch, var(--muted) 80%, transparent);
   }
   .scroll-list::-webkit-scrollbar {
-    width: 10px;
+    width: 12px;
   }
   .scroll-list::-webkit-scrollbar-track {
-    background: color-mix(in oklch, var(--muted-foreground) 16%, transparent);
+    background: color-mix(in oklch, var(--muted) 80%, transparent);
     border-radius: 999px;
   }
   .scroll-list::-webkit-scrollbar-thumb {
-    background-color: color-mix(in oklch, var(--muted-foreground) 70%, transparent);
+    min-height: 40px;
+    border-radius: 999px;
+    background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+    border: 3px solid transparent;
+    background-clip: content-box;
   }
   .scroll-list::-webkit-scrollbar-thumb:hover {
-    background-color: color-mix(in oklch, var(--muted-foreground) 85%, transparent);
+    background-color: var(--muted-foreground);
   }
+
   /* The browse wall: CSS-columns masonry, one column on phones. */
   .wall {
     column-gap: 12px;
@@ -335,6 +340,77 @@
     }
     50% {
       transform: translateY(-3px) rotate(-6deg);
+    }
+  }
+  /* The loading state (components/blimp-loader.tsx): the blimp bobs and noses
+     up and down, gusts stream back off its tail, clouds drift past. */
+  /* Shown only for a real wait: invisible for the first moments, then a fade. */
+  .blimp-appear {
+    animation: blimp-appear 280ms ease-out 450ms both;
+  }
+  @keyframes blimp-appear {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  .blimp-fly {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: blimp-fly 2.4s ease-in-out infinite;
+  }
+  .blimp-gust {
+    stroke-dasharray: 30 140;
+    stroke-dashoffset: 0;
+    opacity: 0;
+    animation: blimp-gust 1.15s linear infinite;
+  }
+  .blimp-gust-short {
+    stroke-dasharray: 12 60;
+    animation-duration: 0.9s;
+  }
+  .blimp-cloud {
+    animation: blimp-cloud 6s linear infinite;
+  }
+  .blimp-cloud-slow {
+    animation-duration: 9s;
+    animation-delay: -3s;
+  }
+  @keyframes blimp-fly {
+    0%, 100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-5px) rotate(-3deg);
+    }
+  }
+  @keyframes blimp-gust {
+    0% {
+      stroke-dashoffset: 4;
+      opacity: 0;
+    }
+    15% {
+      opacity: 0.85;
+    }
+    70% {
+      opacity: 0.6;
+    }
+    100% {
+      stroke-dashoffset: -100;
+      opacity: 0;
+    }
+  }
+  @keyframes blimp-cloud {
+    0% {
+      transform: translateX(16px);
+      opacity: 0;
+    }
+    15%, 80% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(-40px);
+      opacity: 0;
     }
   }
   /* Landing hero text: a short rise on first paint, one line after another. */

@@ -12,7 +12,8 @@
     "flow-check": "node scripts/flow-check.mts",
     "search:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/search-acceptance.mts",
     "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/server/*.test.ts",
-    "account:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/account-acceptance.mts"
+    "account:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/account-acceptance.mts",
+    "boards:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/boards-acceptance.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",

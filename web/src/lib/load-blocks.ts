@@ -309,6 +309,41 @@ export async function loadFlowSummaries(): Promise<FlowSummary[]> {
   return SITES_SRC ? flowSummariesFromApi(await loadSiteSummaries()) : flowSummaries(await loadBlockIndex());
 }
 
+/** Another store's flow, offered as like the one open, with what the two share. */
+export type RelatedFlow = { summary: FlowSummary; shared: ("industry" | "platform" | "theme" | "country")[] };
+
+/**
+ * Flows like this store's, for the foot of its flow page. Ranked as similar
+ * pages are, by the same industry, then platform, then theme, then country,
+ * except that a complete flow outweighs a shared theme and country: it is
+ * the one worth comparing against. The traffic rank breaks ties. A store with only one step captured is no flow
+ * to compare against, so it is left out.
+ */
+export async function loadRelatedFlows(store: Store, limit = 6): Promise<RelatedFlow[]> {
+  const scored: { item: RelatedFlow; score: number }[] = [];
+  for (const summary of await loadFlowSummaries()) {
+    const other = summary.store;
+    if (other.host === store.host || summary.flow.captured < 2) continue;
+    const checks: [RelatedFlow["shared"][number], boolean, number][] = [
+      ["industry", !!other.industry && other.industry !== "other" && other.industry === store.industry, 4],
+      ["platform", !!other.platform && other.platform === store.platform, 2],
+      ["theme", !!other.theme && other.theme === store.theme, 1],
+      ["country", !!other.country && other.country === store.country, 0.5],
+    ];
+    const shared = checks.filter(([, same]) => same).map(([key]) => key);
+    let score = checks.reduce((sum, [, same, weight]) => sum + (same ? weight : 0), 0);
+    if (summary.flow.complete) score += 1.5;
+    scored.push({ item: { summary, shared }, score });
+  }
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      (a.item.summary.store.rank ?? Infinity) - (b.item.summary.store.rank ?? Infinity) ||
+      a.item.summary.store.host.localeCompare(b.item.summary.store.host),
+  );
+  return scored.slice(0, limit).map((s) => s.item);
+}
+
 /** A page from another store, offered as like the one open. */
 export type SimilarPage = { store: Store; page: ProfilePage };
 

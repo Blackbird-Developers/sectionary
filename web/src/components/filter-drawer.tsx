@@ -6,6 +6,7 @@ import { Check, Layers, Lock, Search, SlidersHorizontal, X } from "lucide-react"
 import { cn } from "@/lib/utils";
 import { BAR_FILTERS, countSelected, type FilterKey, type FilterSpec, type Selected } from "@/lib/filters";
 import { useAccess } from "@/lib/account";
+import { BlimpFlying } from "@/components/blimp-loader";
 
 /** The filters Free and signed-out viewers keep (the API drops the rest; server/plans.ts). Same set as the old bar. */
 const FREE_FILTERS: ReadonlySet<FilterKey> = new Set<FilterKey>(["host", "block", "vp"]);
@@ -222,7 +223,15 @@ export function FilterDrawer({
               onClick={() => setOpen(false)}
               className="h-12 w-full rounded-full bg-foreground text-[15px] font-semibold text-background outline-none transition-opacity duration-150 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              {ready && !busy ? `Show results (${total.toLocaleString("en-US")} blocks)` : "Show results…"}
+              {ready && !busy ? (
+                `Show results (${total.toLocaleString("en-US")} blocks)`
+              ) : (
+                // Counting the new results: the blimp flies in the button until they are in.
+                <span className="inline-flex items-center justify-center gap-2.5">
+                  <BlimpFlying width={64} className="blimp-appear -my-4 -ml-3" />
+                  Finding blocks…
+                </span>
+              )}
             </button>
           </footer>
         </aside>
@@ -266,12 +275,14 @@ function Group({
       ? matching
       : [...matching.slice(0, FOLDED), ...matching.slice(FOLDED).filter((o) => picked.includes(o.value))];
   const hidden = matching.length - shown.length;
-  const long = expanded && !trimmed && matching.length > 40;
+  // Opened up or searched with more than a dozen options: a box with its own scrollbar,
+  // so a list like Block (thousands of options) scrolls inside the panel, not the panel itself.
+  const long = shown.length > FOLDED * 2;
 
   if (!options.length && !locked) return null;
 
+  // min-w-0: a fieldset is otherwise as wide as its longest option, and a long block name pushed the panel sideways.
   return (
-    // min-w-0: a fieldset is otherwise as wide as its longest option, which pushed the panel sideways.
     <fieldset className="min-w-0 border-b py-5 last:border-b-0">
       <legend className="float-left mb-3 flex w-full items-center gap-1.5 text-[15px] font-semibold">
         {spec.label}
@@ -306,10 +317,9 @@ function Group({
             <p className="py-1 text-[13px] text-muted-foreground">Nothing here matches.</p>
           ) : (
             <ul
-              className={cn(
-                "flex flex-col",
-                long && "scroll-list max-h-80 overflow-y-auto overscroll-contain rounded-lg border bg-muted/20 py-1 pr-1 pl-2.5",
-              )}
+              className={cn("flex flex-col", long && "scroll-list max-h-80 rounded-lg border bg-background/40 py-1 pr-1 pl-2.5")}
+              tabIndex={long ? 0 : undefined}
+              aria-label={long ? `${spec.label} options` : undefined}
             >
               {shown.map((option) => (
                 <li key={option.value}>
@@ -324,22 +334,20 @@ function Group({
               ))}
             </ul>
           )}
+          {long && (
+            <p className="mt-1.5 text-[11px] tabular-nums text-muted-foreground">
+              {shown.length.toLocaleString("en-US")} {trimmed ? "matching" : "options"} · scroll the list for more
+            </p>
+          )}
 
           {!trimmed && (hidden > 0 || expanded) && matching.length > FOLDED && (
-            <div className="mt-1.5 flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="text-[13px] font-medium underline underline-offset-4 outline-none hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {expanded ? "Show less" : `Show ${hidden.toLocaleString("en-US")} more`}
-              </button>
-              {long && (
-                <span className="ml-auto text-[12px] text-muted-foreground tabular-nums">
-                  {matching.length.toLocaleString("en-US")} in the list · scroll for more
-                </span>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="mt-1.5 text-[13px] font-medium underline underline-offset-4 outline-none hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {expanded ? "Show less" : `Show ${hidden.toLocaleString("en-US")} more`}
+            </button>
           )}
         </div>
       )}

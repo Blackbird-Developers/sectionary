@@ -8,6 +8,7 @@ import { PlanBadge } from "@/components/plan-badge";
 import { AuthHashRedirect } from "@/components/auth-hash-redirect";
 import { DevPlanSwitch } from "@/components/dev-plan-switch";
 import { NavTracker } from "@/components/back-link";
+import { cn } from "@/lib/utils";
 
 /**
  * Top bar plus the page. From tablet width up: logo, the four sections, the
@@ -15,8 +16,21 @@ import { NavTracker } from "@/components/back-link";
  * On phones the sections move to a tab bar along the bottom and the top bar
  * keeps the logo, search and account. The bar sits flat on the page at the
  * top and lifts onto a blurred strip once content scrolls under it.
+ *
+ * The one header for the whole site: the landing and legal pages use it too
+ * (variant "landing": the page runs full width, with their footer under it).
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  variant = "app",
+  footer,
+}: {
+  children: React.ReactNode;
+  variant?: "app" | "landing";
+  /** Under the page, above the phone tab bar: the landing page's footer. */
+  footer?: React.ReactNode;
+}) {
+  const landing = variant === "landing";
   return (
     <div className="flex min-h-dvh flex-col">
       <AuthHashRedirect />
@@ -56,7 +70,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       {/* Bottom padding on phones clears the tab bar and the home indicator. */}
-      <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1800px] flex-1 px-3 pt-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none sm:px-4 md:pb-4">{children}</main>
+      {landing ? (
+        <main id="main" tabIndex={-1} data-landing className="flex-1 outline-none">
+          {children}
+        </main>
+      ) : (
+        <main id="main" tabIndex={-1} className="mx-auto w-full max-w-[1800px] flex-1 px-3 pt-2 pb-[calc(4.5rem+env(safe-area-inset-bottom))] outline-none sm:px-4 md:pb-4">
+          {children}
+        </main>
+      )}
+      {footer && <div className={cn(landing && "pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0")}>{footer}</div>}
       <MobileTabs />
       {process.env.NODE_ENV === "development" && <DevPlanSwitch />}
     </div>

@@ -4,7 +4,7 @@ import { actorFrom, addItem, boardErrorResponse } from "@/server/boards";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** POST /api/boards/[id]/items · BoardItemAdd in, the updated Board out. Adding a block twice is a no-op. */
+/** POST /api/boards/[id]/items · BoardItemAdd ({ blockId } or { host }) in, the updated Board out. Adding an item twice is a no-op. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;

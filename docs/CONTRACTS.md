@@ -145,8 +145,8 @@ All additive: no existing field changed, `CONTRACT_VERSION` stays 1. Shapes in
 | `PATCH /api/boards/[id]` | `x-board-token`, `BoardPatch` | `Board` | |
 | `DELETE /api/boards/[id]` | `x-board-token` | 204 | |
 | `POST /api/boards/[id]/items` | `x-board-token`, `BoardItemAdd` | `Board` | |
-| `PATCH /api/boards/[id]/items/[blockId]` | `x-board-token`, `{ note }` | `Board` | |
-| `DELETE /api/boards/[id]/items/[blockId]` | `x-board-token` | `Board` | |
+| `PATCH /api/boards/[id]/items/[key]` | `x-board-token`, `{ note }` | `Board` | |
+| `DELETE /api/boards/[id]/items/[key]` | `x-board-token` | `Board` | |
 | `GET /api/share/[slug]` | | `SharedBoard`, or 404 while sharing is off | `share.json` |
 | `GET /api/blocks/[id]/history` | | `BlockHistory` | `block.history.json` |
 | `POST /api/brief` | `BriefRequest` | streamed `text/plain` (Markdown) | |
@@ -160,7 +160,15 @@ All additive: no existing field changed, `CONTRACT_VERSION` stays 1. Shapes in
   `/api/share/<slug>` serve the board only while `shared` is true. Turning
   sharing off and on again keeps the same link. `SharedBoard` has no ids and no
   tokens.
-- **Reordering** sends the full list of block ids: `PATCH { order: [...] }`.
+- **Reordering** sends the full list of item keys: `PATCH { order: [...] }`.
+- **Saved library and saved sites (migration 16).** A board has a `kind`:
+  `folder` (every board before, and still the default) or `library`, the
+  account's one Saved list. `POST /api/boards { kind: "library" }` returns that
+  list, making it when there is none. An item is a block or a whole site:
+  `kind: "site"` items have `blockId: null`, `host` and `site` (the `Store`).
+  `POST .../items` takes `{ blockId }` or `{ host }`; the item routes take the
+  item's key, a block id or a host. Share links (`SharedBoard`) carry blocks
+  only for now. Old clients see no change on boards that hold only blocks.
 - **Time machine.** Every capture of the block's page, newest first. `block`
   is the best match in that capture (same viewport and type, nearest index
   and position), null when the page had no such block. `fullPage` is derived
