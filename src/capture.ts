@@ -29,6 +29,7 @@ function usage(): never {
 
   --clips        record short clips (slow motion, sped back up) of blocks that move by themselves
   --sliders      with --clips: press sliders that only move when pressed, and record them
+  --product      with --clips: on product pages, record the photo gallery, the product options and the size guide
 
   --discover     for a bare host, enumerate Shopify pages via /products.json and /collections.json
   --moments      also capture what the store does when used (src/moments.ts); own sites only for now
@@ -49,6 +50,7 @@ function parseArgs(argv: string[]): Options {
     else if (a === '--styles') o.styles = true;
     else if (a === '--clips') o.clips = true;
     else if (a === '--sliders') o.sliders = true;
+    else if (a === '--product') o.product = true;
     else if (a === '--seeds') o.seeds = argv[++i];
     else if (a === '--out') o.out = argv[++i];
     else if (a === '--only') o.only = argv[++i] as ViewportName;
