@@ -1,0 +1,227 @@
+{
+  "id": "436fcc81-c76a-4499-bda6-7e06a549a6f1",
+  "host": "myzoobox.com",
+  "pageType": "product",
+  "pageUrl": "https://myzoobox.com/products/zoologist-club-sibling-kit-easy-reader-3-month-plan",
+  "pageTitle": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan) – My ZOO Box",
+  "viewport": "desktop",
+  "typeHint": "product",
+  "headline": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)",
+  "bg": "rgb(255, 255, 255)",
+  "w": 1400,
+  "h": 695,
+  "src": "https://cdn.test/myzoobox.com/products-zoologist-club-styles/blocks/d-02-product.webp",
+  "platform": "shopify",
+  "theme": "MZB Playful (Prime Day)",
+  "apps": [
+    "ActiveCampaign",
+    "Google Analytics",
+    "Intelligems",
+    "Klaviyo",
+    "Meta Pixel",
+    "Microsoft Clarity",
+    "Okendo",
+    "PayPal",
+    "Shop Pay",
+    "Yotpo"
+  ],
+  "buttons": 8,
+  "images": 1,
+  "videos": 0,
+  "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan) $71.95 − + ADD TO CART Free Shipping On orders over $99 Secure Payment 100% protected transactions Easy Returns 30-day return policy Fast Email Support Get quick responses from our team via support email. SHARE THIS PRODUCT",
+  "thumb": "https://cdn.test/myzoobox.com/products-zoologist-club-styles/blocks/d-02-product_thumb.webp",
+  "capturedAt": "2026-11-16T13:57:25.431Z",
+  "blockType": null,
+  "pageRole": null,
+  "styleTags": [],
+  "patterns": [],
+  "description": null,
+  "taggerVersion": null,
+  "style": {
+    "type": [
+      {
+        "case": "none",
+        "role": "body",
+        "size": 15,
+        "share": 0.37,
+        "colour": "#616161",
+        "family": "Poppins",
+        "weight": 400,
+        "lineHeight": 1.8,
+        "letterSpacing": 0.04
+      },
+      {
+        "case": "none",
+        "role": "heading-1",
+        "size": 36,
+        "share": 0.21,
+        "colour": "#1e3a5f",
+        "family": "Poppins",
+        "weight": 900,
+        "lineHeight": 1.15,
+        "letterSpacing": -0.02
+      },
+      {
+        "case": "none",
+        "role": "body",
+        "size": 16,
+        "share": 0.21,
+        "colour": "#1e3a5f",
+        "family": "Poppins",
+        "weight": 700,
+        "lineHeight": 1.8,
+        "letterSpacing": 0.04
+      },
+      {
+        "case": "none",
+        "role": "price",
+        "size": 15,
+        "share": 0.07,
+        "colour": "#616161",
+        "family": "Poppins",
+        "weight": 400,
+        "lineHeight": 1.8,
+        "letterSpacing": 0.04
+      },
+      {
+        "case": "uppercase",
+        "role": "label",
+        "size": 15,
+        "share": 0.07,
+        "colour": "#1e3a5f",
+        "family": "Poppins",
+        "weight": 700,
+        "lineHeight": 1.8,
+        "letterSpacing": 0.1
+      },
+      {
+        "case": "uppercase",
+        "role": "button",
+        "size": 16,
+        "share": 0.04,
+        "colour": "#ffffff",
+        "family": "Poppins",
+        "weight": 700,
+        "lineHeight": null,
+        "letterSpacing": 0.05
+      },
+      {
+        "case": "none",
+        "role": "price",
+        "size": 36,
+        "share": 0.02,
+        "colour": "#258d8f",
+        "family": "Poppins",
+        "weight": 900,
+        "lineHeight": 1,
+        "letterSpacing": 0.02
+      }
+    ],
+    "accent": "#258d8f",
+    "border": null,
+    "layout": {
+      "align": "left",
+      "width": "full",
+      "padTop": 0,
+      "columns": 2,
+      "mediaSide": "left",
+      "padBottom": 15,
+      "contentWidth": 1400
+    },
+    "radius": {
+      "card": null,
+      "image": 0,
+      "button": 10
+    },
+    "imagery": {
+      "count": 1,
+      "ratio": "1:1",
+      "areaShare": 0.48
+    },
+    "shadows": false,
+    "commerce": {
+      "price": true,
+      "rating": null,
+      "urgency": false,
+      "discount": null,
+      "products": 0,
+      "compareAt": false,
+      "gridColumns": null,
+      "freeShipping": "Free Shipping On orders over $99",
+      "subscription": false,
+      "paymentBadges": false
+    },
+    "background": {
+      "kind": "colour",
+      "colour": "#ffffff"
+    },
+    "textColours": [
+      {
+        "share": 0.5,
+        "colour": "#1e3a5f"
+      },
+      {
+        "share": 0.44,
+        "colour": "#616161"
+      },
+      {
+        "share": 0.04,
+        "colour": "#ffffff"
+      },
+      {
+        "share": 0.02,
+        "colour": "#258d8f"
+      }
+    ],
+    "contrastPass": 0.96
+  },
+  "outline": [
+    {
+      "type": "group",
+      "columns": 2,
+      "children": [
+        {
+          "alt": true,
+          "type": "image",
+          "ratio": "1:1"
+        },
+        {
+          "type": "group",
+          "children": [
+            {
+              "text": "Zoologist Club + Sibling Kit + Easy Reader (3 Month Plan)",
+              "type": "heading",
+              "level": 1
+            },
+            {
+              "type": "price",
+              "compareAt": false
+            },
+            {
+              "type": "form",
+              "fields": [
+                "number"
+              ]
+            },
+            {
+              "type": "text",
+              "words": 2
+            },
+            {
+              "type": "price",
+              "compareAt": false
+            },
+            {
+              "type": "text",
+              "words": 25
+            },
+            {
+              "type": "icon-row",
+              "count": 4
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

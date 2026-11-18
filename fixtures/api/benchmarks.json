@@ -1,0 +1,45 @@
+{
+  "industry": "all",
+  "pageType": "home",
+  "viewport": "desktop",
+  "stores": 13,
+  "minN": 10,
+  "items": [
+    {
+      "industry": "all",
+      "pageType": "home",
+      "viewport": "desktop",
+      "metric": "blocks",
+      "n": 13,
+      "p25": 3,
+      "p50": 5,
+      "p75": 9,
+      "shares": null,
+      "computedAt": "2026-11-18T11:10:50.821Z"
+    },
+    {
+      "industry": "all",
+      "pageType": "home",
+      "viewport": "desktop",
+      "metric": "images-per-screen",
+      "n": 13,
+      "p25": 3.4,
+      "p50": 7.14,
+      "p75": 11.98,
+      "shares": null,
+      "computedAt": "2026-11-18T11:10:50.821Z"
+    },
+    {
+      "industry": "all",
+      "pageType": "home",
+      "viewport": "desktop",
+      "metric": "screens",
+      "n": 13,
+      "p25": 5.4,
+      "p50": 6.5,
+      "p75": 7.9,
+      "shares": null,
+      "computedAt": "2026-11-18T11:10:50.821Z"
+    }
+  ]
+}

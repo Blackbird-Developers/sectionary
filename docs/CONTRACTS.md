@@ -134,6 +134,31 @@ Types in `web/src/contracts/design.ts`.
 
 Run `profile-sites` then `benchmarks` after every import.
 
+### Design data API (additive, SEC-31)
+
+Brief section 8. Shapes in `api.ts`, real responses in `fixtures/api/`
+(written by `npm run mcp:eval -- --write-fixtures` in `web/`, which also
+checks that each endpoint gives the same numbers as the MCP tool beside it).
+
+| Endpoint | Out | Same data as | Fixture |
+|---|---|---|---|
+| `GET /api/blocks/[id]` | `BlockDetail`: the `Block` plus tagger output, `style`, `outline`, `capturedAt` | `blimp_get_block` | `block.detail.json` |
+| `GET /api/sites/[host]/design` | `SiteDesign` | `blimp_get_store_design` | `site.design.json` |
+| `GET /api/benchmarks?industry=&page=&vp=&metric=` | `BenchmarksResponse` | `blimp_get_benchmark` | `benchmarks.json` |
+| `GET /api/taxonomy` | `Taxonomy` | `blimp_list_taxonomy` | `taxonomy.json` |
+
+- `Block` itself does not change: style and outline are on the detail
+  endpoint only, so the wall's list payload does not grow.
+- Missing is null: tagger fields until a block is tagged, `style` and
+  `outline` for captures made before design metadata, `design` (with
+  `note`) for stores without such a capture.
+- `SiteDesign.design.accessibility` is null for signed-out requests, with
+  `accessibilityNote`; signed in, it is filled and the response is
+  `private, no-store`.
+- Unknown `industry`, `page` or `metric` on `/api/benchmarks` is 400
+  `INVALID`, naming the closest valid values. `items` is empty when fewer
+  than `minN` stores were measured; `stores` says how many have the page.
+
 When images move to object storage (SEC-9) the key layout will be
 `sites/<host>/<capturedAt>/<viewport>/<nn>-<type>.webp` and the manifest gains
 an optional `assetBase`. That is an additive change.
