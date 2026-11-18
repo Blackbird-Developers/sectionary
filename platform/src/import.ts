@@ -346,7 +346,7 @@ try {
   // Typo tolerance corrects query words against the corpus vocabulary, so keep it current.
   // Skipped before migration 0004 (no view yet); new blocks still need `npm run embed`.
   await client`REFRESH MATERIALIZED VIEW CONCURRENTLY search_terms`.then(
-    () => console.log("Refreshed search_terms. Run `npm run embed` for semantic search."),
+    () => console.log("Refreshed search_terms. Next: `npm run profile-sites`, `npm run benchmarks`, then `npm run embed` (it embeds the design summaries)."),
     (e: { code?: string }) => { if (e.code !== "42P01") throw e; },
   );
 } finally { await client.end(); }

@@ -14,7 +14,8 @@ type Sql = postgres.Sql;
 const pgArray = (values: readonly string[]) => `{${values.map((v) => `"${v.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
 
 /** Blocks to consider, latest capture of each page only, keyset-paged by id. */
-export async function blockInputs(sql: Sql, opts: { after?: string; limit: number; ids?: string[] }): Promise<BlockInput[]> {
+/** untaggedOnly: skip blocks that already have a block_type (from the rule tagger or an earlier AI run). */
+export async function blockInputs(sql: Sql, opts: { after?: string; limit: number; ids?: string[]; untaggedOnly?: boolean }): Promise<BlockInput[]> {
   const rows = await sql`
     SELECT b.id, s.host, p.type AS page_type, p.url AS page_url, b.viewport, b.block_index, b.top, b.height, b.type_hint,
       b.headline, left(b.text, 2000) AS text, b.buttons, b.images, b.videos, s.industry AS site_industry,
@@ -23,6 +24,7 @@ export async function blockInputs(sql: Sql, opts: { after?: string; limit: numbe
     WHERE c.id = (SELECT c2.id FROM captures c2 WHERE c2.page_id = p.id ORDER BY c2.captured_at DESC LIMIT 1)
       AND b.id > ${opts.after ?? "00000000-0000-0000-0000-000000000000"}
       ${opts.ids ? sql`AND b.id = ANY(${pgArray(opts.ids)}::uuid[])` : sql``}
+      ${opts.untaggedOnly ? sql`AND b.block_type IS NULL` : sql``}
     ORDER BY b.id LIMIT ${opts.limit}`;
   return rows.map((r) => ({
     id: r.id, host: r.host, pageType: r.page_type, pageUrl: r.page_url, viewport: r.viewport, blockIndex: r.block_index,

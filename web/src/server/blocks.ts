@@ -1,4 +1,6 @@
+import type { BlockDetail } from "@/contracts/api";
 import type { Block } from "@/contracts/block";
+import type { BlockStyle, OutlineNode } from "@/contracts/manifest";
 import { BLOCKS_SRC } from "@/lib/data-source";
 import { bucketFor } from "@/lib/colour";
 import { database, pgArray } from "@/server/db";
@@ -214,6 +216,40 @@ export const hasDatabase = () => Boolean(process.env.DATABASE_URL);
  * configured, otherwise the sample JSON the app itself serves. Never trust a
  * block object sent by the browser: its `src` would decide what the server fetches.
  */
+/**
+ * One block for GET /api/blocks/[id]: the Block plus tagger output, style and
+ * outline (BlockDetail). Without a database the sample has none of those, so
+ * they are null. Measurements only: the element's tag, id and classes are
+ * never selected.
+ */
+export async function findBlockDetail(id: string, origin: string): Promise<BlockDetail | null> {
+  const empty = { capturedAt: null, blockType: null, pageRole: null, styleTags: [], patterns: [], description: null, taggerVersion: null, style: null, outline: null };
+  if (!hasDatabase()) {
+    const block = await findBlock(id, origin);
+    return block ? { ...block, ...empty } : null;
+  }
+  if (!UUID.test(id)) return null;
+  const sql = database();
+  const [row] = await sql`SELECT ${blockColumns(sql)}, c.captured_at, b.block_type, b.ai_response->>'page_role' AS page_role,
+    b.tags AS style_tags, b.ai_response->'patterns' AS patterns, b.ai_description, b.ai_response->>'prompt_version' AS tagger_version,
+    b.style, b.outline
+    FROM ${blockJoins(sql)} WHERE b.id=${id}`;
+  if (!row) return null;
+  const tagged = row.block_type != null;
+  return {
+    ...toBlock(row),
+    capturedAt: row.captured_at ? (row.captured_at as Date).toISOString() : null,
+    blockType: (row.block_type as string | null) ?? null,
+    pageRole: tagged ? ((row.page_role as string | null) ?? null) : null,
+    styleTags: (row.style_tags as string[] | null) ?? [],
+    patterns: Array.isArray(row.patterns) ? (row.patterns as string[]) : [],
+    description: (row.ai_description as string | null) ?? null,
+    taggerVersion: tagged ? ((row.tagger_version as string | null) ?? null) : null,
+    style: (row.style as BlockStyle | null) ?? null,
+    outline: (row.outline as OutlineNode[] | null) ?? null,
+  };
+}
+
 export async function findBlock(id: string, origin: string): Promise<Block | null> {
   if (hasDatabase()) {
     if (!UUID.test(id)) return null;

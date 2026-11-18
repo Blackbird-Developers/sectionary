@@ -1,0 +1,240 @@
+{
+  "host": "myzoobox.com",
+  "brand": "myzoobox",
+  "industry": "other",
+  "builtAt": "2026-11-18T11:10:47.268Z",
+  "design": {
+    "shape": {
+      "label": "rounded",
+      "radius": {
+        "card": 24,
+        "image": 0,
+        "input": 6,
+        "button": 10
+      },
+      "shadows": true
+    },
+    "accent": {
+      "bucket": "teal",
+      "colour": "#258d8f"
+    },
+    "layout": {
+      "pages": [
+        {
+          "blocks": 5,
+          "screens": 4.1,
+          "pageType": "product",
+          "viewport": "desktop"
+        },
+        {
+          "blocks": 5,
+          "screens": 6,
+          "pageType": "product",
+          "viewport": "mobile"
+        }
+      ],
+      "gridColumns": {
+        "mobile": null,
+        "desktop": null
+      },
+      "productImageRatios": [
+        "1:1"
+      ]
+    },
+    "builtAt": "2026-11-18T11:10:47.265Z",
+    "buttons": {
+      "primary": {
+        "case": "uppercase",
+        "text": "#ffffff",
+        "count": 1,
+        "border": null,
+        "height": 53,
+        "radius": 10,
+        "weight": 700,
+        "fontSize": 16,
+        "paddingX": 28,
+        "background": "#258d8f"
+      },
+      "secondary": {
+        "case": "none",
+        "text": "#258d8f",
+        "count": 1,
+        "border": null,
+        "height": 49,
+        "radius": 0,
+        "weight": 700,
+        "fontSize": 17,
+        "paddingX": 0,
+        "background": null
+      }
+    },
+    "palette": [
+      {
+        "role": "background",
+        "share": 1,
+        "bucket": "white",
+        "colour": "#ffffff"
+      },
+      {
+        "role": "text",
+        "share": 0.27,
+        "bucket": "dark",
+        "colour": "#555555"
+      },
+      {
+        "role": "text-muted",
+        "share": 0.2,
+        "bucket": "grey",
+        "colour": "#666666"
+      },
+      {
+        "role": "accent",
+        "share": 0.4,
+        "bucket": "teal",
+        "colour": "#258d8f"
+      },
+      {
+        "role": "accent-text",
+        "share": 1,
+        "bucket": "white",
+        "colour": "#ffffff"
+      },
+      {
+        "role": "border",
+        "share": 1,
+        "bucket": "teal",
+        "colour": "#51a4a5"
+      },
+      {
+        "role": "link",
+        "share": 0.41,
+        "bucket": "grey",
+        "colour": "#666666"
+      }
+    ],
+    "partial": false,
+    "sources": [
+      {
+        "url": "https://myzoobox.com/products/zoologist-club-sibling-kit-easy-reader-3-month-plan",
+        "pageType": "product",
+        "viewports": [
+          "desktop",
+          "mobile"
+        ],
+        "capturedAt": "2026-11-16T13:57:25.431Z"
+      }
+    ],
+    "spacing": {
+      "gutter": 20,
+      "baseUnit": null,
+      "blockPadding": 13,
+      "contentWidth": 1260
+    },
+    "summary": "Headings and body in Poppins; headings 900, body 15px. Type scale 12, 13, 14, 15, 16, 17, 18, 24, 30, 36. Dark grey text on white, accent teal #258d8f for buttons. Rounded buttons, 53px tall, uppercase labels. Product images 1:1.",
+    "version": 1,
+    "headings": [
+      {
+        "size": {
+          "mobile": 36,
+          "desktop": 36
+        },
+        "level": 1,
+        "pages": 2,
+        "family": "Poppins",
+        "weight": 900,
+        "uppercase": false,
+        "distinctSizes": 1
+      },
+      {
+        "size": {
+          "mobile": null,
+          "desktop": null
+        },
+        "level": 2,
+        "pages": 0,
+        "family": null,
+        "weight": null,
+        "uppercase": null,
+        "distinctSizes": 0
+      },
+      {
+        "size": {
+          "mobile": 22,
+          "desktop": 27
+        },
+        "level": 3,
+        "pages": 2,
+        "family": "Poppins",
+        "weight": 650,
+        "uppercase": false,
+        "distinctSizes": 1
+      },
+      {
+        "size": {
+          "mobile": 14,
+          "desktop": 14
+        },
+        "level": 4,
+        "pages": 2,
+        "family": "Happy Monkey",
+        "weight": 400,
+        "uppercase": false,
+        "distinctSizes": 1
+      },
+      {
+        "size": {
+          "mobile": null,
+          "desktop": null
+        },
+        "level": 5,
+        "pages": 0,
+        "family": null,
+        "weight": null,
+        "uppercase": null,
+        "distinctSizes": 0
+      },
+      {
+        "size": {
+          "mobile": null,
+          "desktop": null
+        },
+        "level": 6,
+        "pages": 0,
+        "family": null,
+        "weight": null,
+        "uppercase": null,
+        "distinctSizes": 0
+      }
+    ],
+    "typography": {
+      "ui": "Poppins",
+      "body": "Poppins",
+      "scale": [
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        24,
+        30,
+        36
+      ],
+      "heading": "Poppins",
+      "bodySize": {
+        "mobile": 14,
+        "desktop": 15
+      },
+      "bodyLineHeight": 1.5
+    },
+    "consistency": {
+      "sizes": 12,
+      "families": 2,
+      "textColours": 2,
+      "buttonVariants": 5
+    },
+    "accessibility": null
+  },
+  "accessibilityNote": "accessibility signals are shown to signed-in accounts"
+}

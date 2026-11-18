@@ -9,6 +9,7 @@ them and the rules for changing them.
 | Capture manifest | `manifest.ts` | Lane A, one `manifest.json` per captured page | Lane B importer | `fixtures/manifests/` |
 | Items | `block.ts`, `store.ts` | Lane B API (sample JSON today) | Lane C screens | `web/public/sample/*.json` |
 | HTTP API | `api.ts` | Lane B | Lane C | `fixtures/api/*.json` |
+| Design profiles and benchmarks | `design.ts` | Lane B jobs (`profile-sites`, `benchmarks`) | Lane C API, MCP server | built from `fixtures/manifests/myzoobox.com` |
 
 ## Rules
 
@@ -103,7 +104,60 @@ styles, font files or URLs to them (`docs/bot-page.md`). The existing `tag`,
 `id` and `classes` on a block stay in the manifest for the importer and are
 never served through the MCP.
 
-Budget: the three fields add at most 20 KB to a manifest per viewport.
+Budget: the three fields add at most 20 KB per viewport, measured as compact
+JSON (no indentation; the crawler writes manifests indented, which adds about
+half again). The myzoobox.com product page adds 12.7 KB on desktop.
+
+### Design profiles and benchmarks (additive, SEC-31)
+
+Built by the platform from the design metadata above, never by the crawler.
+Types in `web/src/contracts/design.ts`.
+
+- `StoreDesignProfile` (L3), stored in `sites.design_profile` by
+  `npm run profile-sites`: the store's heading, body and UI families, type
+  scale, heading system per level (sizes per viewport, weight, case, and how
+  many distinct sizes a level takes across pages), merged palette with the
+  accent named, primary and secondary buttons, shape, spacing, layout habits,
+  consistency counts and accessibility signals, plus `summary`: a
+  DESIGN.md-style paragraph from a fixed template, no AI call. Built from the
+  latest capture with page styles of each page type; stores without one keep
+  a null profile.
+- `Benchmark` (L4), rows of the `benchmarks` table, rebuilt by
+  `npm run benchmarks`: per industry (or `all`), page type (or `all`)
+  and viewport, each numeric metric's quartiles and each categorical metric's
+  shares, always with `n`, the stores measured. Rows under
+  `MIN_BENCHMARK_N` (10) are not stored.
+- **Accessibility signals are signals, not an audit.** A store's own
+  (`StoreDesignProfile.accessibility`, `PageStyles.accessibility`) are
+  served to signed-in accounts and MCP keys only; benchmarks across stores
+  are public.
+
+Run `profile-sites` then `benchmarks` after every import.
+
+### Design data API (additive, SEC-31)
+
+Brief section 8. Shapes in `api.ts`, real responses in `fixtures/api/`
+(written by `npm run mcp:eval -- --write-fixtures` in `web/`, which also
+checks that each endpoint gives the same numbers as the MCP tool beside it).
+
+| Endpoint | Out | Same data as | Fixture |
+|---|---|---|---|
+| `GET /api/blocks/[id]` | `BlockDetail`: the `Block` plus tagger output, `style`, `outline`, `capturedAt` | `blimp_get_block` | `block.detail.json` |
+| `GET /api/sites/[host]/design` | `SiteDesign` | `blimp_get_store_design` | `site.design.json` |
+| `GET /api/benchmarks?industry=&page=&vp=&metric=` | `BenchmarksResponse` | `blimp_get_benchmark` | `benchmarks.json` |
+| `GET /api/taxonomy` | `Taxonomy` | `blimp_list_taxonomy` | `taxonomy.json` |
+
+- `Block` itself does not change: style and outline are on the detail
+  endpoint only, so the wall's list payload does not grow.
+- Missing is null: tagger fields until a block is tagged, `style` and
+  `outline` for captures made before design metadata, `design` (with
+  `note`) for stores without such a capture.
+- `SiteDesign.design.accessibility` is null for signed-out requests, with
+  `accessibilityNote`; signed in, it is filled and the response is
+  `private, no-store`.
+- Unknown `industry`, `page` or `metric` on `/api/benchmarks` is 400
+  `INVALID`, naming the closest valid values. `items` is empty when fewer
+  than `minN` stores were measured; `stores` says how many have the page.
 
 When images move to object storage (SEC-9) the key layout will be
 `sites/<host>/<capturedAt>/<viewport>/<nn>-<type>.webp` and the manifest gains

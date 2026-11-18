@@ -3,6 +3,8 @@
 // carries the same item shapes. See docs/CONTRACTS.md for the rules.
 
 import type { Block, Viewport } from "./block";
+import type { Benchmark, StoreDesignProfile } from "./design";
+import type { BlockStyle, OutlineNode } from "./manifest";
 import type { Store } from "./store";
 
 export const CONTRACT_VERSION = 1;
@@ -141,7 +143,7 @@ export type Account = {
   twoStep: boolean;
 };
 /** Pro-only things the UI locks for Free and signed-out viewers ("open" is opening a block at all). */
-// "mcp": the MCP server at /api/mcp with an API key (SEC-31). Pro and Team until the owner decides otherwise.
+// "mcp": the MCP server at /api/mcp with an API key (SEC-31). Pro and Team (owner decision, 18 Nov 2026).
 export type Feature = "open" | "brief" | "history" | "boards" | "filters" | "copy-image" | "source-link" | "full-images" | "mcp";
 /**
  * `gates` is false while PLAN_GATES is off (everything open). `features` is
@@ -156,6 +158,71 @@ export type AccountResponse = { account: Account | null; views?: { used: number;
 export type ViewCheck = { allowed: boolean; used: number; limit: number | null; plan: Plan | null;
   /** Why not: signed out (opening a block needs an account) or today's cap is used up. */
   reason?: "SIGN_IN_REQUIRED" | "LIMIT" };
+
+/**
+ * Design data (additive, SEC-31 brief section 8). The same readers as the MCP
+ * server, so both serve the same numbers. Measurements only, never source:
+ * no HTML, CSS, class names or element ids. Missing data is null, never guessed.
+ */
+
+/**
+ * GET /api/blocks/[id] · one Block plus its tagger output and, for captures
+ * made with design metadata, its measured style and outline. The tagger
+ * fields are null (and the lists empty) until the block is tagged; `style` and
+ * `outline` are null for captures made before design metadata was collected.
+ */
+export type BlockDetail = Block & {
+  capturedAt: string | null;
+  blockType: string | null;
+  pageRole: string | null;
+  styleTags: string[];
+  patterns: string[];
+  /** The tagger's 200-character description. */
+  description: string | null;
+  /** The tagger version that wrote the fields above, null when untagged. */
+  taggerVersion: string | null;
+  style: BlockStyle | null;
+  outline: OutlineNode[] | null;
+};
+
+/**
+ * GET /api/sites/[host]/design · the store design profile (L3) and its
+ * `summary`. `design` is null, with `note`, until a capture made with design
+ * metadata is imported. The store's own accessibility signals go to signed-in
+ * accounts only: signed out, `design.accessibility` is null and
+ * `accessibilityNote` says why (benchmarks across stores stay public).
+ */
+export type SiteDesign = {
+  host: string;
+  brand: string;
+  industry: string | null;
+  design: (Omit<StoreDesignProfile, "accessibility"> & { accessibility: StoreDesignProfile["accessibility"] | null }) | null;
+  builtAt: string | null;
+  note?: string;
+  accessibilityNote?: string;
+};
+
+/**
+ * GET /api/benchmarks?industry=&page=&vp=&metric= · what is typical (L4).
+ * `industry` and `page` default to "all", `vp` to desktop; `metric` is
+ * comma-separated, every published metric when left out. Only rows measured
+ * over at least `minN` stores exist, each with its `n`. `stores` is how many
+ * stores have that page captured, so an empty `items` can say why.
+ */
+export type BenchmarksQuery = { industry?: string; page?: string; vp?: Viewport; metric?: string };
+export type BenchmarksResponse = { industry: string; pageType: string; viewport: Viewport; stores: number; minN: number; items: Benchmark[] };
+
+/** GET /api/taxonomy · the closed lists behind the filters, with what each value means, and how much of the library is tagged. */
+export type Taxonomy = {
+  blockTypes: { value: string; group: "global" | "ecommerce"; meaning: string }[];
+  pageRoles: { value: string; meaning: string }[];
+  styleTags: string[];
+  industries: string[];
+  pageTypes: { value: string; pages: number }[];
+  platforms: { value: string; stores: number }[];
+  viewports: Viewport[];
+  tagging: { blocks: number; tagged: number; taggerVersion: string };
+};
 
 /** Every error response, any endpoint. */
 export type ApiError = { error: string; code?: string };

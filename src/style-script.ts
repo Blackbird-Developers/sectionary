@@ -132,7 +132,7 @@ export const STYLE_THRESHOLDS = {
   iconRowMaxText: 60,
   buttonRadiusTolerance: 2,
   maxTypeStyles: 8,
-  /** Text styles carrying less of a block's characters than this are left out (size budget: 20 KB per viewport; myzoobox.com product page). */
+  /** Text styles carrying less of a block's characters than this are left out (size budget: 20 KB per viewport of compact JSON; myzoobox.com product page). */
   minStyleShare: 0.02,
   maxTextColours: 4,
   maxVariants: 3,

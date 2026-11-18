@@ -7,6 +7,34 @@ PLAN.md changes only when scope does; the board mirrors every work item.
 Earlier sessions are in Ben's vault copy (To Do's/New APP Mobbin Recreate).
 This file starts on 2026-10-01 so every lane can append to it.
 
+## 2026-11-18 · Buna (Lane B)
+
+**SEC-31: MCP v2, the design data API, design-aware search.** On `buna`, not
+pushed. No migration.
+
+- MCP v2: `blimp_get_store_design`, `blimp_get_page_profile`,
+  `blimp_get_store_flow`, `blimp_get_benchmark`, `blimp_find_similar_blocks`
+  (brief step 8). `npm run mcp:eval` in `web/` runs the ten evaluation
+  questions against the fixtures through the real route: all pass.
+- Brief section 8 (step 5): `GET /api/blocks/[id]` now carries tagger output,
+  style and outline (`BlockDetail`); new `/api/sites/[host]/design`,
+  `/api/benchmarks`, `/api/taxonomy`. Contract commit separate, with real
+  fixtures in `fixtures/api/`; Lane C please review. A store's own
+  accessibility signals go to signed-in accounts only.
+- Brief 7.4: blocks from `--styles` captures are embedded with their outline's
+  heading and button text and the store's design summary. After an import
+  run `profile-sites`, `benchmarks`, then `embed`.
+- Size budget: the only `--styles` fixture (myzoobox.com product page, 5
+  blocks) adds 12.7 KB desktop and 11.5 KB mobile, about 2 KB a block, so a
+  20-block home page may pass 20 KB. Measure on a long page before turning
+  `--styles` on by default.
+- Waiting: the 20-store accuracy check (a person with dev tools, brief
+  section 10), then `--styles` on by default and a recapture; production runs
+  of the tagger, `profile-sites`, `benchmarks` and `embed`; owner decisions in
+  brief section 12 item 3 (thumbnails or full screenshots; item 2 decided:
+  the MCP stays in Pro and Team);
+  `blimp_compare_stores` after the compare pilot.
+
 ## 2026-10-28 · Buna (Lane B)
 
 **Free plan with a 7-day trial, two-step sign-in, session fix.** On `buna`.

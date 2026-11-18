@@ -1,0 +1,363 @@
+{
+  "blockTypes": [
+    {
+      "value": "announcement-bar",
+      "group": "global",
+      "meaning": "thin strip above the header with a promo, shipping threshold or notice"
+    },
+    {
+      "value": "header-navigation",
+      "group": "global",
+      "meaning": "logo, main menu, search, account and cart icons"
+    },
+    {
+      "value": "hero",
+      "group": "global",
+      "meaning": "the large opening banner of a page: headline, image or video, primary call to action"
+    },
+    {
+      "value": "usp-bar",
+      "group": "global",
+      "meaning": "row of short selling points with icons (free shipping, returns, guarantees)"
+    },
+    {
+      "value": "logo-press-bar",
+      "group": "global",
+      "meaning": "row of press, retailer or partner logos (\"as seen in\")"
+    },
+    {
+      "value": "image-with-text",
+      "group": "global",
+      "meaning": "one image beside or behind a block of copy, a single story or feature"
+    },
+    {
+      "value": "video",
+      "group": "global",
+      "meaning": "a section whose main content is a video player or video embed"
+    },
+    {
+      "value": "features-grid",
+      "group": "global",
+      "meaning": "grid or list of product or brand features, benefits or ingredients"
+    },
+    {
+      "value": "testimonials",
+      "group": "global",
+      "meaning": "customer quotes or written endorsements (not the product reviews widget)"
+    },
+    {
+      "value": "ugc-gallery",
+      "group": "global",
+      "meaning": "grid or carousel of customer photos or social posts (Instagram, TikTok)"
+    },
+    {
+      "value": "faq",
+      "group": "global",
+      "meaning": "questions and answers, usually an accordion"
+    },
+    {
+      "value": "newsletter",
+      "group": "global",
+      "meaning": "email or SMS sign-up form"
+    },
+    {
+      "value": "cta-band",
+      "group": "global",
+      "meaning": "short band whose job is one call to action"
+    },
+    {
+      "value": "footer",
+      "group": "global",
+      "meaning": "site footer: link columns, legal, payment icons, social links"
+    },
+    {
+      "value": "comparison-table",
+      "group": "global",
+      "meaning": "table comparing products, plans or the brand against competitors"
+    },
+    {
+      "value": "pricing",
+      "group": "global",
+      "meaning": "plans or tiers with prices to choose between (not a single product's buy box)"
+    },
+    {
+      "value": "team",
+      "group": "global",
+      "meaning": "people: founders, team members, experts"
+    },
+    {
+      "value": "blog-teasers",
+      "group": "global",
+      "meaning": "cards linking to articles, journal or blog posts"
+    },
+    {
+      "value": "contact",
+      "group": "global",
+      "meaning": "contact details or a contact form"
+    },
+    {
+      "value": "stats",
+      "group": "global",
+      "meaning": "large numbers as proof (\"1M customers\", \"4.8 stars\")"
+    },
+    {
+      "value": "how-it-works",
+      "group": "global",
+      "meaning": "numbered steps or a timeline explaining a process"
+    },
+    {
+      "value": "app-download",
+      "group": "global",
+      "meaning": "promotion of a mobile app with store badges"
+    },
+    {
+      "value": "trust-badges",
+      "group": "global",
+      "meaning": "certification, security, payment or guarantee badges"
+    },
+    {
+      "value": "featured-collection",
+      "group": "ecommerce",
+      "meaning": "a curated row or carousel of products on a home or landing page"
+    },
+    {
+      "value": "collection-grid",
+      "group": "ecommerce",
+      "meaning": "the main product grid of a collection or category page, or a grid of collection tiles"
+    },
+    {
+      "value": "product-card",
+      "group": "ecommerce",
+      "meaning": "a single product tile, or a section that is essentially one product card"
+    },
+    {
+      "value": "filter-sort-bar",
+      "group": "ecommerce",
+      "meaning": "filters, facets and sort controls for a product listing"
+    },
+    {
+      "value": "product-gallery",
+      "group": "ecommerce",
+      "meaning": "a product page's image gallery and thumbnails"
+    },
+    {
+      "value": "buy-box",
+      "group": "ecommerce",
+      "meaning": "product title, price, variants and add to cart"
+    },
+    {
+      "value": "subscription-picker",
+      "group": "ecommerce",
+      "meaning": "choice between one-time purchase and subscribe (and save), delivery frequency"
+    },
+    {
+      "value": "bundle-builder",
+      "group": "ecommerce",
+      "meaning": "build-your-own bundle or kit: pick several items for a set price"
+    },
+    {
+      "value": "size-guide",
+      "group": "ecommerce",
+      "meaning": "size chart, fit guide or measurement help"
+    },
+    {
+      "value": "shipping-returns",
+      "group": "ecommerce",
+      "meaning": "shipping, delivery and returns information"
+    },
+    {
+      "value": "product-tabs",
+      "group": "ecommerce",
+      "meaning": "product details in tabs or accordions (description, ingredients, how to use)"
+    },
+    {
+      "value": "product-reviews",
+      "group": "ecommerce",
+      "meaning": "the reviews widget: star summary, review list, write a review"
+    },
+    {
+      "value": "cross-sell-upsell",
+      "group": "ecommerce",
+      "meaning": "\"you may also like\", \"complete the look\", frequently bought together"
+    },
+    {
+      "value": "recently-viewed",
+      "group": "ecommerce",
+      "meaning": "products the shopper viewed before"
+    },
+    {
+      "value": "sticky-add-to-cart",
+      "group": "ecommerce",
+      "meaning": "add-to-cart bar fixed to the top or bottom while scrolling"
+    },
+    {
+      "value": "cart-drawer",
+      "group": "ecommerce",
+      "meaning": "slide-out mini cart"
+    },
+    {
+      "value": "cart-page",
+      "group": "ecommerce",
+      "meaning": "the cart page's line items, totals and checkout button"
+    },
+    {
+      "value": "checkout-step",
+      "group": "ecommerce",
+      "meaning": "a checkout step: contact, shipping, payment"
+    },
+    {
+      "value": "order-confirmation",
+      "group": "ecommerce",
+      "meaning": "thank-you or order status page content"
+    },
+    {
+      "value": "account",
+      "group": "ecommerce",
+      "meaning": "login, register or account dashboard"
+    },
+    {
+      "value": "search-results",
+      "group": "ecommerce",
+      "meaning": "results of an on-site search"
+    },
+    {
+      "value": "quiz-finder",
+      "group": "ecommerce",
+      "meaning": "a quiz or finder that recommends products"
+    },
+    {
+      "value": "store-locator",
+      "group": "ecommerce",
+      "meaning": "find a physical store or stockist"
+    },
+    {
+      "value": "gift-card",
+      "group": "ecommerce",
+      "meaning": "gift card purchase or balance"
+    }
+  ],
+  "pageRoles": [
+    {
+      "value": "opening",
+      "meaning": "the first thing a visitor sees: top of the page, in the first screen"
+    },
+    {
+      "value": "navigation",
+      "meaning": "site chrome that repeats on every page: announcement bar, header, menus"
+    },
+    {
+      "value": "content",
+      "meaning": "the body of the page: what this page is about"
+    },
+    {
+      "value": "conversion",
+      "meaning": "where the page asks for the purchase or sign-up: buy box, pricing, add to cart, sign-up"
+    },
+    {
+      "value": "social-proof",
+      "meaning": "reviews, testimonials, press, stats and badges that build trust"
+    },
+    {
+      "value": "closing",
+      "meaning": "end of the page: final call to action, footer"
+    }
+  ],
+  "styleTags": [
+    "minimal",
+    "bold",
+    "playful",
+    "luxury",
+    "editorial",
+    "brutalist",
+    "dark",
+    "pastel",
+    "photo-led",
+    "illustration-led",
+    "typographic",
+    "gradient"
+  ],
+  "industries": [
+    "fashion-apparel",
+    "beauty-skincare",
+    "food-drink",
+    "supplements-wellness",
+    "subscription-box",
+    "kids-baby",
+    "pets",
+    "home-furniture",
+    "jewellery-watches",
+    "sports-outdoor",
+    "tech-gadgets",
+    "gifts-stationery",
+    "other"
+  ],
+  "pageTypes": [
+    {
+      "value": "home",
+      "pages": 13
+    },
+    {
+      "value": "collection",
+      "pages": 12
+    },
+    {
+      "value": "product",
+      "pages": 8
+    },
+    {
+      "value": "cart",
+      "pages": 1
+    }
+  ],
+  "platforms": [
+    {
+      "value": "shopify",
+      "stores": 6
+    },
+    {
+      "value": "wix",
+      "stores": 1
+    },
+    {
+      "value": "nextjs",
+      "stores": 1
+    },
+    {
+      "value": "squarespace",
+      "stores": 1
+    },
+    {
+      "value": "unknown",
+      "stores": 1
+    },
+    {
+      "value": "nuxt",
+      "stores": 1
+    },
+    {
+      "value": "bigcommerce",
+      "stores": 1
+    },
+    {
+      "value": "salesforce-commerce-cloud",
+      "stores": 1
+    },
+    {
+      "value": "woocommerce",
+      "stores": 1
+    },
+    {
+      "value": "magento",
+      "stores": 1
+    }
+  ],
+  "viewports": [
+    "desktop",
+    "mobile"
+  ],
+  "tagging": {
+    "blocks": 433,
+    "tagged": 0,
+    "taggerVersion": "tagger-v1.0"
+  }
+}

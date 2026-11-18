@@ -38,8 +38,9 @@
   // deploy (vercel deploy from web/) uploads web/ alone, so `next build` fails on them.
   // - scripts/search-acceptance.mts loads platform/src/local-db.ts (and platform's
   //   PGlite packages); node runs it directly (npm run search:acceptance).
-  // - scripts/account-acceptance.mts, the same way (npm run account:acceptance).
+  // - scripts/account-acceptance.mts, boards-acceptance.mts and mcp-eval.mts, the
+  //   same way (npm run account:acceptance, boards:acceptance, mcp:eval).
   // - src/server/search-intent.test.ts checks the intents against
   //   platform/src/taxonomy.ts; run it from the repo: npx tsx --test src/server/*.test.ts
-  "exclude": ["node_modules", "scripts/search-acceptance.mts", "scripts/account-acceptance.mts", "scripts/boards-acceptance.mts", "src/server/search-intent.test.ts"]
+  "exclude": ["node_modules", "scripts/search-acceptance.mts", "scripts/account-acceptance.mts", "scripts/boards-acceptance.mts", "scripts/mcp-eval.mts", "src/server/search-intent.test.ts"]
 }

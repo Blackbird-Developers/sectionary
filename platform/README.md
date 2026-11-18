@@ -63,6 +63,8 @@ full text only.
 After an import or a tagging run:
 
 ```bash
+npm run profile-sites    # store design profiles (SEC-31), before embed
+npm run benchmarks       # what is typical across stores (SEC-31)
 npm run embed            # embeds new/changed blocks, refreshes search_terms
 npm run search:eval      # acceptance queries against http://localhost:3000
 ```
@@ -71,7 +73,10 @@ Set `VOYAGE_API_KEY` in `platform/.env` for `embed` and in the web app's
 environment for queries. `VOYAGE_MODEL` defaults to `voyage-3.5` and must
 match on both sides. Blocks are embedded from their AI description. Until the
 tagger has written one, a block is embedded from its type, headline and copy,
-and embedded again automatically once the description lands.
+and embedded again automatically once the description lands. Captures made
+with `--styles` add the outline's heading and button text and the store's
+design summary (`src/embed-input.ts`), so "serif headings, pill buttons" and
+"hero with two buttons" find blocks.
 
 Migration `0007_search_terms_taxonomy.sql` adds block types and tags to the
 typo vocabulary, so a tagged "subscription-picker" is found by "picker"

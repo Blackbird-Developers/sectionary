@@ -13,11 +13,17 @@ export type {
   MomentResponse,
   MotionKind,
 } from "./manifest";
+export type { Benchmark, HeadingSystemLevel, ProfileSource, StoreAccessibility, StoreDesignProfile } from "./design";
+export { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "./design";
+export type { CategoricalBenchmark, NumericBenchmark } from "./design";
 export { CONTRACT_VERSION } from "./api";
 export type {
   Account,
   AccountResponse,
   ApiError,
+  BenchmarksQuery,
+  BenchmarksResponse,
+  BlockDetail,
   BlockHistory,
   BlocksQuery,
   BlocksResponse,
@@ -32,8 +38,10 @@ export type {
   Page,
   Plan,
   SharedBoard,
+  SiteDesign,
   SiteProfile,
   StoresQuery,
   StoresResponse,
+  Taxonomy,
   ViewCheck,
 } from "./api";

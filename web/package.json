@@ -13,7 +13,8 @@
     "search:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/search-acceptance.mts",
     "test": "node --test --disable-warning=MODULE_TYPELESS_PACKAGE_JSON src/server/*.test.ts",
     "account:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/account-acceptance.mts",
-    "boards:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/boards-acceptance.mts"
+    "boards:acceptance": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/boards-acceptance.mts",
+    "mcp:eval": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/server-alias.mjs scripts/mcp-eval.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.127.0",
@@ -31,6 +32,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",
