@@ -271,7 +271,8 @@ function Group({
   if (!options.length && !locked) return null;
 
   return (
-    <fieldset className="border-b py-5 last:border-b-0">
+    // min-w-0: a fieldset is otherwise as wide as its longest option, which pushed the panel sideways.
+    <fieldset className="min-w-0 border-b py-5 last:border-b-0">
       <legend className="float-left mb-3 flex w-full items-center gap-1.5 text-[15px] font-semibold">
         {spec.label}
         {locked && <Lock aria-label="Pro" className="size-3.5 text-muted-foreground" />}
@@ -304,7 +305,12 @@ function Group({
           {shown.length === 0 ? (
             <p className="py-1 text-[13px] text-muted-foreground">Nothing here matches.</p>
           ) : (
-            <ul className={cn("flex flex-col", long && "max-h-80 overflow-y-auto overscroll-contain")}>
+            <ul
+              className={cn(
+                "flex flex-col",
+                long && "scroll-list max-h-80 overflow-y-auto overscroll-contain rounded-lg border bg-muted/20 py-1 pr-1 pl-2.5",
+              )}
+            >
               {shown.map((option) => (
                 <li key={option.value}>
                   <Option
@@ -320,13 +326,20 @@ function Group({
           )}
 
           {!trimmed && (hidden > 0 || expanded) && matching.length > FOLDED && (
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="mt-1.5 text-[13px] font-medium underline underline-offset-4 outline-none hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {expanded ? "Show less" : `Show ${hidden.toLocaleString("en-US")} more`}
-            </button>
+            <div className="mt-1.5 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="text-[13px] font-medium underline underline-offset-4 outline-none hover:text-foreground/80 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {expanded ? "Show less" : `Show ${hidden.toLocaleString("en-US")} more`}
+              </button>
+              {long && (
+                <span className="ml-auto text-[12px] text-muted-foreground tabular-nums">
+                  {matching.length.toLocaleString("en-US")} in the list · scroll for more
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
