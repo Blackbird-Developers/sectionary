@@ -12,8 +12,9 @@ more than one page per second, and identifies itself in every request as
 `SectionaryBot/<version>` with a link to this page.
 
 To show how a page behaves, it may scroll, open the navigation menu, move a
-slideshow to its next slide, select a product option or open a product preview,
-and take a screenshot or a short recording of the result.
+slideshow or a product's photos to the next one, select a product option, open
+a size guide or a product preview, and take a screenshot or a short recording
+of the result. Anything it opens, it closes again.
 On stores whose robots.txt allows it, it also adds one product to a cart to
 photograph the cart, then empties the cart again. While it does this it blocks
 the store's analytics and ad tracking, so it is not counted as a shopper. It
