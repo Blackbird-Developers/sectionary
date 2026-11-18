@@ -11,8 +11,9 @@ import { measureStyles, STYLE_THRESHOLDS, type BlockStyleC, type OutlineNodeC, t
 import { Politeness, botUserAgent, DESKTOP_BASE_UA, MOBILE_BASE_UA, type Lane } from './polite.js';
 import { isEmptyCartBlock } from './empty-cart.js';
 import type { ManifestClip, MomentKind, MotionKind } from '../web/src/contracts/manifest.js';
-import { recordClips, type RawClip } from './clips.js';
+import { CLIP_THRESHOLDS, SLIDER_THRESHOLDS, recordClips, recordSliderClips, type RawClip } from './clips.js';
 import { encodeClip } from './clip-encode.js';
+import { TIME_WARP_SCRIPT, setPageRate } from './time-warp.js';
 import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
 import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
@@ -55,9 +56,15 @@ export type CaptureOptions = {
    * until they are recorded, then the stills are taken exactly as without clips. Off by default.
    */
   clips?: boolean;
+  /**
+   * With clips: sliders that only move when pressed get a clip too. After every still and moment, each slider's
+   * own "next" arrow (or dots, or track) is pressed a few times while recording (src/clips.ts recordSliderClips).
+   * Off by default.
+   */
+  sliders?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false };
 
 /** At most this many clips per page and viewport (the clips test: 4). */
 const CLIPS_PER_PAGE = 4;
@@ -269,6 +276,9 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
   // Node. Functions we ship into the page via page.evaluate still contain the
   // call, so define a no-op shim in the page before any script runs.
   await context.addInitScript('globalThis.__name = globalThis.__name || ((f) => f);');
+  // Clips are recorded in slow motion (src/time-warp.ts): a page clock whose speed can change, in every frame
+  // before the page's own scripts. At normal speed, which is always except while a clip records, nothing changes.
+  if (opts.clips) await context.addInitScript(TIME_WARP_SCRIPT);
   const page = await context.newPage();
   page.setDefaultTimeout(45_000);
   const t0 = Date.now();
@@ -354,10 +364,13 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
     // frames wait on disk and are encoded after the page (captureViewport). Then motion goes off and the recorded
     // videos are rewound, so every still below is taken exactly as without clips. A failure never fails the page.
     let rawClips: RawClip[] = [];
+    let zeroMotion: Awaited<ReturnType<Page['addStyleTag']>> | null = null;
     if (opts.clips && collected.blocks.length) {
       rawClips = await recordClips(page, { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: CLIPS_PER_PAGE, log: () => {} }).catch(() => [] as RawClip[]);
+      // Normal speed again, even if a recording was cut off before it could put the speed back.
+      await setPageRate(page, null, 1);
       await page.emulateMedia({ reducedMotion: 'reduce' }).catch(() => {});
-      await page.addStyleTag({ content: ZERO_MOTION_CSS }).catch(() => {});
+      zeroMotion = await page.addStyleTag({ content: ZERO_MOTION_CSS }).catch(() => null);
       await page
         .evaluate((refs) => {
           for (const ref of refs) {
@@ -455,6 +468,18 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       moments = done.moments;
       momentNotes = done.notes;
     }
+    // Sliders that only move when pressed (Ben, 18 Nov 2026), last of all: every still and moment is on disk, so
+    // pressing them changes nothing already captured. Motion comes back on for them. The bot page says the
+    // crawler moves slideshows to their next slide (released together, BOT_VERSION 0.5).
+    if (opts.clips && opts.sliders && collected.blocks.length) {
+      await dismissOverlays(page, false);
+      await zeroMotion?.evaluate((s) => (s as Element).remove()).catch(() => {});
+      await page.emulateMedia({ reducedMotion: 'no-preference' }).catch(() => {});
+      await page.waitForTimeout(300);
+      const skip = new Set(rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref));
+      const env = { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: SLIDER_THRESHOLDS.maxPerPage, touch: vp === 'mobile', log: () => {} };
+      rawClips = [...rawClips, ...(await recordSliderClips(page, env, skip).catch(() => [] as RawClip[]))];
+    }
     return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
@@ -493,7 +518,11 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<ViewportResult>((resolve) => {
     // Moments add up to 6 s before the blocks and 35 s after them; filling a cart up to 20 s more.
-    const extra = (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) + (opts.clips ? CLIPS_PER_PAGE * 16_000 + 10_000 : 0);
+    // Clips: the clip step's own budget plus one candidate that started just before it ran out; sliders the same.
+    const extra =
+      (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) +
+      (opts.clips ? CLIP_THRESHOLDS.pageMs + CLIP_THRESHOLDS.candidateMs + 10_000 : 0) +
+      (opts.clips && opts.sliders ? SLIDER_THRESHOLDS.pageMs + SLIDER_THRESHOLDS.candidateMs : 0);
     timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
   let r: ViewportResult;
@@ -535,7 +564,7 @@ async function attachClips(r: Extract<ViewportResult, { ok: true }>, pageDir: st
     const stem = block.file ? block.file.replace(/\.jpe?g$/i, '') : `blocks/${vp[0]}-${String(block.index).padStart(2, '0')}-${block.typeHint}`;
     const file = `${stem}.mp4`;
     const rect = { x: Math.round(raw.rect.x - raw.block.x), y: Math.round(raw.rect.y - raw.block.y), width: Math.round(raw.rect.width), height: Math.round(raw.rect.height) };
-    const res = await encodeClip({ framesDir: raw.framesDir, frames: raw.frames, rect: raw.rect, viewportWidth: raw.viewportWidth, frameRegion: raw.frameRegion, recordedMs: raw.recordedMs || 5000, outFile: path.join(pageDir, file) }).catch(
+    const res = await encodeClip({ framesDir: raw.framesDir, frames: raw.frames, rect: raw.rect, viewportWidth: raw.viewportWidth, frameRegion: raw.frameRegion, recordedMs: raw.recordedMs || 5000, slowdown: raw.slowdown, outFile: path.join(pageDir, file) }).catch(
       (e: Error) => ({ ok: false as const, error: e.message.split('\n')[0] }),
     );
     block.clip = res.ok
@@ -647,8 +676,17 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
       result.lines.push(`  ${vp} moments: ${said.length ? said.join(', ') : 'none'}${r.momentNotes.length ? ' · ' + r.momentNotes.join('; ') : ''}`);
     }
     if (opts.clips) {
-      const clipped = r.blocks.filter((b) => b.clip?.file).map((b) => `${b.typeHint} ${b.clip!.kind} ${(b.clip!.durationMs / 1000).toFixed(1)}s ${Math.round(b.clip!.bytes / 1024)}KB`);
-      const tried = (r.clips ?? []).filter((c) => c.verdict !== 'recorded').map((c) => `${c.motionHint} ${c.verdict}`);
+      const raws = new Map((r.clips ?? []).filter((c) => c.verdict === 'recorded').map((c) => [c.ref, c]));
+      const clipped = r.blocks
+        .filter((b) => b.clip?.file)
+        .map((b) => {
+          const raw = raws.get(b.ref);
+          const how = raw ? `${raw.pressed ? ` pressed (${raw.why.replace(/^slider /, '').split(':')[0]})` : ''} x${raw.slowdown ?? 1}${raw.captureFps ? ` (${raw.captureFps} shots/s)` : ''}` : '';
+          return `${b.typeHint} ${b.clip!.kind} ${(b.clip!.durationMs / 1000).toFixed(1)}s ${Math.round(b.clip!.bytes / 1024)}KB${how}`;
+        });
+      const tried = (r.clips ?? [])
+        .filter((c) => c.verdict !== 'recorded')
+        .map((c) => `${c.pressed ? `slider ${c.ref}` : `${c.motionHint} ${c.ref}`} ${c.verdict}${c.error ? ` (${c.error})` : ''}${c.pressed && c.error === 'navigated' ? ` after pressing "${c.why.split(': ').slice(1).join(': ')}"` : ''}`);
       result.lines.push(`  ${vp} clips: ${clipped.length ? clipped.join(', ') : 'none'}${tried.length ? ` · not recorded: ${tried.join(', ')}` : ''}`);
     }
   }
