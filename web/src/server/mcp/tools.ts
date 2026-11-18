@@ -121,7 +121,7 @@ export function blimpServer(origin: string): McpServer {
       description:
         "Find website sections across stores. `query` is plain language (\"subscription picker with savings badge\"); filters narrow it. " +
         "Without a query, lists blocks matching the filters. One block per section type per store and viewport. " +
-        "Returns at most 20; page on with `cursor`. `detail: \"full\"` adds the block's text (400 characters), image URL and tagger patterns.",
+        "Returns at most 20; page on with `cursor`. `detail: \"full\"` adds the block's text (400 characters), image URL, tagger patterns, and its measured outline and style (null for captures without design metadata).",
       inputSchema: z.object({
         query: z.string().max(200).optional().describe("Plain-language description of the section wanted"),
         block_type: z.string().optional().describe("From blimp_list_taxonomy, e.g. 'product-reviews'"),
