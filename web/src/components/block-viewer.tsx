@@ -14,7 +14,7 @@ import { TimeMachineStage, useTimeMachine } from "@/components/time-machine";
 import { BlockInfoPanel, copyImage, TABS, zoomWidth, type Tab } from "@/components/block-info";
 import { cn } from "@/lib/utils";
 import { assetUrl } from "@/lib/data-source";
-import { labelFor, PAGE_TYPE_LABEL, thumbOf, type Block } from "@/lib/blocks";
+import { labelFor, PAGE_TYPE_LABEL, shotsOf, thumbOf, type Block } from "@/lib/blocks";
 import { capturesOf, counterpartOf, similarTo, type DetailIndex } from "@/lib/block-detail";
 import type { FilterKey } from "@/lib/filters";
 import type { TechCounts } from "@/lib/tech";
@@ -458,6 +458,10 @@ function Stage({ block }: { block: Block }) {
   const [room, setRoom] = useState<{ w: number; h: number } | null>(null);
   const [loaded, setLoaded] = useState(false);
   const thumb = thumbOf(block);
+  // The screenshot's files: one, or the slices of a block too tall for one
+  // (see shotsOf). A slice that was worked out and is not there is left out.
+  const shots = shotsOf(block);
+  const [missing, setMissing] = useState<string[]>([]);
 
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -527,7 +531,8 @@ function Stage({ block }: { block: Block }) {
               mobile ? "rounded-[28px] ring-1 ring-border" : "rounded-lg ring-1 ring-border",
               !zoom && "shadow-xl",
             )}
-            style={{ width, aspectRatio: `${block.w} / ${block.h}`, background: block.bg }}
+            // The recorded shape holds the room until the screenshot is in; then the frame takes the picture's own.
+            style={{ width, aspectRatio: loaded ? undefined : `${block.w} / ${block.h}`, background: block.bg }}
           >
             {/* What the wall already loaded, so there is a picture at once. */}
             {!loaded && thumb && (
@@ -535,23 +540,30 @@ function Stage({ block }: { block: Block }) {
               <img src={assetUrl(thumb)} alt="" aria-hidden className="absolute inset-0 h-full w-full object-cover object-top" />
             )}
             {!loaded && !thumb && <div className="shimmer absolute inset-0 opacity-70" aria-hidden />}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              ref={image}
-              src={assetUrl(block.src)}
-              alt={`${labelFor(block.typeHint)} block from ${block.host}, ${block.viewport}`}
-              width={block.w}
-              height={block.h}
-              decoding="async"
-              fetchPriority="high"
-              onLoad={() => setLoaded(true)}
-              onClick={(e) => canZoom && toggleZoom(e)}
-              className={cn(
-                "relative block h-full w-full transition-opacity duration-200",
-                loaded ? "opacity-100" : "opacity-0",
-                canZoom && (zoom ? "cursor-zoom-out" : "cursor-zoom-in"),
-              )}
-            />
+            {shots
+              .filter((shot) => !missing.includes(shot.src))
+              .map((shot, n) => (
+                // Each file across the frame at its own shape, one under the other: never stretched to the block's recorded size.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={shot.src}
+                  ref={n === 0 ? image : undefined}
+                  src={assetUrl(shot.src)}
+                  alt={n === 0 ? `${labelFor(block.typeHint)} block from ${block.host}, ${block.viewport}` : ""}
+                  width={shot.w}
+                  height={shot.h}
+                  decoding="async"
+                  fetchPriority={n === 0 ? "high" : "auto"}
+                  onLoad={n === 0 ? () => setLoaded(true) : undefined}
+                  onError={n === 0 ? undefined : () => setMissing((gone) => [...gone, shot.src])}
+                  onClick={(e) => canZoom && toggleZoom(e)}
+                  className={cn(
+                    "relative block h-auto w-full transition-opacity duration-200",
+                    loaded ? "opacity-100" : "opacity-0",
+                    canZoom && (zoom ? "cursor-zoom-out" : "cursor-zoom-in"),
+                  )}
+                />
+              ))}
             {/* A block that moves plays its clip over the screenshot while it is on screen; clicks still zoom. */}
             <BlockClip block={block} mode="view" />
           </div>

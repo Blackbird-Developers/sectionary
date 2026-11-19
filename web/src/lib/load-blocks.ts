@@ -7,7 +7,7 @@ import type { Block, BlockSet } from "@/contracts/block";
 import type { Store, StoreSet } from "@/contracts/store";
 import { buildIndex, queryBlocks, MAX_LIMIT, type BlockIndex, type WallQuery, type WallResponse } from "@/lib/block-source";
 import { baseType, detailIndex, type DetailIndex } from "@/lib/block-detail";
-import { isUnnamed } from "@/lib/blocks";
+import { isUnnamed, type Shot } from "@/lib/blocks";
 import { expandBlocks } from "@/lib/mock-blocks";
 import { pagesFromBlocks, profileFromApi, profileFromIndex, siteCardFromApi, siteCards, storeFromBlocks, summaryPages, type ProfilePage, type SiteCard, type SiteSummary, type SiteView } from "@/lib/site-profile";
 import { flowSummaries, flowSummariesFromApi, type FlowSummary } from "@/lib/flows";
@@ -237,6 +237,8 @@ export async function loadSiteView(host: string): Promise<SiteView | null> {
 export type PageBlocks = {
   desktop: Block[];
   mobile: Block[];
+  /** The page's full-size screenshot per viewport, file by file, when the API lists it (see captureFiles in lib/blocks.ts for when it does not). */
+  shots?: { desktop: Shot[] | null; mobile: Shot[] | null };
   /** True when only the sections the wall shows came back, without the ones the store repeats on other pages. */
   partial: boolean;
 };
@@ -253,8 +255,8 @@ export function loadPageBlocks(host: string, url: string): Promise<PageBlocks> {
   return once(pageBlocks, `${host} ${url}`, async () => {
     const response = await fetch(withQuery(`${SITES_SRC}/${encodeURIComponent(host)}/page`, { url })).catch(() => null);
     if (response?.ok) {
-      const { desktop, mobile } = (await response.json()) as { desktop: Block[]; mobile: Block[] };
-      return { desktop, mobile, partial: false };
+      const { desktop, mobile, shots } = (await response.json()) as { desktop: Block[]; mobile: Block[]; shots?: PageBlocks["shots"] };
+      return { desktop, mobile, partial: false, ...(shots && { shots }) };
     }
     const own = (await once(storeBlocks, host, () => fetchAll({ host }))).filter((b) => b.pageUrl === url);
     return { desktop: own.filter((b) => b.viewport === "desktop"), mobile: own.filter((b) => b.viewport === "mobile"), partial: true };

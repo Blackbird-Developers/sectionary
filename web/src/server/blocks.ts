@@ -12,17 +12,26 @@ type Sql = ReturnType<typeof database>;
  * so /api/blocks, boards, share links and the time machine return the same shape.
  */
 export const blockColumns = (sql: Sql) => sql`b.id, s.host, p.type AS page_type, p.url AS page_url, p.title AS page_title,
-  b.viewport, b.type_hint, b.headline, b.background, b.width, b.height, b.image_key, b.thumbnail_key,
+  b.viewport, b.type_hint, b.headline, b.background, b.width, b.height, b.image_key, b.thumbnail_key, b.image_slices,
   s.platform, s.theme_name, s.apps, b.buttons, b.images, b.videos, left(b.text, 400) AS text, b.clip`;
 
 /** blocks.clip (migration 0015) as the importer stores it; Block.clip is its contract shape. */
 type StoredClip = { kind: string; url: string; width: number; height: number; durationMs: number; rect?: { x: number; y: number; width: number; height: number } };
 export const blockJoins = (sql: Sql) => sql`blocks b JOIN captures c ON c.id=b.capture_id JOIN pages p ON p.id=c.page_id JOIN sites s ON s.id=p.site_id`;
 
-/** A row as a Block, plus `thumb` (the 600px thumbnail, see thumbOf in lib/blocks.ts), which contract v1 does not have yet. */
-export function toBlock(r: Record<string, unknown>): Block & { thumb?: string } {
+/** blocks.image_slices (migration 0005) as the importer stores it: the files of a screenshot taller than WebP allows, top to bottom. */
+type StoredSlice = { index: number; src: string; top: number; width: number; height: number };
+
+/**
+ * A row as a Block, plus two fields contract v1 does not have yet: `thumb`
+ * (the 600px thumbnail, see thumbOf in lib/blocks.ts) and, for a screenshot
+ * stored in slices, `slices` (every file of it in order, see shotsOf there;
+ * `src` is only the first).
+ */
+export function toBlock(r: Record<string, unknown>): Block & { thumb?: string; slices?: { src: string; w: number; h: number }[] } {
   // A block that moves by itself carries its recording; the block's image is the clip's poster.
   const clip = r.clip as StoredClip | null | undefined;
+  const slices = Array.isArray(r.image_slices) ? (r.image_slices as StoredSlice[]).filter((s) => s?.src && s.width > 0 && s.height > 0) : [];
   return {
     id: r.id as string, host: r.host as string, pageType: r.page_type as string, pageUrl: r.page_url as string,
     pageTitle: (r.page_title as string | null) ?? null, viewport: r.viewport as Block["viewport"], typeHint: r.type_hint as string,
@@ -30,6 +39,7 @@ export function toBlock(r: Record<string, unknown>): Block & { thumb?: string } 
     src: (r.image_key as string | null) ?? "", platform: (r.platform as string | null) ?? null, theme: (r.theme_name as string | null) ?? null,
     apps: (r.apps as string[]) ?? [], buttons: r.buttons as number, images: r.images as number, videos: r.videos as number, text: r.text as string,
     ...(r.thumbnail_key ? { thumb: r.thumbnail_key as string } : {}),
+    ...(slices.length > 1 ? { slices: [...slices].sort((x, y) => x.index - y.index).map((x) => ({ src: x.src, w: x.width, h: x.height })) } : {}),
     ...(clip?.url
       ? { clip: { kind: clip.kind, src: clip.url, w: clip.width, h: clip.height, ms: clip.durationMs, ...(clip.rect ? { rect: { x: clip.rect.x, y: clip.rect.y, w: clip.rect.width, h: clip.rect.height } } : {}) } }
       : {}),

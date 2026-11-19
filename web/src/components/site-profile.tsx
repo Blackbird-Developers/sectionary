@@ -8,7 +8,7 @@ import { ArrowRight, ExternalLink, Route } from "lucide-react";
 import { StoreIcon } from "@/components/store-icon";
 import { BlockViewer } from "@/components/block-viewer";
 import { ViewportSwitch } from "@/components/viewport-switch";
-import { PageModeSwitch, PageViewer, type PageBlocks, type PageMode } from "@/components/page-viewer";
+import { PageModeSwitch, PageViewer, preloadCapture, type PageBlocks, type PageMode } from "@/components/page-viewer";
 import { cn } from "@/lib/utils";
 import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 import { assetUrl } from "@/lib/data-source";
@@ -42,10 +42,11 @@ export function SiteProfileView({ host }: { host: string }) {
   // they load; the window opens at once and fills in.
   const [open, setOpen] = useState<OpenPage | null>(null);
 
-  const openPage = useCallback((page: ProfilePage) => {
+  // `from` is the store the page belongs to: this profile's, or another's for a similar page.
+  const openPage = useCallback((page: ProfilePage, from: string) => {
     const viewport: Viewport = page.desktopBlocks.length || page.desktop || !(page.mobileBlocks.length || page.mobile) ? "desktop" : "mobile";
-    setOpen({ page, blocks: null, viewport, mode: "page", at: 0 });
-    blocksOf(page).then(
+    setOpen({ page, host: from, blocks: null, viewport, mode: "page", at: 0 });
+    blocksOf(page, from).then(
       (blocks) => setOpen((o) => (o?.page.key === page.key ? { ...o, blocks } : o)),
       () => setOpen((o) => (o?.page.key === page.key ? { ...o, blocks: { desktop: [], mobile: [] } } : o)),
     );
@@ -231,7 +232,7 @@ export function SiteProfileView({ host }: { host: string }) {
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
               {pages.map((page) => (
                 <li key={page.key}>
-                  <PageCard page={page} busy={open?.page.key === page.key && !open.blocks} onOpen={() => openPage(page)} />
+                  <PageCard page={page} busy={open?.page.key === page.key && !open.blocks} onOpen={() => openPage(page, store.host)} />
                 </li>
               ))}
             </ul>
@@ -251,7 +252,8 @@ export function SiteProfileView({ host }: { host: string }) {
         onMode={setMode}
         focus={open?.at ?? 0}
         onClose={() => closeMode("page")}
-        siteHost={host}
+        siteHost={store.host}
+        pageHost={open?.host}
         similar={similarPages.length > 0 ? <SimilarPages pages={similarPages} onOpen={openPage} /> : undefined}
       />
       <SectionViewer
@@ -272,14 +274,16 @@ export function SiteProfileView({ host }: { host: string }) {
 }
 
 /** Pages like the open one from other stores: a click opens that page in the same window. */
-function SimilarPages({ pages, onOpen }: { pages: SimilarPage[]; onOpen: (page: ProfilePage) => void }) {
+function SimilarPages({ pages, onOpen }: { pages: SimilarPage[]; onOpen: (page: ProfilePage, from: string) => void }) {
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
       {pages.map(({ store, page }) => (
         <li key={page.key}>
           <button
             type="button"
-            onClick={() => onOpen(page)}
+            onClick={() => onOpen(page, store.host)}
+            onPointerEnter={() => preloadCapture(page.desktop ?? page.mobile)}
+            onFocus={() => preloadCapture(page.desktop ?? page.mobile)}
             aria-label={`${PAGE_TYPE_LABEL[page.type] ?? page.type} page from ${store.host}`}
             className="group block w-full overflow-hidden rounded-xl border border-white/10 bg-card text-left outline-none transition-colors duration-150 hover:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring"
           >
@@ -301,6 +305,9 @@ function PageCard({ page, busy, onOpen }: { page: ProfilePage; busy: boolean; on
     <button
       type="button"
       onClick={onOpen}
+      // About to be opened: start on its full-size screenshot, so the page opens sharp.
+      onPointerEnter={() => preloadCapture(page.desktop ?? page.mobile)}
+      onFocus={() => preloadCapture(page.desktop ?? page.mobile)}
       aria-busy={busy}
       disabled={page.blockCount === 0}
       className={cn(
@@ -373,6 +380,8 @@ export function Stack({ src, blocks, ratio }: { src: string | null; blocks: Bloc
 
 type OpenPage = {
   page: ProfilePage;
+  /** The store the page belongs to, which need not be the host in its URL. */
+  host: string;
   blocks: PageBlocks | null;
   viewport: Viewport;
   mode: PageMode;
@@ -383,13 +392,16 @@ type OpenPage = {
 
 /**
  * A page's blocks at both viewports, top to bottom: the sample carries them,
- * the API sends them on request.
+ * the API sends them on request, for the store (`host`) the page belongs to.
  */
-async function blocksOf(page: ProfilePage): Promise<PageBlocks> {
+async function blocksOf(page: ProfilePage, host: string): Promise<PageBlocks> {
   if (page.desktopBlocks.length || page.mobileBlocks.length) return { desktop: page.desktopBlocks, mobile: page.mobileBlocks };
   if (page.blockCount === 0) return { desktop: [], mobile: [] };
-  const { desktop, mobile } = await loadPageBlocks(new URL(page.url).host, page.url);
-  return { desktop, mobile };
+  // By the store's host, which is how the API files its pages: the page's own
+  // URL is often on another one ("www.ulta.com" for ulta.com), and asking under
+  // that finds no blocks, which left the page as its small thumbnail blown up.
+  const { desktop, mobile, shots } = await loadPageBlocks(host, page.url);
+  return { desktop, mobile, shots };
 }
 
 /**

@@ -104,3 +104,106 @@ export function thumbOf(block: Block): string | undefined {
   const thumb = (block as Block & { thumb?: string }).thumb;
   return thumb && block.h <= block.w * 2 ? thumb : undefined;
 }
+
+/**
+ * One file of a block's screenshot. `w` and `h` give its shape: the file's
+ * pixels for a slice, the block's CSS size for a whole screenshot.
+ */
+export type Shot = { src: string; w: number; h: number };
+
+/** Rows in one slice of a tall screenshot: DEFAULT_SLICE_HEIGHT in the image pipeline (src/images.ts). */
+const SLICE_ROWS = 8192;
+
+/** Screenshots are captured at two image pixels per CSS pixel. */
+const CAPTURE_SCALE = 2;
+
+/**
+ * The files that make up the block's screenshot, top to bottom. WebP stops at
+ * 16,383 rows, so the image pipeline cuts a taller screenshot into slices
+ * ("…_s000.webp", "…_s001.webp") and `src` is only the first of them: drawn
+ * alone over the block's whole height it is stretched and blurred. Draw each
+ * shot at full width and its own height, one under the other.
+ *
+ * /api/blocks sends `slices` ahead of the contract, the way `thumb` arrives.
+ * Without it the slices are worked out from the first one's name and the
+ * block's height, which is how the pipeline cut them.
+ */
+export function shotsOf(block: Block): Shot[] {
+  const sent = (block as Block & { slices?: Shot[] }).slices;
+  if (sent && sent.length > 0) return sent;
+  const first = /^(.*)_s000(\.webp(?:\?.*)?)$/.exec(block.src);
+  if (!first) return [{ src: block.src, w: block.w, h: block.h }];
+  const w = block.w * CAPTURE_SCALE;
+  const rows = Math.max(1, Math.round(block.h * CAPTURE_SCALE));
+  const shots: Shot[] = [];
+  for (let top = 0; top < rows; top += SLICE_ROWS) {
+    shots.push({ src: `${first[1]}_s${String(shots.length).padStart(3, "0")}${first[2]}`, w, h: Math.min(SLICE_ROWS, rows - top) });
+  }
+  return shots;
+}
+
+/**
+ * Where a page's full-size screenshot is, worked out from its thumbnail's
+ * address. The image pipeline stores "…/desktop_thumb.webp" beside
+ * "…/desktop.webp", or beside "…/desktop_s000.webp", "…/desktop_s001.webp"
+ * and so on when the page is taller than WebP allows; which of the two, and
+ * how many slices, only loading them tells. Null when the address is not a
+ * thumbnail's.
+ */
+export function captureFiles(thumb: string): { whole: string; slice: (n: number) => string } | null {
+  const found = /^(.*)_thumb(\.webp(?:\?.*)?)$/.exec(thumb);
+  if (!found) return null;
+  return { whole: `${found[1]}${found[2]}`, slice: (n) => `${found[1]}_s${String(n).padStart(3, "0")}${found[2]}` };
+}
+
+/** How far down its page a block starts, in CSS pixels, when the source says (/api/sites/[host]/page does, ahead of the contract). */
+function topOf(block: Block): number | undefined {
+  const top = (block as Block & { top?: number }).top;
+  return typeof top === "number" && Number.isFinite(top) ? top : undefined;
+}
+
+/**
+ * Where each block starts on a page `pageHeight` CSS pixels tall: where the
+ * capture measured it, when every block says. Otherwise an estimate: the
+ * blocks one after another, scaled to the page's height, which is right for
+ * a page of full-width sections and near enough for the rest.
+ */
+function blockTops(blocks: Block[], pageHeight: number): number[] {
+  const measured = blocks.map(topOf);
+  if (measured.every((top) => top !== undefined)) return measured as number[];
+  const total = blocks.reduce((sum, b) => sum + b.h, 0) || 1;
+  let above = 0;
+  return blocks.map((b) => {
+    const top = (above / total) * pageHeight;
+    above += b.h;
+    return top;
+  });
+}
+
+/** How far down a page (`pageHeight` CSS pixels tall) block `at` of `blocks` starts. */
+export function blockTop(blocks: Block[], at: number, pageHeight: number): number {
+  return blockTops(blocks, pageHeight)[at] ?? 0;
+}
+
+/**
+ * The block at height `y` on a page, both in CSS pixels: the one that spans
+ * it (the first of them, where blocks sit side by side), else the nearest.
+ * -1 for a page with no blocks.
+ */
+export function blockAt(blocks: Block[], y: number, pageHeight: number): number {
+  const tops = blockTops(blocks, pageHeight);
+  const scale = blocks.every((b) => topOf(b) !== undefined) ? 1 : pageHeight / (blocks.reduce((sum, b) => sum + b.h, 0) || 1);
+  let nearest = -1;
+  let gap = Infinity;
+  for (let i = 0; i < blocks.length; i++) {
+    const top = tops[i];
+    const bottom = top + blocks[i].h * scale;
+    if (y >= top && y < bottom) return i;
+    const away = y < top ? top - y : y - bottom;
+    if (away < gap) {
+      gap = away;
+      nearest = i;
+    }
+  }
+  return nearest;
+}
