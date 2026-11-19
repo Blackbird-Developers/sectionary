@@ -282,6 +282,15 @@ gets a clip too: after the screenshots, the crawler presses the slideshow's
 own next arrow (or its dots, or scrolls it) three times while recording. Its
 `clip.kind` is `carousel`; nothing else in the contract changes.
 
+With `--product`, on product pages, three interactions are recorded after
+everything else (src/product-clips.ts). The photo gallery's thumbnails are
+clicked, and the clip (`carousel`) goes on the product block when it has none
+yet. Two new ordinary blocks may be added, continuing the viewport's block
+indexes after any moment panels: `product-options` (the option pickers, its
+clip showing two other choices being made) and `size-guide` (the panel the
+size guide opens, its clip showing it appear). Both clips are kind
+`animation`. The importer, API and player take them as they are.
+
 - `motionHint` on a block says why the crawler looked at it. It is present
   whenever the crawler looked, even when nothing was recorded (most
   slideshows do not play on their own).

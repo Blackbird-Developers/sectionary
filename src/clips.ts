@@ -128,9 +128,9 @@ export function diffShare(a: Buffer, b: Buffer, level = CLIP_THRESHOLDS.diffLeve
   return diff / n;
 }
 
-type Control = { aborted: boolean };
+export type Control = { aborted: boolean };
 
-async function step(ctl: Control, page: Page, ms: number): Promise<void> {
+export async function step(ctl: Control, page: Page, ms: number): Promise<void> {
   if (ctl.aborted) throw new Error('aborted');
   await sleep(page, ms);
   if (ctl.aborted) throw new Error('aborted');
@@ -161,7 +161,7 @@ function recordMs(hint: MotionHint, videoSeconds: number): number {
   return 5000;
 }
 
-type RecordPlan = {
+export type RecordPlan = {
   placed: Placement;
   /** The clip's planned length in page time. */
   contentMs: number;
@@ -176,6 +176,8 @@ type RecordPlan = {
   untilChange?: boolean;
   /** Runs once the recording has started; wait(ms) waits that long in page time. The recording stops when it returns. */
   during?: (wait: (pageMs: number) => Promise<void>) => Promise<void>;
+  /** Use the screenshot loop on desktop too (a picture every time, even while nothing moves): interactions. */
+  loop?: boolean;
 };
 
 /**
@@ -185,10 +187,13 @@ type RecordPlan = {
  * second of clip (time-warp.ts) and puts the speed back after, whatever happens. The screencast is at least as
  * fast as those shots, so on desktop the slowdown errs on the safe side. Fills `out` when frames were recorded.
  */
-async function recordFrames(page: Page, env: ClipEnv, framesDir: string, ctl: Control, out: RawClip, plan: RecordPlan): Promise<void> {
+export async function recordFrames(page: Page, env: ClipEnv, framesDir: string, ctl: Control, out: RawClip, plan: RecordPlan): Promise<void> {
   const size = page.viewportSize() || { width: 1440, height: 900 };
   const dpr = await page.evaluate(() => window.devicePixelRatio).catch(() => 1);
   const phone = size.width < 768;
+  // The screenshot loop takes a picture whatever happens on screen; the screencast only when something changes,
+  // which an instant popup can leave at one frame (spanx.com size guide, 18 Nov 2026). Interactions ask for the loop.
+  const useLoop = phone || !!plan.loop;
   const m = 8;
   const r = plan.placed.rect;
   const x0 = Math.max(0, Math.floor(r.x) - m);
@@ -234,7 +239,7 @@ async function recordFrames(page: Page, env: ClipEnv, framesDir: string, ctl: Co
     if (plan.beforeStart) await plan.beforeStart();
     const t0 = Date.now();
     let loop: Promise<void> = Promise.resolve();
-    if (phone) {
+    if (useLoop) {
       loop = (async () => {
         while (!stop) {
           const res = await shot().catch(() => null);
@@ -278,7 +283,7 @@ async function recordFrames(page: Page, env: ClipEnv, framesDir: string, ctl: Co
       }
     } finally {
       stop = true;
-      if (!phone) await cdp.send('Page.stopScreencast').catch(() => {});
+      if (!useLoop) await cdp.send('Page.stopScreencast').catch(() => {});
       await loop.catch(() => {});
       await Promise.all(writes).catch(() => {});
     }
@@ -289,7 +294,7 @@ async function recordFrames(page: Page, env: ClipEnv, framesDir: string, ctl: Co
     out.rect = plan.placed.rect;
     out.block = plan.placed.block;
     out.viewportWidth = size.width;
-    if (phone) out.frameRegion = region;
+    if (useLoop) out.frameRegion = region;
     out.slowdown = k;
   } finally {
     if (k > 1) await setPageRate(page, cdp, 1).catch(() => {});
@@ -391,23 +396,31 @@ async function changed(dir: string, frames: { file: string }[]): Promise<boolean
  * the slider itself, so something else moving in the block (abelfragrance.com's drifting colour gradient,
  * 18 Nov 2026) does not count as the slider moving.
  */
-async function changedAnywhere(dir: string, frames: { file: string }[], crop?: { left: number; top: number; width: number; height: number }): Promise<boolean> {
+export async function changedAnywhere(
+  dir: string,
+  frames: { file: string }[],
+  crop?: { left: number; top: number; width: number; height: number },
+  /** Small changes matter for some interactions (a price, a selected option): compare finer, with a lower bar. */
+  fine?: { size: number; share: number },
+): Promise<boolean> {
   if (frames.length < 2) return false;
+  const px = fine?.size ?? 64;
+  const bar = fine?.share ?? CLIP_THRESHOLDS.movingShare;
   const small = async (f: string) => {
     let img = sharp(await readFile(path.join(dir, f)));
     if (crop) img = img.extract(crop);
-    return img.resize({ width: 64, height: 64, fit: 'fill' }).greyscale().raw().toBuffer();
+    return img.resize({ width: px, height: px, fit: 'fill' }).greyscale().raw().toBuffer();
   };
   const a = await small(frames[0].file);
   for (const q of [0.25, 0.5, 0.75, 1]) {
     const f = frames[Math.min(frames.length - 1, Math.max(1, Math.round((frames.length - 1) * q)))];
-    if (diffShare(a, await small(f.file)) > CLIP_THRESHOLDS.movingShare) return true;
+    if (diffShare(a, await small(f.file)) > bar) return true;
   }
   return false;
 }
 
 /** Runs one candidate inside its time limit; on timeout it is aborted and marked failed. */
-async function withLimit(limitMs: number, out: RawClip, run: (ctl: Control) => Promise<void>): Promise<void> {
+export async function withLimit(limitMs: number, out: RawClip, run: (ctl: Control) => Promise<void>): Promise<void> {
   const ctl: Control = { aborted: false };
   const work = run(ctl).catch((e: Error) => {
     if (e.message !== 'aborted') {
@@ -434,7 +447,7 @@ const describe = (c: RawClip) =>
   `${c.verdict}${c.error ? ' ' + c.error : ''}${c.frames ? ` · ${c.frames.length} frames` : ''}${c.slowdown ? ` · slowed x${c.slowdown}` : ''}${c.captureFps ? ` (${c.captureFps} shots/s)` : ''} · ${(c.ms / 1000).toFixed(1)}s`;
 
 /** The slider's own box in frame pixels, for changedAnywhere; undefined when it cannot be worked out. */
-async function sliderCrop(out: RawClip, focus: Placement['focus'], vh: number): Promise<{ left: number; top: number; width: number; height: number } | undefined> {
+export async function sliderCrop(out: RawClip, focus: Placement['focus'], vh: number): Promise<{ left: number; top: number; width: number; height: number } | undefined> {
   if (!focus || !out.frames?.length || !out.framesDir || !out.viewportWidth) return undefined;
   const meta = await sharp(path.join(out.framesDir, out.frames[0].file)).metadata();
   const fw = meta.width || 0;
@@ -480,6 +493,20 @@ export async function recordClips(page: Page, env: ClipEnv): Promise<RawClip[]> 
 }
 
 const sameDoc = (u: string) => u.split('#')[0];
+
+/**
+ * A real click (desktop) or tap (phones) on the element matching `sel` when it is fully on screen and nothing
+ * covers it, else a click from inside the page (no scrolling, no hover). False when it is gone.
+ */
+export async function pressSelector(page: Page, env: ClipEnv, sel: string): Promise<boolean> {
+  const at = await page.evaluate(controlPoint, sel).catch(() => null);
+  if (at) {
+    if (env.touch) await page.touchscreen.tap(at.x, at.y);
+    else await page.mouse.click(at.x, at.y);
+    return true;
+  }
+  return page.evaluate(clickControl, sel).catch(() => false);
+}
 
 /**
  * Presses the slider once: a real click (desktop) or tap (phones) on its arrow or dot when it is on screen and

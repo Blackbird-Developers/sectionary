@@ -14,6 +14,7 @@ import type { ManifestClip, MomentKind, MotionKind } from '../web/src/contracts/
 import { CLIP_THRESHOLDS, SLIDER_THRESHOLDS, recordClips, recordSliderClips, type RawClip } from './clips.js';
 import { encodeClip } from './clip-encode.js';
 import { TIME_WARP_SCRIPT, setPageRate } from './time-warp.js';
+import { PRODUCT_THRESHOLDS, recordProductClips } from './product-clips.js';
 import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
 import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
@@ -62,9 +63,14 @@ export type CaptureOptions = {
    * Off by default.
    */
   sliders?: boolean;
+  /**
+   * With clips, on product pages (stage 2): the photo gallery's thumbnails, the product options and the size
+   * guide are recorded (src/product-clips.ts); options and size guide become new blocks. Off by default.
+   */
+  product?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false, product: false };
 
 /** At most this many clips per page and viewport (the clips test: 4). */
 const CLIPS_PER_PAGE = 4;
@@ -98,7 +104,7 @@ type CartJob = { fill: boolean; held?: HeldCart };
 export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[]; motionHint?: MotionKind; clip?: ManifestClip };
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[] }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[]; productNotes?: string[] }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -480,7 +486,25 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       const env = { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: SLIDER_THRESHOLDS.maxPerPage, touch: vp === 'mobile', log: () => {} };
       rawClips = [...rawClips, ...(await recordSliderClips(page, env, skip).catch(() => [] as RawClip[]))];
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips };
+    // Stage 2 (Ben, 18 Nov 2026), product pages only, after the sliders: the photo gallery's thumbnails, the
+    // product options and the size guide (src/product-clips.ts). New blocks continue the viewport's indexes.
+    // The bot page says the crawler moves product photos, picks options and opens size guides (released
+    // together, BOT_VERSION 0.6).
+    let productNotes: string[] = [];
+    if (opts.clips && opts.product && kind === 'product' && collected.blocks.length) {
+      await dismissOverlays(page, false);
+      await zeroMotion?.evaluate((s) => (s as Element).remove()).catch(() => {});
+      await page.emulateMedia({ reducedMotion: 'no-preference' }).catch(() => {});
+      await page.waitForTimeout(300);
+      const skip = new Set(rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref));
+      const env = { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: 3, touch: vp === 'mobile', log: () => {} };
+      const firstIndex = blocks.reduce((m, b) => Math.max(m, b.index), 0) + 1;
+      const pr = await recordProductClips(page, env, { pageDir, vp, quality: opts.quality, firstIndex, skip }).catch((e: Error) => ({ clips: [] as RawClip[], blocks: [], notes: [`product step failed: ${e.message.split('\n')[0]}`] }));
+      blocks.push(...pr.blocks);
+      rawClips = [...rawClips, ...pr.clips];
+      productNotes = pr.notes;
+    }
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips, productNotes };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
@@ -522,7 +546,8 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
     const extra =
       (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) +
       (opts.clips ? CLIP_THRESHOLDS.pageMs + CLIP_THRESHOLDS.candidateMs + 10_000 : 0) +
-      (opts.clips && opts.sliders ? SLIDER_THRESHOLDS.pageMs + SLIDER_THRESHOLDS.candidateMs : 0);
+      (opts.clips && opts.sliders ? SLIDER_THRESHOLDS.pageMs + SLIDER_THRESHOLDS.candidateMs : 0) +
+      (opts.clips && opts.product ? PRODUCT_THRESHOLDS.pageMs + PRODUCT_THRESHOLDS.candidateMs : 0);
     timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
   let r: ViewportResult;
@@ -688,6 +713,7 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
         .filter((c) => c.verdict !== 'recorded')
         .map((c) => `${c.pressed ? `slider ${c.ref}` : `${c.motionHint} ${c.ref}`} ${c.verdict}${c.error ? ` (${c.error})` : ''}${c.pressed && c.error === 'navigated' ? ` after pressing "${c.why.split(': ').slice(1).join(': ')}"` : ''}`);
       result.lines.push(`  ${vp} clips: ${clipped.length ? clipped.join(', ') : 'none'}${tried.length ? ` · not recorded: ${tried.join(', ')}` : ''}`);
+      if (r.productNotes?.length) result.lines.push(`  ${vp} product: ${r.productNotes.join(', ')}`);
     }
   }
 
