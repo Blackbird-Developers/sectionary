@@ -5,16 +5,17 @@ library of real website and online-store designs, built by Blackbird.
 
 **What it does.** It visits public pages of online stores the way a browser
 does, once, and takes screenshots of those pages, plus short silent screen
-recordings of the sections that move (slideshows, background videos, scrolling
-text), so designers can study how stores are built. It captures at most a handful of pages per store (home,
+recordings of the sections that move (slideshows, videos, scrolling text), so
+designers can study how stores are built. It captures at most a handful of pages per store (home,
 one or two collections, one or two products) at desktop and phone width, no
 more than one page per second, and identifies itself in every request as
 `SectionaryBot/<version>` with a link to this page.
 
 To show how a page behaves, it may scroll, open the navigation menu, move a
 slideshow or a product's photos to the next one, select a product option, open
-a size guide or a product preview, and take a screenshot or a short recording
-of the result. Anything it opens, it closes again.
+a size guide or a product preview, press play on a video, and take a screenshot
+or a short recording of the result. Anything it opens, it closes again, and any
+video it starts, it pauses again.
 On stores whose robots.txt allows it, it also adds one product to a cart to
 photograph the cart, then empties the cart again. While it does this it blocks
 the store's analytics and ad tracking, so it is not counted as a shopper. It
