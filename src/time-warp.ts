@@ -135,6 +135,9 @@ export async function setPageRate(page: Page, cdp: CDPSession | null, rate: numb
     if (w.__secWarp) w.__secWarp.setRate(r);
     for (const m of Array.from(document.querySelectorAll('video, audio'))) {
       try {
+        // The default too: a video that loads its source after this (a player started by a press) would
+        // otherwise come back to normal speed (play-clips.ts).
+        (m as HTMLMediaElement).defaultPlaybackRate = r;
         (m as HTMLMediaElement).playbackRate = r;
       } catch {
         /* a player that refuses the rate keeps its own */
