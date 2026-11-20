@@ -174,8 +174,12 @@ export type RecordPlan = {
   beforeStart?: () => Promise<void>;
   /** Autoplaying carousels: carry on (up to 10 s of page time) until one slide change was seen, plus 1 s. */
   untilChange?: boolean;
-  /** Runs once the recording has started; wait(ms) waits that long in page time. The recording stops when it returns. */
-  during?: (wait: (pageMs: number) => Promise<void>) => Promise<void>;
+  /**
+   * Runs once the recording has started; wait(ms) waits that long in page time, and slowdown says how many times
+   * slower than real the page runs (media started later must be set to it: play-clips.ts). The recording stops
+   * when it returns.
+   */
+  during?: (wait: (pageMs: number) => Promise<void>, slowdown: number) => Promise<void>;
   /** Use the screenshot loop on desktop too (a picture every time, even while nothing moves): interactions. */
   loop?: boolean;
 };
@@ -265,15 +269,18 @@ export async function recordFrames(page: Page, env: ClipEnv, framesDir: string, 
     }
     const wait = (pageMs: number) => step(ctl, page, Math.round(pageMs * k));
     try {
-      if (plan.during) await plan.during(wait);
+      if (plan.during) await plan.during(wait, k);
       else {
         await wait(contentMs);
         if (plan.untilChange) {
           // Up to 10 s of page time until one slide change has been seen, plus 1 s.
           const limit = Math.min(t0 + 10_000 * k, plan.deadline - 1500);
           while (Date.now() < limit) {
-            await Promise.all(writes);
-            if (frames.length > 1 && (await changed(framesDir, frames))) {
+            // Only frames already on disk: one that arrives during the wait is not written yet (ENOENT on
+            // aetherapparel.com's phone slideshow, 20 Nov 2026). Frame i and write i are pushed together.
+            const n = frames.length;
+            await Promise.all(writes.slice(0, n));
+            if (n > 1 && (await changed(framesDir, frames.slice(0, n)))) {
               await wait(1000);
               break;
             }

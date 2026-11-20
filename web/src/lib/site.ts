@@ -8,7 +8,7 @@
 export const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL || null;
 
 /** Bump when the wording of Terms, Privacy or /bot changes. */
-export const LEGAL_UPDATED = "2026-11-18";
+export const LEGAL_UPDATED = "2026-11-20";
 
 export const LEGAL_PAGES = [
   { href: "/terms", label: "Terms" },

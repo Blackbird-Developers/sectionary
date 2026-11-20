@@ -15,6 +15,7 @@ import { CLIP_THRESHOLDS, SLIDER_THRESHOLDS, recordClips, recordSliderClips, typ
 import { encodeClip } from './clip-encode.js';
 import { TIME_WARP_SCRIPT, setPageRate } from './time-warp.js';
 import { PRODUCT_THRESHOLDS, recordProductClips } from './product-clips.js';
+import { PLAY_THRESHOLDS, recordPlayClips } from './play-clips.js';
 import { finalizeMoments, runMoments, runPopupWatch, type CrawlerMoment, type MomentContext, type MomentResult } from './moments.js';
 import { cartsStopped, clearPending, emptyCart, hasPending, installGuards, loadLines, noteFailed, notePending, noteTry, waitingCarts, CART_ALL_ENV, CART_ALL_VALUE, MAX_WAITING, type CartScope, type HeldCart } from './cart-session.js';
 
@@ -68,9 +69,14 @@ export type CaptureOptions = {
    * guide are recorded (src/product-clips.ts); options and size guide become new blocks. Off by default.
    */
   product?: boolean;
+  /**
+   * With clips (stage 3): videos that wait for a press get their own play button pressed while they are
+   * recorded, then paused again (src/play-clips.ts); a video that opens in a popup becomes a new block. Off by default.
+   */
+  play?: boolean;
 };
 
-export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false, product: false };
+export const DEFAULT_CAPTURE: CaptureOptions = { out: 'data', only: null, maxBlocks: 40, minHeight: 80, quality: 88, viewportTimeoutMs: 150_000, wantLinks: false, moments: [], momentsCartScope: 'own', styles: false, clips: false, sliders: false, product: false, play: false };
 
 /** At most this many clips per page and viewport (the clips test: 4). */
 const CLIPS_PER_PAGE = 4;
@@ -138,7 +144,7 @@ export function fitStyleMetadata(page: PageStylesC, blocks: CapturedBlock[], bud
 }
 
 type ViewportResult =
-  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[]; productNotes?: string[] }
+  | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[]; productNotes?: string[]; playNotes?: string[] }
   | { ok: false; status: number | null; error: string; ms: number };
 
 export type PageResult = {
@@ -538,7 +544,24 @@ async function captureViewportInner(context: BrowserContext, url: string, vp: Vi
       rawClips = [...rawClips, ...pr.clips];
       productNotes = pr.notes;
     }
-    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips, productNotes };
+    // Stage 3 (Ben, 20 Nov 2026), last of all: videos that wait for a press get their own play button pressed
+    // while they are recorded, then are paused again (src/play-clips.ts); one that opens in a popup becomes a new
+    // block. The bot page says the crawler presses play on videos (released together, BOT_VERSION 0.7).
+    let playNotes: string[] = [];
+    if (opts.clips && opts.play && collected.blocks.length) {
+      await dismissOverlays(page, false);
+      await zeroMotion?.evaluate((s) => (s as Element).remove()).catch(() => {});
+      await page.emulateMedia({ reducedMotion: 'no-preference' }).catch(() => {});
+      await page.waitForTimeout(300);
+      const skip = new Set(rawClips.filter((c) => c.verdict === 'recorded').map((c) => c.ref));
+      const env = { context, framesRoot: path.join(pageDir, '_frames', vp), maxClips: PLAY_THRESHOLDS.maxPerPage, touch: vp === 'mobile', log: () => {} };
+      const firstIndex = blocks.reduce((m, b) => Math.max(m, b.index), 0) + 1;
+      const pl = await recordPlayClips(page, env, { pageDir, vp, quality: opts.quality, firstIndex, skip }).catch((e: Error) => ({ clips: [] as RawClip[], blocks: [], notes: [`play step failed: ${e.message.split('\n')[0]}`] }));
+      blocks.push(...pl.blocks);
+      rawClips = [...rawClips, ...pl.clips];
+      playNotes = pl.notes;
+    }
+    return { ok: true, status, site, meta, strategy: collected.strategy, fullFile, fullHeight, blocks, links, finalUrl: page.url(), emptyText, moments, momentNotes, ms: Date.now() - t0, pageStyles: styled?.page ?? null, stylesError, clips: rawClips, productNotes, playNotes };
   } catch (e) {
     return { ok: false, status, error: (e as Error).message.split('\n')[0], ms: Date.now() - t0 };
   }
@@ -581,7 +604,8 @@ async function captureViewport(browser: Browser, url: string, vp: ViewportName, 
       (opts.moments.length ? (job.fill ? 55_000 : 40_000) : 0) +
       (opts.clips ? CLIP_THRESHOLDS.pageMs + CLIP_THRESHOLDS.candidateMs + 10_000 : 0) +
       (opts.clips && opts.sliders ? SLIDER_THRESHOLDS.pageMs + SLIDER_THRESHOLDS.candidateMs : 0) +
-      (opts.clips && opts.product ? PRODUCT_THRESHOLDS.pageMs + PRODUCT_THRESHOLDS.candidateMs : 0);
+      (opts.clips && opts.product ? PRODUCT_THRESHOLDS.pageMs + PRODUCT_THRESHOLDS.candidateMs : 0) +
+      (opts.clips && opts.play ? PLAY_THRESHOLDS.pageMs + PLAY_THRESHOLDS.candidateMs : 0);
     timer = setTimeout(() => resolve({ ok: false, status: null, error: 'page-timeout', ms: Date.now() - t0 }), opts.viewportTimeoutMs + extra);
   });
   let r: ViewportResult;
@@ -752,6 +776,7 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
         .map((c) => `${c.pressed ? `slider ${c.ref}` : `${c.motionHint} ${c.ref}`} ${c.verdict}${c.error ? ` (${c.error})` : ''}${c.pressed && c.error === 'navigated' ? ` after pressing "${c.why.split(': ').slice(1).join(': ')}"` : ''}`);
       result.lines.push(`  ${vp} clips: ${clipped.length ? clipped.join(', ') : 'none'}${tried.length ? ` · not recorded: ${tried.join(', ')}` : ''}`);
       if (r.productNotes?.length) result.lines.push(`  ${vp} product: ${r.productNotes.join(', ')}`);
+      if (r.playNotes?.length) result.lines.push(`  ${vp} play: ${r.playNotes.join(', ')}`);
     }
   }
 

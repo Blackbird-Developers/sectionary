@@ -19,7 +19,7 @@
 //   --clips             also record short clips of blocks that move by themselves (hero videos, slideshows), in slow motion
 //   --sliders           with --clips: also press sliders that only move when pressed, and record them
 //   --product           with --clips: on product pages, record the photo gallery, the product options and the size guide
-//   --product           with --clips: on product pages, record the photo gallery, the product options and the size guide
+//   --play              with --clips: press play on videos that wait for it, record them playing, pause them again
 //   --moments safe      also capture moments (popups, open menus, sticky buy bars; src/moments.ts), own sites only for now
 //   --moments all --moments-cart-scope own|optin|all   also fill one cart per store and photograph it (src/cart-session.ts);
 //                       all also needs MOMENTS_CART_ALL=I_HAVE_SIGN_OFF
@@ -68,6 +68,8 @@ type Options = {
   sliders: boolean;
   /** With clips, on product pages: the photo gallery, the product options and the size guide (stage 2). */
   product: boolean;
+  /** With clips: videos that wait for a press are pressed, recorded and paused again (stage 3). */
+  play: boolean;
   out: string;
   db: string;
   moments: MomentKind[];
@@ -75,7 +77,7 @@ type Options = {
 };
 
 function parseArgs(argv: string[]): Options {
-  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, styles: false, clips: false, sliders: false, product: false, out: 'data', db: '', moments: [], momentsCartScope: 'own' };
+  const o: Options = { seed: null, hosts: [], limit: Infinity, parallel: 3, maxAttempts: 2, retryDelayMs: 300_000, perType: 2, stopAfter: Infinity, enqueueOnly: false, retryFailed: false, recapture: false, report: false, stop: false, force: false, headed: false, styles: false, clips: false, sliders: false, product: false, play: false, out: 'data', db: '', moments: [], momentsCartScope: 'own' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--seed') o.seed = argv[++i];
@@ -97,7 +99,7 @@ function parseArgs(argv: string[]): Options {
     else if (a === '--clips') o.clips = true;
     else if (a === '--sliders') o.sliders = true;
     else if (a === '--product') o.product = true;
-    else if (a === '--product') o.product = true;
+    else if (a === '--play') o.play = true;
     else if (a === '--moments-cart-scope') {
       const v = argv[++i];
       if (v !== 'own' && v !== 'optin' && v !== 'all') {
@@ -522,7 +524,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', onStop);
   process.on('SIGTERM', onStop);
 
-  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out, styles: opts.styles, clips: opts.clips, sliders: opts.sliders, product: opts.product, moments: opts.moments, momentsCartScope: opts.momentsCartScope }, browser: getBrowser, log, stopping: isStopping };
+  const ctx: Ctx = { q, polite, opts, capture: { ...DEFAULT_CAPTURE, out: opts.out, styles: opts.styles, clips: opts.clips, sliders: opts.sliders, product: opts.product, play: opts.play, moments: opts.moments, momentsCartScope: opts.momentsCartScope }, browser: getBrowser, log, stopping: isStopping };
   const todo = q.counts().pending || 0;
   console.log(`${todo} store(s) to capture, ${opts.parallel} at a time -> ${opts.out}/`);
 

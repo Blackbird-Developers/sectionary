@@ -1,2 +1,5 @@
 # Hosts we never capture (opt-outs and takedown requests). One per line,
 # subdomains included automatically, www. ignored. Lines starting with # are comments.
+
+# 20 Nov 2026: hijacked, the store's pages now carry gambling spam ("FOMOTOTO"). Removed from the library the same day.
+beautyrout.com
