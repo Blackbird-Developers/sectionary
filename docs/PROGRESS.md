@@ -7,6 +7,30 @@ PLAN.md changes only when scope does; the board mirrors every work item.
 Earlier sessions are in Ben's vault copy (To Do's/New APP Mobbin Recreate).
 This file starts on 2026-10-01 so every lane can append to it.
 
+## 2026-11-20 · Buna (Lane B)
+
+**SEC-31 in production (AWS).** Merging #55 and #56 deployed to ECS (checked
+by image digest). Production migrations 0001–0016 all applied: 0016 had
+been applied by hand and is now recorded. Backup before any change:
+a full \`pg_dump\` of \`public\`, kept off the repo.
+
+- MCP plans (#56): every plan can connect. Free gets the taxonomy, and every
+  library tool answers with how to upgrade, never data. The trial gets
+  everything plus its end date. Library data stays Pro and Team.
+- Free rule tagger written to production: 81,302 of 117,225 blocks (69.4%)
+  have a \`block_type\` (product 70%, home 62%, collection 76%, cart 80%). The
+  95% target needs the paid AI tagger on the rest (\`--untagged-only\`), and
+  that needs the owner's spend approval.
+- \`benchmarks\` run on production: 2,444 rows, none under n = 10 (page length,
+  block count, images per screen, block types per page). Store design profiles:
+  0, because no production capture has \`--styles\` yet.
+- The 20-store accuracy review is ready to do: [ACCURACY-REVIEW.md](ACCURACY-REVIEW.md).
+- Open: \`PLAN_GATES\` and the Paddle prices are not set on the ECS service;
+  the Vercel URL has not changed since about 3 Nov; \`account:acceptance\` fails one
+  check on \`main\` ("Free: filters other than Store and Block type are
+  dropped", 86 vs 172), which needs its own fix. \`blimp_compare_stores\` waits for
+  the compare pilot.
+
 ## 2026-11-19 · Codex
 
 **SEC-31 repository completion pass.** The contract gaps found in review are
