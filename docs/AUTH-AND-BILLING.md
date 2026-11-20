@@ -84,6 +84,7 @@ set on first sign-in). After that it is Free unless it pays.
 | Copy as brief, time machine | no | no | yes |
 | Copy image, source page link | no | no | yes |
 | Boards and share links | no | no new boards or additions; the ones you have stay readable, shareable, editable, deletable | yes |
+| Blimp MCP (AI tools, docs/MCP.md) | no: needs a key | a key connects and lists the filter values; every library tool answers with how to upgrade, never data | everything (the trial adds when it ends to each answer) |
 | Price shown (hypothesis, PLAN.md) | | $0 | $12 a month, $96 a year; Team $20 a seat a month, $192 a year |
 
 Each gate is one call, `can(access, feature)` in `web/src/server/plans.ts`,

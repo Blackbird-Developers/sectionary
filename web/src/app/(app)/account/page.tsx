@@ -121,7 +121,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       />
 
       {apiKeys && (
-        <ApiKeysCard keys={apiKeys} endpoint={`${configuredOrigin() ?? "http://localhost:3000"}/api/mcp`} allowed={can(access, "mcp")} max={MAX_KEYS} />
+        <ApiKeysCard keys={apiKeys} endpoint={`${configuredOrigin() ?? "http://localhost:3000"}/api/mcp`} full={can(access, "mcp")} max={MAX_KEYS} />
       )}
 
       <PlanPicker

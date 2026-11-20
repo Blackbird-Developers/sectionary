@@ -15,13 +15,13 @@ type Props = {
   keys: ApiKeyInfo[];
   /** This site's /api/mcp, for the setup line. */
   endpoint: string;
-  /** The account's plan includes the MCP server. */
-  allowed: boolean;
+  /** The account's plan includes the library tools (Pro, Team, trial). On Free a key still connects. */
+  full: boolean;
   max: number;
 };
 
 /** API keys for the Blimp MCP server (SEC-31): make one, copy it once, revoke it. */
-export function ApiKeysCard({ keys, endpoint, allowed, max }: Props) {
+export function ApiKeysCard({ keys, endpoint, full, max }: Props) {
   const [state, create, pending] = useActionState(createApiKeyAction, idle);
   const id = useId();
   const error = state.status === "error" ? state.message : null;
@@ -53,9 +53,14 @@ export function ApiKeysCard({ keys, endpoint, allowed, max }: Props) {
         </ul>
       )}
 
-      {!allowed ? (
-        <p className="rounded-lg border border-dashed p-3 text-[13px] text-muted-foreground">The MCP server comes with Pro.</p>
-      ) : keys.length >= max ? (
+      {!full && (
+        <p className="rounded-lg border border-dashed p-3 text-[13px] text-muted-foreground">
+          On Free, a key connects your AI tool and lists Blimp&apos;s filter values. Searching and reading the library comes with Pro:
+          your tool will say so when it asks. <a href="#plans" className="text-link underline-offset-2 hover:underline">See plans</a>
+        </p>
+      )}
+
+      {keys.length >= max ? (
         <p className="text-[13px] text-muted-foreground">You have {max} keys, the most an account can hold. Revoke one to make another.</p>
       ) : (
         <form action={create} className="flex flex-col gap-2" noValidate>
