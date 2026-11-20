@@ -75,6 +75,7 @@ test("Sonnet is the default model, Haiku the cheaper option, both from the envir
 test("prices: known models, env override, and no price means no submission", () => {
   assert.deepEqual(priceOf("claude-sonnet-5-5", {}), { input: 2, output: 10 });
   assert.deepEqual(priceOf("claude-haiku-4-5", {}), { input: 1, output: 5 });
+  assert.deepEqual(priceOf("claude-haiku-5-5", {}), { input: 0.1, output: 0.5 });
   assert.deepEqual(priceOf("claude-x", { TAGGER_PRICE_INPUT: "3", TAGGER_PRICE_OUTPUT: "15" }), { input: 3, output: 15 });
   assert.throws(() => priceOf("claude-unknown-9", {}), /TAGGER_PRICE_INPUT/);
 });
@@ -108,6 +109,7 @@ test("a request carries the screenshot, the cached system prompt and the taxonom
   const schema = sonnet.params.output_config?.format?.schema as { properties: { block_type: { enum: string[] } } };
   assert.equal(schema.properties.block_type.enum.length, 47);
   assert.equal("thinking" in buildRequest(block, image, "claude-haiku-4-5", {}).params, false);
+  assert.deepEqual(buildRequest(block, image, "claude-haiku-5-5", {}).params.thinking, { type: "disabled" });
 });
 
 test("the input hash changes with the inputs, the model and nothing else", () => {
