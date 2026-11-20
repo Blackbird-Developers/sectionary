@@ -42,6 +42,7 @@ test("every migration applies on a fresh Postgres 17, in order", () => {
     "0004_search.sql", "0005_image_slices.sql", "0006_tagger.sql", "0007_search_terms_taxonomy.sql", "0008_rls_new_tables.sql",
     "0009_accounts_billing.sql", "0010_trial_two_step.sql", "0011_security_hardening.sql", "0012_app_role.sql", "0013_api_keys.sql",
     "0014_design_metadata.sql", "0015_block_clips.sql", "0016_saved_library_and_sites.sql",
+    "0017_wall_covering_indexes.sql",
   ]);
 });
 
