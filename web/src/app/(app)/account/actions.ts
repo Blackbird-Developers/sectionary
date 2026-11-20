@@ -11,7 +11,6 @@ import { revalidatePath } from "next/cache";
 import { clientIp, hit, limitKey, RateLimitError } from "@/server/rate-limit";
 import { configuredOrigin } from "@/server/site-url";
 import { ApiKeyError, createApiKey, revokeApiKey } from "@/server/api-keys";
-import { accessOf, can } from "@/server/plans";
 
 // SEC-27 sign-in and SEC-28 billing actions. Thin: the work is in src/server.
 
@@ -240,11 +239,14 @@ export type ApiKeyState =
   | { status: "created"; key: string; name: string }
   | { status: "error"; message: string };
 
-/** A new key for the MCP server. The key is in the answer once and never again. */
+/**
+ * A new key for the MCP server. The key is in the answer once and never again.
+ * Any plan may make one: on Free the key connects and lists the filter values,
+ * and the library tools answer with how to upgrade (server/mcp/tools.ts).
+ */
 export async function createApiKeyAction(_prev: ApiKeyState, form: FormData): Promise<ApiKeyState> {
   const user = await currentUser();
   if (!user) return { status: "error", message: "Sign in again first." };
-  if (!can(accessOf(user), "mcp")) return { status: "error", message: "The MCP server comes with Pro." };
   let created: Awaited<ReturnType<typeof createApiKey>>;
   try {
     await hit([{ key: `api-key:u:${user.id}`, max: 10, windowSeconds: 60 * MINUTE }], "Too many new keys for now. Wait a while, then try again.");
