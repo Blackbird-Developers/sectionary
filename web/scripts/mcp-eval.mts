@@ -259,6 +259,9 @@ check("/api/taxonomy: the MCP's lists", tax.body.blockTypes?.length === mcpTax.b
   tax.body.platforms?.find((p: { value: string }) => p.value === "shopify")?.stores === expected.q9);
 
 const styled = (await call("blimp_search_blocks", { store: "myzoobox.com", page_type: "product", viewport: "desktop", limit: 1 })).data.items[0];
+const selectedDetail = (await call("blimp_get_block", { id: styled.id, include: ["outline"] })).data;
+check("blimp_get_block: include returns only the requested optional detail", Array.isArray(selectedDetail.outline) &&
+  !("style" in selectedDetail) && !("text" in selectedDetail) && !("image_url" in selectedDetail));
 const detail = await get(api.block, `/api/blocks/${styled.id}`, { id: styled.id });
 check("/api/blocks/[id]: the Block plus style and outline", detail.body.id === styled.id && typeof detail.body.src === "string" &&
   detail.body.style !== null && Array.isArray(detail.body.outline) && "blockType" in detail.body && "taggerVersion" in detail.body);
@@ -278,6 +281,53 @@ if (process.argv.includes("--write-fixtures")) {
 const allCalls = calls.join("\n");
 const apiLeaks = ["\"classes\"", "\"tag\"", "\"elementId\"", "\"html\"", "\"css\"", "<div", "class="].filter((s) => allCalls.includes(s));
 check(`no source in any API response either (${calls.length} responses in all)`, !apiLeaks.length, apiLeaks.join(", "));
+
+// ---------------------------------------------------------------- plans: Free, trial and Pro over the same route
+
+/** An account with a key and its own MCP client. `trial` days left: 0 = Free (trial over), null = paid Pro. */
+async function accountClient(email: string, trialDays: number | null) {
+  const id = crypto.randomUUID();
+  await local.db.query("INSERT INTO auth.users (id) VALUES ($1)", [id]);
+  await accounts.upsertUser(id, email);
+  if (trialDays === null) await local.db.query("UPDATE users SET plan='pro', plan_status='active' WHERE id=$1", [id]);
+  else await local.db.query("UPDATE users SET plan='free', trial_ends_at=now() + make_interval(days => $2) WHERE id=$1", [id, trialDays === 0 ? -1 : trialDays]);
+  const { key: k } = await apiKeys.createApiKey(id, "evaluation");
+  const c = new Client({ name: "blimp-eval-plans", version: "1.0.0" });
+  await c.connect(new StreamableHTTPClientTransport(new URL("http://app.test/api/mcp"), {
+    fetch: (url, init) => route.POST(new Request(url, init)),
+    requestInit: { headers: { authorization: `Bearer ${k}` } },
+  }));
+  return c;
+}
+const textOf = (r: { content: unknown }) => (r.content as { text?: string }[]).map((c) => c.text ?? "").join("\n");
+
+console.log("");
+const LIBRARY_CALLS: [string, Record<string, unknown>][] = [
+  ["blimp_search_blocks", { query: "footer" }], ["blimp_get_block", { id: styled.id }], ["blimp_search_stores", {}],
+  ["blimp_get_store", { host: "myzoobox.com" }], ["blimp_get_store_design", { host: "myzoobox.com" }],
+  ["blimp_get_page_profile", { host: "myzoobox.com", page_type: "product" }], ["blimp_get_store_flow", { host: "myzoobox.com" }],
+  ["blimp_get_benchmark", { page_type: "home" }], ["blimp_find_similar_blocks", { id: styled.id }],
+];
+
+const freeClient = await accountClient("free@blimp.test", 0);
+const freeTools = (await freeClient.listTools()).tools.map((t) => t.name);
+check("Free: connects and lists all ten tools (no 402)", freeTools.length === tools.length, `${freeTools.length} tools`);
+const freeTax = await freeClient.callTool({ name: "blimp_list_taxonomy", arguments: {} });
+check("Free: blimp_list_taxonomy answers", !freeTax.isError && Boolean(freeTax.structuredContent), textOf(freeTax).slice(0, 200));
+const freeAnswers = await Promise.all(LIBRARY_CALLS.map(async ([name, args]) => ({ name, r: await freeClient.callTool({ name, arguments: args }) })));
+const leaked = freeAnswers.filter(({ r }) => !r.isError || r.structuredContent !== undefined || !/needs Blimp Pro/.test(textOf(r)) || !textOf(r).includes("/account"));
+check(`Free: the ${LIBRARY_CALLS.length} library tools answer with how to upgrade, and no data`, !leaked.length, leaked.map((l) => l.name).join(", "));
+const freeLeaks = freeAnswers.map(({ r }) => textOf(r)).join("\n");
+check("Free: no store, block or design value in any answer", !/myzoobox|footer|#[0-9a-f]{6}/i.test(freeLeaks), freeLeaks.slice(0, 200));
+await freeClient.close();
+
+const trialClient = await accountClient("trial@blimp.test", 3);
+const trialAnswer = await trialClient.callTool({ name: "blimp_search_blocks", arguments: { query: "footer" } });
+check("Trial: library tools answer, with when the trial ends", !trialAnswer.isError && Boolean(trialAnswer.structuredContent) && /trial: ends/.test(textOf(trialAnswer)), textOf(trialAnswer).slice(-200));
+await trialClient.close();
+
+const proAnswer = await client.callTool({ name: "blimp_search_blocks", arguments: { query: "footer" } });
+check("Pro: library tools answer, with no trial or upgrade note", !proAnswer.isError && !/trial|needs Blimp Pro/i.test(textOf(proAnswer)), textOf(proAnswer).slice(-200));
 
 await client.close();
 await local.stop();

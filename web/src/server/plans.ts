@@ -38,6 +38,20 @@ export function accessOf(user: { plan: Plan; trialEndsAt: string | null } | null
   return inTrial(user) ? "pro" : "free";
 }
 
+/**
+ * How the MCP server serves an account. "open" (gates off) and "paid" get every
+ * tool; "trial" gets every tool with a note saying when the trial ends; "free"
+ * can connect and list the filter values, and every library tool answers with
+ * how to upgrade instead of data. The "mcp" feature stays Pro and Team (owner
+ * decision, 18 Nov 2026): Free never receives library data through the MCP.
+ */
+export type McpTier = "open" | "paid" | "trial" | "free";
+export function mcpTier(user: { plan: Plan; trialEndsAt: string | null }, now = Date.now()): McpTier {
+  if (!gatesOn()) return "open";
+  if (isPaid(user.plan)) return "paid";
+  return inTrial(user, now) ? "trial" : "free";
+}
+
 /** The filters Free and signed-out viewers keep: Store and Block type, and the Web / Mobile switch (vp). */
 export const FREE_FILTERS = new Set(["host", "block", "vp"]);
 

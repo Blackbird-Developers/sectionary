@@ -132,7 +132,9 @@ Types in `web/src/contracts/design.ts`.
   served to signed-in accounts and MCP keys only; benchmarks across stores
   are public.
 
-Run `profile-sites` then `benchmarks` after every import.
+The importer runs `profile-sites` then `benchmarks` after every import. They
+remain available as standalone repair/rebuild commands. Run `embed` explicitly
+afterward because it calls a paid external service.
 
 ### Design data API (additive, SEC-31)
 

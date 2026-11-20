@@ -32,7 +32,7 @@ export async function profileInputs(sql: postgres.Sql, siteId: string): Promise<
   return rows.map((r) => ({
     pageType: String(r.type),
     url: String(r.url),
-    capturedAt: (r.captured_at as Date).toISOString(),
+    capturedAt: new Date(r.captured_at as string | Date).toISOString(),
     styles: r.page_styles as Partial<Record<Viewport, PageStyles>>,
     productRatios: ["product", "collection"].includes(String(r.type))
       ? ratios.filter((x) => x.capture_id === r.capture_id).map((x) => String(x.ratio)) : [],
@@ -52,7 +52,10 @@ export async function profileSites(sql: postgres.Sql, opts: { host?: string; log
   for (const site of sites) {
     const profile = buildDesignProfile(await profileInputs(sql, site.id));
     if (!profile) continue;
-    await sql`UPDATE sites SET design_profile = ${sql.json(JSON.parse(JSON.stringify(profile)))}, design_profile_at = now(), updated_at = now() WHERE id = ${site.id}`;
+    // Bind JSON as text and cast explicitly. postgres.js' json helper is fine
+    // against Postgres itself, but PGlite's socket protocol can expose the
+    // helper wrapper as an object instead of its encoded string.
+    await sql`UPDATE sites SET design_profile = ${JSON.stringify(profile)}::text::jsonb, design_profile_at = now(), updated_at = now() WHERE id = ${site.id}`;
     written += 1;
     log(`  ${site.host}: ${profile.sources.length} page type(s). ${profile.summary}`);
   }

@@ -6,6 +6,7 @@ import { decodeCursor, encodeCursor, MAX_ITEMS, PAGE_TYPES, unknownValue, withou
 import { appName, findBlocks, findStores, getBlock, getStore, isTypeHint, libraryTaxonomy, similarBlocks, STYLE_NOTE, type McpBlock } from "@/server/mcp/data";
 import { benchmarks, PAGE_STYLE_NOTE, pageProfile, storeDesign, storeFlow } from "@/server/design";
 import { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "@/contracts/design";
+import type { McpTier } from "@/server/plans";
 
 // The Blimp MCP server (SEC-31, brief section 9). v1: taxonomy, block and
 // store search, one block, one store. v2: store design, page profile, flow,
@@ -15,6 +16,7 @@ import { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "@/c
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const VIEWPORTS = ["desktop", "mobile"] as const;
+const BLOCK_INCLUDES = ["outline", "style", "text", "image"] as const;
 
 // ---------------------------------------------------------------- output shapes
 
@@ -63,18 +65,51 @@ function check(field: string, value: string | undefined, valid: readonly string[
 
 // ---------------------------------------------------------------- the server
 
-export function blimpServer(origin: string): McpServer {
+/** Which plan the key's account is on (plans.ts, mcpTier) and, during a trial, when it ends. */
+export type McpAccess = { tier: McpTier; trialEndsAt: string | null };
+
+/** Tools a Free account may call. Every other tool answers with how to upgrade, and no data. */
+const FREE_TOOLS = new Set(["blimp_list_taxonomy"]);
+
+const upgradeText = (origin: string) =>
+  `This needs Blimp Pro. This account is on the Free plan: it can connect and list the filter values (blimp_list_taxonomy), ` +
+  `but searching and reading the library comes with Pro or Team. Upgrade at ${origin}/account, then try again. ` +
+  `Tell the user this rather than retrying.`;
+
+const trialText = (origin: string, endsAt: string) =>
+  `Blimp Pro trial: ends ${new Date(endsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })}. ` +
+  `After that the library tools need Pro or Team (${origin}/account).`;
+
+/** `access` comes from the route after the key is checked. Without it the server fails closed, as Free. */
+export function blimpServer(origin: string, given?: McpAccess): McpServer {
+  const access: McpAccess = given ?? { tier: "free", trialEndsAt: null };
+  const free = access.tier === "free";
   const server = new McpServer(
-    { name: "blimp", version: "2.0.0", title: "Blimp" },
+    { name: "blimp", version: "2.1.0", title: "Blimp" },
     {
       instructions:
         "Blimp is a library of e-commerce website sections (blocks) captured from real stores, desktop and phone. " +
         "Call blimp_list_taxonomy first to learn the valid block types, page types and industries. " +
         "Search with blimp_search_blocks, then open the few worth it with blimp_get_block. " +
         "For a store's design system use blimp_get_store_design; for one page, blimp_get_page_profile; for what is typical, blimp_get_benchmark. " +
-        "Facts are measured from public pages; fields that were not collected are null, never guessed.",
+        "Facts are measured from public pages; fields that were not collected are null, never guessed." +
+        (free ? ` This account is on the Free plan: only blimp_list_taxonomy answers; the other tools need Pro (${origin}/account).` : ""),
     },
   );
+
+  // The plan gate sits around every tool's handler, so each call-site below keeps
+  // its typed arguments. Free: an upgrade message, never data. Trial: the answer
+  // plus when the trial ends. Paid and gates-off: the answer as is.
+  const register = server.registerTool.bind(server);
+  server.registerTool = ((name: string, config: never, handler: (...args: unknown[]) => Promise<Result>) =>
+    register(name, config, (async (...args: unknown[]) => {
+      if (free && !FREE_TOOLS.has(name)) return fail(upgradeText(origin));
+      const result = await handler(...args);
+      if (access.tier === "trial" && access.trialEndsAt && !result.isError) {
+        return { ...result, content: [...result.content, { type: "text" as const, text: trialText(origin, access.trialEndsAt) }] };
+      }
+      return result;
+    }) as never)) as typeof server.registerTool;
 
   server.registerTool(
     "blimp_list_taxonomy",
@@ -185,15 +220,27 @@ export function blimpServer(origin: string): McpServer {
       description:
         "One block in full: store, page, position, block type and tagger output, up to 400 characters of its visible text, " +
         "screenshot and thumbnail URLs, and the capture date. Includes the measured outline and style for captures made with design metadata; null with a note for older ones.",
-      inputSchema: z.object({ id: z.string().describe("A block id from blimp_search_blocks") }),
+      inputSchema: z.object({
+        id: z.string().describe("A block id from blimp_search_blocks"),
+        include: z.array(z.enum(BLOCK_INCLUDES)).max(BLOCK_INCLUDES.length).optional()
+          .describe("Optional detail fields. Left out, all four are returned for compatibility."),
+      }),
       outputSchema: blockItem,
       annotations: READ_ONLY,
     },
-    async ({ id }) => {
+    async ({ id, include }) => {
       const block = await getBlock(id.trim(), origin);
       if (!block) return fail(`No block with id '${id}'. Ids come from blimp_search_blocks.`);
-      return ok(block, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
-        `${block.text ? `Text: ${block.text}\n` : ""}Image: ${block.image_url ?? "none"}\nStyle: ${block.style ? "measured (outline and style in the structured result)" : `null (${STYLE_NOTE})`}`);
+      const wanted = new Set(include ?? BLOCK_INCLUDES);
+      const selected: McpBlock = { ...block };
+      if (!wanted.has("outline")) delete selected.outline;
+      if (!wanted.has("style")) { delete selected.style; delete selected.style_note; }
+      if (!wanted.has("text")) delete selected.text;
+      if (!wanted.has("image")) delete selected.image_url;
+      return ok(selected, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
+        `${wanted.has("text") && block.text ? `Text: ${block.text}\n` : ""}` +
+        `${wanted.has("image") ? `Image: ${block.image_url ?? "none"}\n` : ""}` +
+        `${wanted.has("style") ? `Style: ${block.style ? "measured (outline and style in the structured result)" : `null (${STYLE_NOTE})`}` : ""}`);
     },
   );
 

@@ -24,11 +24,20 @@ This page covers what is built.
   Serves the 2026-07-28 protocol and falls back to stateless 2025-era serving.
 - **Auth:** a bearer key from `api_keys` (migration 13). Only the SHA-256 is
   stored, like session tokens. At most 5 active keys per account.
-- **Plan:** the `"mcp"` feature. With `PLAN_GATES=on`, Pro and Team (and the
-  7-day trial); Free gets 402. Owner decision, 18 Nov 2026 (brief section 12,
-  item 2): it stays in Pro and Team, no separate plan or metering.
-- **Limits:** 120 requests a minute per key, 5,000 a day per account, in the
-  shared `rate_limits` table. Over the limit: 429 with `Retry-After`.
+- **Plan:** the library stays Pro and Team. Owner decision, 18 Nov 2026 (brief
+  section 12, item 2): no separate plan or metering. With `PLAN_GATES=on`
+  (`mcpTier` in `web/src/server/plans.ts`):
+  - **Pro, Team:** every tool.
+  - **Trial (7 days):** every tool; each answer ends with the date the trial ends.
+  - **Free:** can make a key and connect, and `blimp_list_taxonomy` answers.
+    Every other tool answers `isError` with "This needs Blimp Pro … Upgrade at
+    <site>/account", and no data, so the agent tells the user why instead of
+    the client showing a failed connection (it used to be HTTP 402).
+
+  The route checks the key, works out the tier and hands it to the server as
+  `authInfo`, which a client cannot set; without it the server serves as Free.
+- **Limits:** 120 requests a minute per key, 5,000 a day per account (Free: 30
+  and 300), in the shared `rate_limits` table. Over the limit: 429 with `Retry-After`.
 
 ## Tools
 
@@ -41,7 +50,7 @@ until a store is captured with `--styles`.
 |---|---|
 | `blimp_list_taxonomy` | Valid block types with meanings, page roles, style tags, industries, page types and platforms in the library, and how much is tagged |
 | `blimp_search_blocks` | Plain-language query plus filters (block type, page type, industry, platform, app, viewport, style tag, has price / reviews / video, store). At most 20, cursor paging |
-| `blimp_get_block` | One block: metadata, tagger output, 400 characters of text, image and thumbnail URLs, capture date |
+| `blimp_get_block` | One block: metadata and tagger output; optional `include` selects outline, style, up to 400 characters of text, and the screenshot URL (all by default) |
 | `blimp_search_stores` | Stores by name, industry, platform, country, app |
 | `blimp_get_store` | One store: stack, apps, captured pages, capture history |
 | `blimp_get_store_design` | v2. The store design profile (L3): fonts, type scale, heading system, palette and accent, buttons, shape, spacing, layout habits, consistency counts, accessibility signals, and a DESIGN.md-style `summary` |
@@ -81,7 +90,10 @@ import, a Pro account and key, and the official MCP client talking to the real
 route through auth, plan gate and rate limits. Ten questions pinned to the
 fixtures, with answers computed from the manifests rather than the server's
 code; then the HTTP API is checked against the same answers, and every
-response for source. All pass. These are scripted calls: they prove the tools
+response for source. Last, Free, trial and Pro accounts call the same route:
+Free connects, gets the taxonomy and only upgrade messages from the nine
+library tools (no store, block or design value in any of them); the trial gets
+answers with its end date; Pro gets answers with neither note. All pass. These are scripted calls: they prove the tools
 and data can answer, not that a given model picks the right calls.
 
 ## Not yet

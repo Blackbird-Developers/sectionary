@@ -10,6 +10,8 @@ import { clipOf, type UploadedClip } from "./clips.js";
 import type { Manifest, ManifestBlock, PageStyles } from "../../web/src/contracts/manifest.js";
 import { bucketFor } from "../../web/src/lib/colour.js";
 import { blocks, captures, pages, sites, siteTech, captureDiffs } from "./schema.js";
+import { profileSites } from "./profile.js";
+import { rebuildBenchmarks } from "./benchmarks.js";
 
 try { process.loadEnvFile(resolve(import.meta.dirname, "../.env")); } catch {}
 const url = process.env.DATABASE_URL;
@@ -346,7 +348,14 @@ try {
   // Typo tolerance corrects query words against the corpus vocabulary, so keep it current.
   // Skipped before migration 0004 (no view yet); new blocks still need `npm run embed`.
   await client`REFRESH MATERIALIZED VIEW CONCURRENTLY search_terms`.then(
-    () => console.log("Refreshed search_terms. Next: `npm run profile-sites`, `npm run benchmarks`, then `npm run embed` (it embeds the design summaries)."),
+    () => console.log("Refreshed search_terms."),
     (e: { code?: string }) => { if (e.code !== "42P01") throw e; },
   );
+  // L3 and L4 are derived from the latest imported captures. Keep them in
+  // step with every import rather than relying on an operator to remember two
+  // follow-up commands (SEC-31 brief 7.3). Embeddings remain an explicit job:
+  // they call an external paid service and are not safe to trigger implicitly.
+  const profiled = await profileSites(client, { log: console.log });
+  const benchmarkRows = await rebuildBenchmarks(client);
+  console.log(`Rebuilt design metadata: ${profiled} store profile(s), ${benchmarkRows} benchmark row(s). Next: \`npm run embed\`.`);
 } finally { await client.end(); }

@@ -109,6 +109,40 @@ type CartJob = { fill: boolean; held?: HeldCart };
 /** `moment` is set on the panel a moment revealed (a popup, an open menu), written after the page's own blocks. */
 export type CapturedBlock = BlockInfo & { viewport: ViewportName; file: string | null; error?: string; moment?: MomentKind; style?: BlockStyleC; outline?: OutlineNodeC[]; motionHint?: MotionKind; clip?: ManifestClip };
 
+/** Hard contract budget for pageStyles plus block style/outline at one viewport. */
+export const STYLE_METADATA_BUDGET = 20 * 1024;
+
+/**
+ * Keep design metadata within the manifest contract's 20 KB/viewport budget.
+ * The richest measurements stay first; on unusually long pages we reduce
+ * secondary styles and outline detail, then omit detail from the last blocks.
+ * `partial` makes every such trim explicit rather than pretending it is a full
+ * measurement. The block fields are optional by contract for this reason.
+ */
+export function fitStyleMetadata(page: PageStylesC, blocks: CapturedBlock[], budget = STYLE_METADATA_BUDGET): number {
+  const bytes = () => Buffer.byteLength(JSON.stringify({ pageStyles: page, blocks: blocks.map(({ style, outline }) => ({ style, outline })) }));
+  if (bytes() <= budget) return bytes();
+  page.partial = true;
+
+  for (const b of blocks) if (b.style) {
+    b.style.type = b.style.type.slice(0, 4);
+    b.style.textColours = b.style.textColours.slice(0, 2);
+  }
+  const trimNodes = (nodes: OutlineNodeC[], max: number, depth = 1): OutlineNodeC[] => nodes.slice(0, max).map((node) => ({
+    ...node,
+    ...(node.children ? { children: depth >= 2 ? undefined : trimNodes(node.children, Math.max(2, Math.floor(max / 2)), depth + 1) } : {}),
+  }));
+  for (const b of blocks) if (b.outline) b.outline = trimNodes(b.outline, 20);
+  if (bytes() <= budget) return bytes();
+  for (const b of blocks) if (b.outline) b.outline = trimNodes(b.outline, 10);
+
+  // Later sections lose outline before style: the style still lets an agent
+  // search and compare them, and a screenshot remains available for detail.
+  for (let i = blocks.length - 1; i >= 0 && bytes() > budget; i--) delete blocks[i].outline;
+  for (let i = blocks.length - 1; i >= 0 && bytes() > budget; i--) delete blocks[i].style;
+  return bytes();
+}
+
 type ViewportResult =
   | { ok: true; status: number | null; site: SiteInfo; meta: PageMeta; strategy: string; fullFile: string; fullHeight: number; blocks: CapturedBlock[]; links: string[]; finalUrl: string; emptyText: string | null; moments: CrawlerMoment[]; momentNotes: string[]; ms: number; pageStyles: PageStylesC | null; stylesError: string | null; clips?: RawClip[]; productNotes?: string[]; playNotes?: string[] }
   | { ok: false; status: number | null; error: string; ms: number };
@@ -709,7 +743,11 @@ export async function capturePage(browser: Browser, url: string, opts: CaptureOp
     const themeName = r.site.theme && (r.site.theme as { name?: string }).name;
     const stylesNote = r.pageStyles ? ` · styles ${r.pageStyles.ms}ms${r.pageStyles.partial ? ' (partial)' : ''}` : r.stylesError ? ` · styles failed: ${r.stylesError}` : '';
     result.lines.push(`  ${vp}: ${r.site.platform}${themeName ? ' / ' + themeName : ''} · ${okBlocks}/${r.blocks.length} blocks (${r.strategy}) · ${(r.ms / 1000).toFixed(1)}s${stylesNote}`);
-    if (r.pageStyles) (manifest.pageStyles ||= {})[vp] = r.pageStyles;
+    if (r.pageStyles) {
+      const styleBytes = fitStyleMetadata(r.pageStyles, r.blocks);
+      (manifest.pageStyles ||= {})[vp] = r.pageStyles;
+      if (r.pageStyles.partial) result.lines.push(`  ${vp}: design metadata partial, ${styleBytes} bytes after budget trimming`);
+    }
     manifest.viewports[vp] = { file: r.fullFile, width: VIEWPORTS[vp].width, fullHeight: r.fullHeight, strategy: r.strategy, status: r.status, ms: r.ms };
     if (!manifest.site.platform) Object.assign(manifest.site, r.site);
     if (!manifest.page.title) Object.assign(manifest.page, r.meta);
