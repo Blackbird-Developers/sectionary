@@ -259,6 +259,9 @@ check("/api/taxonomy: the MCP's lists", tax.body.blockTypes?.length === mcpTax.b
   tax.body.platforms?.find((p: { value: string }) => p.value === "shopify")?.stores === expected.q9);
 
 const styled = (await call("blimp_search_blocks", { store: "myzoobox.com", page_type: "product", viewport: "desktop", limit: 1 })).data.items[0];
+const selectedDetail = (await call("blimp_get_block", { id: styled.id, include: ["outline"] })).data;
+check("blimp_get_block: include returns only the requested optional detail", Array.isArray(selectedDetail.outline) &&
+  !("style" in selectedDetail) && !("text" in selectedDetail) && !("image_url" in selectedDetail));
 const detail = await get(api.block, `/api/blocks/${styled.id}`, { id: styled.id });
 check("/api/blocks/[id]: the Block plus style and outline", detail.body.id === styled.id && typeof detail.body.src === "string" &&
   detail.body.style !== null && Array.isArray(detail.body.outline) && "blockType" in detail.body && "taggerVersion" in detail.body);
