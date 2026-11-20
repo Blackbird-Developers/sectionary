@@ -41,7 +41,7 @@ until a store is captured with `--styles`.
 |---|---|
 | `blimp_list_taxonomy` | Valid block types with meanings, page roles, style tags, industries, page types and platforms in the library, and how much is tagged |
 | `blimp_search_blocks` | Plain-language query plus filters (block type, page type, industry, platform, app, viewport, style tag, has price / reviews / video, store). At most 20, cursor paging |
-| `blimp_get_block` | One block: metadata, tagger output, 400 characters of text, image and thumbnail URLs, capture date |
+| `blimp_get_block` | One block: metadata and tagger output; optional `include` selects outline, style, up to 400 characters of text, and the screenshot URL (all by default) |
 | `blimp_search_stores` | Stores by name, industry, platform, country, app |
 | `blimp_get_store` | One store: stack, apps, captured pages, capture history |
 | `blimp_get_store_design` | v2. The store design profile (L3): fonts, type scale, heading system, palette and accent, buttons, shape, spacing, layout habits, consistency counts, accessibility signals, and a DESIGN.md-style `summary` |

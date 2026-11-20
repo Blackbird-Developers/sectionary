@@ -15,6 +15,7 @@ import { CATEGORICAL_BENCHMARKS, MIN_BENCHMARK_N, NUMERIC_BENCHMARKS } from "@/c
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false } as const;
 const VIEWPORTS = ["desktop", "mobile"] as const;
+const BLOCK_INCLUDES = ["outline", "style", "text", "image"] as const;
 
 // ---------------------------------------------------------------- output shapes
 
@@ -185,15 +186,27 @@ export function blimpServer(origin: string): McpServer {
       description:
         "One block in full: store, page, position, block type and tagger output, up to 400 characters of its visible text, " +
         "screenshot and thumbnail URLs, and the capture date. Includes the measured outline and style for captures made with design metadata; null with a note for older ones.",
-      inputSchema: z.object({ id: z.string().describe("A block id from blimp_search_blocks") }),
+      inputSchema: z.object({
+        id: z.string().describe("A block id from blimp_search_blocks"),
+        include: z.array(z.enum(BLOCK_INCLUDES)).max(BLOCK_INCLUDES.length).optional()
+          .describe("Optional detail fields. Left out, all four are returned for compatibility."),
+      }),
       outputSchema: blockItem,
       annotations: READ_ONLY,
     },
-    async ({ id }) => {
+    async ({ id, include }) => {
       const block = await getBlock(id.trim(), origin);
       if (!block) return fail(`No block with id '${id}'. Ids come from blimp_search_blocks.`);
-      return ok(block, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
-        `${block.text ? `Text: ${block.text}\n` : ""}Image: ${block.image_url ?? "none"}\nStyle: ${block.style ? "measured (outline and style in the structured result)" : `null (${STYLE_NOTE})`}`);
+      const wanted = new Set(include ?? BLOCK_INCLUDES);
+      const selected: McpBlock = { ...block };
+      if (!wanted.has("outline")) delete selected.outline;
+      if (!wanted.has("style")) { delete selected.style; delete selected.style_note; }
+      if (!wanted.has("text")) delete selected.text;
+      if (!wanted.has("image")) delete selected.image_url;
+      return ok(selected, `${line(block).slice(2)}\nCaptured ${block.captured_at.slice(0, 10)} from ${block.page_url}\n` +
+        `${wanted.has("text") && block.text ? `Text: ${block.text}\n` : ""}` +
+        `${wanted.has("image") ? `Image: ${block.image_url ?? "none"}\n` : ""}` +
+        `${wanted.has("style") ? `Style: ${block.style ? "measured (outline and style in the structured result)" : `null (${STYLE_NOTE})`}` : ""}`);
     },
   );
 

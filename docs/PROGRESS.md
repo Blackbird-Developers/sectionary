@@ -7,6 +7,22 @@ PLAN.md changes only when scope does; the board mirrors every work item.
 Earlier sessions are in Ben's vault copy (To Do's/New APP Mobbin Recreate).
 This file starts on 2026-10-01 so every lane can append to it.
 
+## 2026-11-19 · Codex
+
+**SEC-31 repository completion pass.** The contract gaps found in review are
+closed: imports now rebuild L3 profiles and L4 benchmarks; `blimp_get_block`
+supports selective `include`; the public store-design answer uses the shared
+response cache while signed-in accessibility data remains private; and capture
+hard-enforces the 20 KB design-metadata budget per viewport, marking trimmed
+profiles partial. MCP evaluation (ten pinned questions, HTTP parity and source
+safety), all 52 platform tests, all 11 web tests, all 42 root tests, the 31
+browser style checks, and all three type-checks pass.
+
+Still an operational release gate, not something this checkout can truthfully
+mark done: the human 20-store browser/devtools accuracy comparison, production
+tagging/import/embedding/recapture, and `blimp_compare_stores` after the compare
+pilot defines its aligned-comparison contract.
+
 ## 2026-11-18 · Buna (Lane B)
 
 **SEC-31: MCP v2, the design data API, design-aware search.** On `buna`, not

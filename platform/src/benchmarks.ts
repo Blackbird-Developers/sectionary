@@ -213,12 +213,13 @@ export async function rebuildBenchmarks(sql: postgres.Sql, minN = MIN_BENCHMARK_
   const rows = computeBenchmarks(await pageFacts(sql), minN);
   await sql.begin(async (tx) => {
     await tx`DELETE FROM benchmarks`;
-    for (let i = 0; i < rows.length; i += 500) {
-      const chunk = rows.slice(i, i + 500).map((r) => ({
-        industry: r.industry, page_type: r.pageType, viewport: r.viewport, metric: r.metric, n: r.n,
-        p25: r.p25, p50: r.p50, p75: r.p75, shares: r.shares === null ? null : tx.json(r.shares),
-      }));
-      await tx`INSERT INTO benchmarks ${tx(chunk, "industry", "page_type", "viewport", "metric", "n", "p25", "p50", "p75", "shares")}`;
+    for (const r of rows) {
+      // The explicit text hop keeps postgres.js and the PGlite socket from
+      // JSON-encoding an already-stringified value a second time.
+      const shares = r.shares === null ? null : JSON.stringify(r.shares);
+      await tx`INSERT INTO benchmarks (industry, page_type, viewport, metric, n, p25, p50, p75, shares)
+        VALUES (${r.industry}, ${r.pageType}, ${r.viewport}, ${r.metric}, ${r.n}, ${r.p25}, ${r.p50}, ${r.p75},
+          CASE WHEN ${shares}::text IS NULL THEN NULL ELSE ${shares}::text::jsonb END)`;
     }
   });
   return rows.length;

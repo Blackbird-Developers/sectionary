@@ -20,7 +20,7 @@ const STALE_MS = 24 * 60 * 60_000;
 /** Roughly what the cached bodies may take, in characters; the least recently used go first. */
 const BUDGET = 150_000_000;
 
-type Entry = { at: number; body: string; headers: Record<string, string>; size: number };
+type Entry = { at: number; body: string; headers: Record<string, string>; status: number; size: number };
 type Store = { entries: Map<string, Entry>; pending: Map<string, Promise<Entry>>; size: number };
 
 declare global {
@@ -51,12 +51,12 @@ function remember(s: Store, key: string, entry: Entry) {
   }
 }
 
-function build(s: Store, key: string, make: () => Promise<{ body: unknown; headers?: Record<string, string> }>): Promise<Entry> {
+function build(s: Store, key: string, make: () => Promise<{ body: unknown; headers?: Record<string, string>; status?: number }>): Promise<Entry> {
   let pending = s.pending.get(key);
   if (!pending) {
-    pending = make().then(({ body, headers = {} }) => {
+    pending = make().then(({ body, headers = {}, status = 200 }) => {
       const text = JSON.stringify(body);
-      const entry = { at: Date.now(), body: text, headers, size: text.length };
+      const entry = { at: Date.now(), body: text, headers, status, size: text.length };
       remember(s, key, entry);
       return entry;
     });
@@ -76,7 +76,7 @@ function build(s: Store, key: string, make: () => Promise<{ body: unknown; heade
 export async function cachedJson(
   key: string,
   headers: Record<string, string>,
-  make: () => Promise<{ body: unknown; headers?: Record<string, string> }>,
+  make: () => Promise<{ body: unknown; headers?: Record<string, string>; status?: number }>,
 ): Promise<Response> {
   const s = store();
   const hit = s.entries.get(key);
@@ -95,6 +95,7 @@ export async function cachedJson(
     state = "miss";
   }
   return new Response(entry.body, {
+    status: entry.status,
     headers: { "content-type": "application/json", ...headers, ...entry.headers, "x-cache": state },
   });
 }
