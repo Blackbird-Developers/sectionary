@@ -140,13 +140,20 @@ async function main(): Promise<void> {
   const uniq = [...new Set(targets)];
   console.log(`Capturing ${uniq.length} page(s) x ${opts.only ? 1 : 2} viewport(s) -> ${opts.out}/`);
 
-  const browser = await chromium.launch({ headless: !opts.headed });
+  const launch = () => chromium.launch({ headless: !opts.headed });
+  let browser = await launch();
   // A filled cart travels from its product page to the same store's cart page, then is emptied (src/cart-session.ts).
   const held = new Map<string, Partial<Record<ViewportName, HeldCart>>>();
   try {
     // Carts a crash left behind are emptied first.
     if (opts.moments.includes('add-to-cart')) await emptyPending(browser, opts.out);
     for (const url of uniq) {
+      // A browser that crashed is started again (stage 3 run 3, 20 Nov 2026: the browser closed on the first page and
+      // the other 226 pages each failed in a moment).
+      if (!browser.isConnected()) {
+        console.log('browser closed: starting a new one');
+        browser = await launch();
+      }
       // Only carts that already had a try and have been quiet: a fresh cart waits for its own cart page.
       if (waitingCarts(opts.out).length) await emptyPending(browser, opts.out, { skipUntried: true }).catch(() => null);
       // Too many carts waiting for Shopify's rate limit: wait for a free place before a product page fills another.
@@ -173,7 +180,7 @@ async function main(): Promise<void> {
       const left = waitingCarts(opts.out);
       if (left.length) console.error(`CART NOT EMPTIED: ${left.join(', ')} (kept in ${opts.out}/_carts; the next run tries again)`);
     }
-    await browser.close();
+    await browser.close().catch(() => {});
   }
 
   const n = await buildIndex(opts.out);
