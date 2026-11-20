@@ -24,13 +24,14 @@ type Options = CaptureOptions & { urls: string[]; discover: boolean; seeds: stri
 
 function usage(): never {
   console.log(`Usage: npm run capture -- <url|host> [...] [--discover] [--seeds file] [--only desktop|mobile]
-                          [--out data] [--max-blocks 40] [--min-height 80] [--quality 88] [--headed] [--styles] [--clips] [--sliders] [--product] [--play]
+                          [--out data] [--max-blocks 40] [--min-height 80] [--quality 88] [--headed] [--styles] [--clips] [--sliders] [--product] [--play] [--interact]
                           [--moments first-visit-popup,menu-open,sticky-atc | safe | all] [--moments-cart-scope own|optin|all]
 
   --clips        record short clips (slow motion, sped back up) of blocks that move by themselves
   --sliders      with --clips: press sliders that only move when pressed, and record them
   --product      with --clips: on product pages, record the photo gallery, the product options and the size guide
   --play         with --clips: press play on videos that wait for it, record them playing, pause them again
+  --interact     with --clips: open an FAQ question, hover product cards, open a quick view and the filters, close them again
 
   --discover     for a bare host, enumerate Shopify pages via /products.json and /collections.json
   --moments      also capture what the store does when used (src/moments.ts); own sites only for now
@@ -53,6 +54,7 @@ function parseArgs(argv: string[]): Options {
     else if (a === '--sliders') o.sliders = true;
     else if (a === '--product') o.product = true;
     else if (a === '--play') o.play = true;
+    else if (a === '--interact') o.interact = true;
     else if (a === '--seeds') o.seeds = argv[++i];
     else if (a === '--out') o.out = argv[++i];
     else if (a === '--only') o.only = argv[++i] as ViewportName;
