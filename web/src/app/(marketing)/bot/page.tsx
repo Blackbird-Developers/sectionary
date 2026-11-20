@@ -20,7 +20,7 @@ const DOES = [
   "Desktop and phone width, one page per second at most",
   "Names itself in every request as SectionaryBot/<version>",
   "Records short silent clips of sections that move, never downloading your videos",
-  "May scroll, open the menu or a size guide, move a slideshow, pick a product option, press play on a video, and record how the page reacts",
+  "May scroll, open the menu, a size guide, a question or the filters, move a slideshow, pick a product option, rest the pointer on a product, press play on a video, and record how the page reacts",
   "Where robots.txt allows it, adds one product to a cart, photographs it and empties it again",
 ];
 
@@ -60,7 +60,7 @@ export default function BotPage() {
             <code>SectionaryBot/&lt;version&gt;</code> with a link to this page.
           </p>
           <p>
-            To show how a page behaves, it may scroll, open the navigation menu, move a slideshow or a product&rsquo;s photos to the next one, select a product option, open a size guide or a product preview, press play on a video, and take a screenshot or a short recording of the result. Anything it opens, it closes again, and any video it starts, it pauses again. On stores whose robots.txt allows it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
+            To show how a page behaves, it may scroll, open the navigation menu, move a slideshow or a product&rsquo;s photos to the next one, select a product option, open a size guide, a product preview, a question in a list of questions or a collection&rsquo;s filters, rest the pointer on a product, press play on a video, and take a screenshot or a short recording of the result. It never applies a filter. Anything it opens, it closes again, and any video it starts, it pauses again. On stores whose robots.txt allows it, it also adds one product to a cart to photograph the cart, then empties the cart again. While it does this it blocks the store&rsquo;s analytics and ad tracking, so it is not counted as a shopper. It never types into a field, and the only form it sends is a product&rsquo;s add to cart.
           </p>
         </>
       ),

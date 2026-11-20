@@ -25,6 +25,7 @@
     "clips-check": "tsx src/clips-check.ts",
     "product-check": "tsx src/product-check.ts",
     "play-check": "tsx src/play-check.ts",
+    "interact-check": "tsx src/interact-check.ts",
     "retype-blocks": "tsx src/retype-blocks.ts",
     "styles-check": "tsx src/styles-check.ts",
     "prune-seeds": "tsx src/prune-seeds.ts",
