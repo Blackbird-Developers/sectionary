@@ -170,11 +170,17 @@ export function wallWhere(sql: Sql, f: BlockFilters) {
 // that, but the library has few distinct backgrounds, so the server buckets
 // each one once and filters on the list. Refreshed every few minutes so new
 // captures' colours join without a restart.
+//
+// Read from wall_shown, not blocks: every colour filter and facet is over the
+// shown set (SHOWN, wallWhere, facetCounts), so a background only blocks off
+// the wall have can match nothing. On production (23 Nov 2026) the blocks
+// version took 3 s warm and 19 s cold, paid every five minutes by whichever
+// request came first; wall_shown takes 0.1 s warm and 0.9 s cold.
 let palette: { at: number; bucket: Map<string, string> } | null = null;
 
 async function colourBuckets(sql: Sql): Promise<Map<string, string>> {
   if (palette && Date.now() - palette.at < 5 * 60_000) return palette.bucket;
-  const rows = await sql`SELECT DISTINCT background FROM blocks WHERE background IS NOT NULL`;
+  const rows = await sql`SELECT DISTINCT background FROM wall_shown WHERE background IS NOT NULL`;
   const bucket = new Map<string, string>();
   for (const { background } of rows) {
     const key = bucketFor(background as string);
