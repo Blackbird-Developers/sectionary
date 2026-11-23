@@ -14,29 +14,13 @@ export function database() {
  * Drops the pool: its connections close at once and every query still on or
  * waiting for one fails (CONNECTION_DESTROYED), so the requests behind them
  * answer 503 instead of hanging. The next database() opens a fresh pool.
+ * Only for a pool that is stuck, never for one that is busy: the health check
+ * tells the two apart (server/pool-health.ts).
  */
 export function resetDatabase() {
   const old = globalThis.sectionarySql;
   globalThis.sectionarySql = undefined;
   if (old) void old.end({ timeout: 0 }).catch(() => {});
-}
-
-/**
- * Whether the pool still answers `SELECT 1` within `ms`. On 13 Nov 2026 the
- * one AWS task had all five connections stuck for hours: no error, no answer,
- * every query queued behind them until the load balancer gave up at 60 s
- * (HTTP 504). A probe that times out finds that state; resetDatabase() ends it.
- */
-export async function databaseResponds(ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const late = new Promise<false>((resolve) => (timer = setTimeout(resolve, ms, false)));
-  try {
-    return await Promise.race([database()`SELECT 1`.then(() => true), late]);
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 /**
