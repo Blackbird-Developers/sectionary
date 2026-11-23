@@ -18,6 +18,8 @@ export const blockColumns = (sql: Sql) => sql`b.id, s.host, p.type AS page_type,
 /** blocks.clip (migration 0015) as the importer stores it; Block.clip is its contract shape. */
 type StoredClip = { kind: string; url: string; width: number; height: number; durationMs: number; rect?: { x: number; y: number; width: number; height: number } };
 export const blockJoins = (sql: Sql) => sql`blocks b JOIN captures c ON c.id=b.capture_id JOIN pages p ON p.id=c.page_id JOIN sites s ON s.id=p.site_id`;
+/** blockJoins behind the wall's shown set (`w`, migration 0018): filter and order on `w` with wallWhere, select blockColumns. */
+export const wallJoins = (sql: Sql) => sql`wall_shown w JOIN blocks b ON b.id=w.id JOIN captures c ON c.id=b.capture_id JOIN pages p ON p.id=c.page_id JOIN sites s ON s.id=p.site_id`;
 
 /** blocks.image_slices (migration 0005) as the importer stores it: the files of a screenshot taller than WebP allows, top to bottom. */
 type StoredSlice = { index: number; src: string; top: number; width: number; height: number };
@@ -72,8 +74,29 @@ export function readFilters(url: URL): BlockFilters {
   return f;
 }
 
-/** What a block offers each filter, as a column over blockJoins. `app` is an array; every other one a single value. */
-function valueOf(sql: Sql, key: FilterKey) {
+/**
+ * Where a filter reads its column: over blockJoins (aliases b, c, p, s), or
+ * over `wall_shown w` (migration 0018), which carries the same values precomputed.
+ */
+type From = "joins" | "wall";
+
+/** What a block offers each filter, as a column. `app` is an array; every other one a single value. */
+function valueOf(sql: Sql, key: FilterKey, from: From = "joins") {
+  if (from === "wall") {
+    switch (key) {
+      case "page": return sql`w.page_type`;
+      case "block": return sql`w.block`;
+      case "vp": return sql`w.viewport`;
+      case "platform": return sql`w.platform`;
+      case "theme": return sql`w.theme_name`;
+      case "app": return sql`w.apps`;
+      case "industry": return sql`w.industry`;
+      case "country": return sql`w.country`;
+      case "host": return sql`w.host`;
+      case "video": return sql`(CASE WHEN w.videos>0 THEN 'yes' ELSE 'no' END)`;
+      case "color": return sql`w.background`;
+    }
+  }
   switch (key) {
     case "page": return sql`p.type`;
     case "block": return sql`coalesce(b.block_type,b.type_hint)`;
@@ -94,14 +117,14 @@ function valueOf(sql: Sql, key: FilterKey) {
  * store with no country fails a country filter rather than vanishing from the
  * near-miss counts.
  */
-function condition(sql: Sql, f: BlockFilters, key: FilterKey) {
+function condition(sql: Sql, f: BlockFilters, key: FilterKey, from: From = "joins") {
   if (!f[key]) return null;
-  if (key === "app") return sql`coalesce(s.apps && ${pgArray(f.app!)}::text[], false)`;
+  if (key === "app") return sql`coalesce(${valueOf(sql, "app", from)} && ${pgArray(f.app!)}::text[], false)`;
   if (key === "color") {
     if (!f.bg) throw new Error("color filter used before withColours");
-    return sql`coalesce(b.background=ANY(${pgArray(f.bg)}::text[]), false)`;
+    return sql`coalesce(${valueOf(sql, "color", from)}=ANY(${pgArray(f.bg)}::text[]), false)`;
   }
-  return sql`coalesce(${valueOf(sql, key)}=ANY(${pgArray(f[key]!)}::text[]), false)`;
+  return sql`coalesce(${valueOf(sql, key, from)}=ANY(${pgArray(f[key]!)}::text[]), false)`;
 }
 
 export const LATEST = (sql: Sql) => sql`c.id=(SELECT c2.id FROM captures c2 WHERE c2.page_id=p.id ORDER BY c2.captured_at DESC LIMIT 1)`;
@@ -116,25 +139,31 @@ export const LATEST = (sql: Sql) => sql`c.id=(SELECT c2.id FROM captures c2 WHER
  * (home, then collection, then product), a whole section before a slice,
  * then the first on its page. Desktop and phone each keep their own, so the
  * pair still opens together. Same rule as sectionKey in lib/blocks.ts.
+ *
+ * The database works this set out once, not on every request: it is the
+ * materialized view wall_shown (migration 0018), rebuilt after imports and
+ * tagging (platform/src/wall.ts, server/wall.ts). Worked out per request it
+ * took the production database 7 to 26 s on 23 Nov 2026.
  */
-const SECTION = (sql: Sql) => sql`regexp_replace(coalesce(b.block_type,b.type_hint), '-part$', '')`;
-const SHOWN = (sql: Sql) => sql`b.id IN (
-  SELECT DISTINCT ON (s.host, b.viewport, ${SECTION(sql)}) b.id
-  FROM ${blockJoins(sql)} WHERE ${LATEST(sql)}
-  ORDER BY s.host, b.viewport, ${SECTION(sql)},
-    array_position(ARRAY['home','collection','product']::text[], p.type) NULLS LAST,
-    coalesce(b.block_type,b.type_hint) LIKE '%-part', p.url, b.block_index, b.id)`;
+const SHOWN = (sql: Sql) => sql`b.id IN (SELECT id FROM wall_shown)`;
 
 /**
- * The WHERE clause for a BlocksQuery over blockJoins: the latest capture of
- * each page, one block per section of a store, then every filter given. `skip`
- * leaves filters out, which is how a facet counts what its other values
- * would add.
+ * The WHERE clause for a BlocksQuery over blockJoins: one block per section of
+ * a store, from the latest capture of each page (SHOWN), then every filter given.
  */
-export function blockWhere(sql: Sql, f: BlockFilters, skip: FilterKey[] = []) {
-  return FILTER_KEYS.filter((key) => !skip.includes(key))
-    .map((key) => condition(sql, f, key))
+export function blockWhere(sql: Sql, f: BlockFilters) {
+  return FILTER_KEYS.map((key) => condition(sql, f, key))
     .reduce((where, next) => (next ? sql`${where} AND ${next}` : where), SHOWN(sql));
+}
+
+/**
+ * The same filters over `wall_shown w`, which is already the shown set: for
+ * counts and orders that need no other table. For rows, wallJoins adds blocks
+ * and the rest, which the database then reads only for the rows a page returns.
+ */
+export function wallWhere(sql: Sql, f: BlockFilters) {
+  return FILTER_KEYS.map((key) => condition(sql, f, key, "wall"))
+    .reduce((where, next) => (next ? sql`${where} AND ${next}` : where), sql`true`);
 }
 
 // The colour filter buckets Block.bg in lib/colour.ts. Postgres cannot run
@@ -178,7 +207,8 @@ export async function facetCounts(sql: Sql, f: BlockFilters, ids?: string[]): Pr
   const ok = (key: FilterKey) => sql(`ok_${key}`);
   const others = (key: FilterKey | null) =>
     FILTER_KEYS.filter((k) => k !== key).reduce((all, k) => sql`${all} AND ${ok(k)}`, sql`true`);
-  const columns = FILTER_KEYS.map((key) => sql`${valueOf(sql, key)} AS ${sql(key)}, ${condition(sql, f, key) ?? sql`true`} AS ${ok(key)}`)
+  // Over wall_shown alone (migration 0018): it carries every filter's column, so no joins.
+  const columns = FILTER_KEYS.map((key) => sql`${valueOf(sql, key, "wall")} AS ${sql(key)}, ${condition(sql, f, key, "wall") ?? sql`true`} AS ${ok(key)}`)
     .reduce((all, next) => sql`${all}, ${next}`);
   const facet = (key: FilterKey) =>
     key === "app"
@@ -189,8 +219,8 @@ export async function facetCounts(sql: Sql, f: BlockFilters, ids?: string[]): Pr
   );
   const parts = [sql`SELECT '#total' AS key, NULL::text AS value, count(*)::int AS count FROM r WHERE ${others(null)}`, ...FILTER_KEYS.map(facet), ...near];
   const rows = await sql`WITH r AS MATERIALIZED (
-      SELECT ${columns} FROM ${blockJoins(sql)}
-      WHERE ${SHOWN(sql)} ${ids ? sql`AND b.id=ANY(${pgArray(ids)}::uuid[])` : sql``}
+      SELECT ${columns} FROM wall_shown w
+      ${ids ? sql`WHERE w.id=ANY(${pgArray(ids)}::uuid[])` : sql``}
     ) ${parts.reduce((all, next) => sql`${all} UNION ALL ${next}`)}`;
 
   const tallies = new Map<string, Map<string, number>>();
