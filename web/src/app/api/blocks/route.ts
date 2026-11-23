@@ -1,6 +1,7 @@
 import { apiError, database, PUBLIC_CACHE } from "@/server/db";
 import { cachedJson, keyOf } from "@/server/response-cache";
-import { blockColumns, blockJoins, blockWhere, facetCounts, readFilters, toBlock, withColours } from "@/server/blocks";
+import { blockColumns, facetCounts, readFilters, toBlock, wallJoins, wallWhere, withColours } from "@/server/blocks";
+import { refreshWallSoon } from "@/server/wall";
 import { searchBlocks } from "@/server/search";
 import { userForRequest } from "@/server/accounts";
 import { accessOf, can, FREE_FILTERS, gatesOn } from "@/server/plans";
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const sql = database();
+    refreshWallSoon(sql);
     const gated = await allowedFilters(request, readFilters(url));
     // An answer every visitor gets alike is kept in memory (server/response-cache.ts):
     // on AWS no CDN keeps it, and building one takes the database seconds.
@@ -94,21 +96,25 @@ async function answer(url: URL, sql: ReturnType<typeof database>, filters: Block
   // turns: every store's first, then every store's second, and so on. Which
   // block is a store's first, and the order of stores within a turn, come from
   // a hash of the ids: scattered, but the same on every request, so pages
-  // follow on from one another and the answer can be cached.
+  // follow on from one another and the answer can be cached. The turns are
+  // worked out ahead of time in wall_shown (migration 0018): per store and
+  // viewport for the usual one-viewport wall, which deals exactly as before,
+  // and per store otherwise, so other filters are still mixed but not strictly
+  // one block per store per turn.
+  //
+  // The mixed orders are indexes on wall_shown, so a page reads only its own
+  // rows; one store is a few hundred rows of it, sorted as they come.
+  const turn = f.vp?.length === 1 ? sql`w.vp_turn` : sql`w.turn`;
   const rowsQuery = f.host?.length
-    ? sql`SELECT ${blockColumns(sql)} FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
-      ORDER BY c.captured_at DESC, c.id, b.viewport, b.block_index, b.id LIMIT ${limit} OFFSET ${offset}`
-    : sql`SELECT * FROM (
-        SELECT ${blockColumns(sql)},
-          row_number() OVER (PARTITION BY s.id ORDER BY md5(b.id::text)) AS turn,
-          md5(s.id::text) AS store_order
-        FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}
-      ) mixed ORDER BY turn, store_order, id LIMIT ${limit} OFFSET ${offset}`;
+    ? sql`SELECT ${blockColumns(sql)} FROM ${wallJoins(sql)} WHERE ${wallWhere(sql, f)}
+      ORDER BY w.captured_at DESC, w.capture_id, w.viewport, w.block_index, w.id LIMIT ${limit} OFFSET ${offset}`
+    : sql`SELECT ${blockColumns(sql)} FROM ${wallJoins(sql)} WHERE ${wallWhere(sql, f)}
+      ORDER BY ${turn}, w.store_order, w.id LIMIT ${limit} OFFSET ${offset}`;
   // Without facets the total is its own count, run alongside the page rather than after it.
   const [rows, counts, counted] = await Promise.all([
     rowsQuery,
     first ? facetCounts(sql, f) : null,
-    first ? null : sql`SELECT count(*)::int AS total FROM ${blockJoins(sql)} WHERE ${blockWhere(sql, f)}`,
+    first ? null : sql`SELECT count(*)::int AS total FROM wall_shown w WHERE ${wallWhere(sql, f)}`,
   ]);
   const total = counts?.total ?? (counted![0].total as number);
   const items = rows.map(toBlock);

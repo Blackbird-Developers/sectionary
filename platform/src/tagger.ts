@@ -48,6 +48,7 @@ import {
   openBatches, pendingHashes, recordBatch, setBatchStatus, taggedHashes, type SubmittedRequest,
 } from "./tagger-store.js";
 import { imageSource, prepareImage } from "./tagger-images.js";
+import { refreshWall } from "./wall.js";
 
 try { process.loadEnvFile(resolve(import.meta.dirname, "../.env")); } catch {}
 
@@ -189,6 +190,8 @@ async function collect(): Promise<number> {
     // New block types, tags and descriptions are search vocabulary (migration 0007); `npm run embed` re-embeds the described blocks.
     await sql`REFRESH MATERIALIZED VIEW CONCURRENTLY search_terms`;
     console.log("Refreshed search_terms. Run `npm run embed` to re-embed blocks from their new descriptions.");
+    // A block type decides which block stands for its section on the wall (migration 0018).
+    await refreshWall(sql);
   }
   return collected;
 }

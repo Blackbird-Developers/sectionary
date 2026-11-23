@@ -19,6 +19,7 @@
 import { resolve } from "node:path";
 import postgres from "postgres";
 import type { BlockType, PageRole } from "./taxonomy.js";
+import { refreshWall } from "./wall.js";
 
 export const RULES_VERSION = "rules-v1";
 
@@ -240,6 +241,8 @@ async function main() {
     console.log(`${RULES_VERSION} · ${write ? "WRITE" : "dry run (nothing written)"}`);
     console.log(`  ${total} blocks · ${skippedAi} already labelled by the AI (left alone) · ${labelled} labelled by rules (${pct(labelled)}) · ${total - skippedAi - labelled} left for the AI (${pct(total - skippedAi - labelled)})`);
     if (write) console.log(`  ${written} rows written`);
+    // A block type decides which block stands for its section on the wall (migration 0018).
+    if (write && written) await refreshWall(sql);
     console.log("\nBy label:");
     for (const [k, n] of [...counts].sort((a, b) => b[1] - a[1])) console.log(`  ${k.padEnd(22)} ${n}`);
     console.log("\nBy rule (with samples):");

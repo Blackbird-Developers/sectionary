@@ -12,6 +12,7 @@ import { bucketFor } from "../../web/src/lib/colour.js";
 import { blocks, captures, pages, sites, siteTech, captureDiffs } from "./schema.js";
 import { profileSites } from "./profile.js";
 import { rebuildBenchmarks } from "./benchmarks.js";
+import { refreshWall } from "./wall.js";
 
 try { process.loadEnvFile(resolve(import.meta.dirname, "../.env")); } catch {}
 const url = process.env.DATABASE_URL;
@@ -351,6 +352,8 @@ try {
     () => console.log("Refreshed search_terms."),
     (e: { code?: string }) => { if (e.code !== "42P01") throw e; },
   );
+  // New captures change which block of each section the wall shows (migration 0018).
+  await refreshWall(client);
   // L3 and L4 are derived from the latest imported captures. Keep them in
   // step with every import rather than relying on an operator to remember two
   // follow-up commands (SEC-31 brief 7.3). Embeddings remain an explicit job:
