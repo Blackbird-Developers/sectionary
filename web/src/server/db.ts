@@ -6,7 +6,9 @@ export function database() {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not configured");
   // DATABASE_POOL_MAX=1 for a local PGlite (platform/src/local-db.ts), which mixes up statements from parallel connections.
-  const max = Number(process.env.DATABASE_POOL_MAX) || 5;
+  // 10 by default (5 until 23 Nov 2026): the wall asks for about fifteen cold reads at once, each seconds long,
+  // and with 5 most of them queued. Supabase's pooler (transaction mode) queues anything past its own limit.
+  const max = Number(process.env.DATABASE_POOL_MAX) || 10;
   return globalThis.sectionarySql ??= postgres(url, { max, prepare: false, idle_timeout: 20, connect_timeout: 10, ...(needsTls(url) && { ssl: "require" as const }) });
 }
 
@@ -26,6 +28,8 @@ export function resetDatabase() {
  * one AWS task had all five connections stuck for hours: no error, no answer,
  * every query queued behind them until the load balancer gave up at 60 s
  * (HTTP 504). A probe that times out finds that state; resetDatabase() ends it.
+ * `ms` must be long enough for a busy pool's queue to move, or a busy pool
+ * looks stuck (server/pool-probe.ts says how long the health check waits).
  */
 export async function databaseResponds(ms: number): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined;
