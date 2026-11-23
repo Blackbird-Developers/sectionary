@@ -35,4 +35,10 @@ COPY --from=build --chown=node:node /repo/web/.next/static ./.next/static
 COPY --from=build --chown=node:node /repo/web/public ./public
 USER node
 EXPOSE 8080
-CMD ["node", "server.js"]
+# HOSTNAME is set again when the server starts, not only above: on ECS Fargate
+# the runtime replaces it with the task's own name (ip-172-31-...internal), and
+# the Next.js server listens on HOSTNAME. It then answered only on the task's
+# private address, so the cache warm-up's requests to 127.0.0.1
+# (src/instrumentation.ts) were refused on every start since 17 Nov 2026
+# ("cache warm: 0 block types in 30s").
+CMD ["sh", "-c", "HOSTNAME=0.0.0.0 exec node server.js"]
