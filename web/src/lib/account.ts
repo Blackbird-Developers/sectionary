@@ -6,11 +6,42 @@ import { API_MODE } from "@/lib/data-source";
 
 let cached: Promise<AccountResponse> | null = null;
 
+/** Pauses before each retry of /api/account, in ms. */
+const RETRIES_MS = [500, 1_500, 3_000];
+
+/**
+ * When /api/account cannot answer (the database is down or its pool was
+ * dropped, 23 Nov 2026), the viewer is unknown: shown as signed out with the
+ * gates on, so nothing paid opens. Before, a failed answer read as
+ * { account: null } with no `gates`, which every check took as "gates off":
+ * Free and signed-out viewers saw Pro until they reloaded, and signed-in ones
+ * looked signed out.
+ */
+const UNKNOWN: AccountResponse = { account: null, gates: true, features: [] };
+
+async function fetchAccount(): Promise<AccountResponse> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const r = await fetch("/api/account", { cache: "no-store" });
+      if (r.ok) return (await r.json()) as AccountResponse;
+      if (r.status < 500) return UNKNOWN; // not something a retry fixes
+    } catch {
+      // Offline or the connection dropped: retry.
+    }
+    if (attempt >= RETRIES_MS.length) return UNKNOWN;
+    await new Promise((resolve) => setTimeout(resolve, RETRIES_MS[attempt]));
+  }
+}
+
 function load(): Promise<AccountResponse> {
   const as = devAs();
-  cached ??= as
-    ? Promise.resolve(devAccount(as))
-    : fetch("/api/account", { cache: "no-store" }).then((r) => (r.ok ? r.json() : { account: null })).catch(() => ({ account: null }));
+  if (as) return (cached ??= Promise.resolve(devAccount(as)));
+  if (!cached) {
+    const pending = fetchAccount();
+    cached = pending;
+    // Only a real answer is kept for the page: after a failure the next screen asks again.
+    void pending.then((res) => { if (res === UNKNOWN && cached === pending) cached = null; });
+  }
   return cached;
 }
 
