@@ -86,6 +86,8 @@ try {
 
   // The app's search, in process. Env is read when it runs: database URL now, Voyage per mode.
   process.env.DATABASE_URL = local.url;
+  // One connection, as the other acceptance scripts: PGlite mixes up statements from parallel connections (server/db.ts).
+  process.env.DATABASE_POOL_MAX = "1";
   process.env.VOYAGE_BASE_URL = voyageUrl;
   delete process.env.VOYAGE_API_KEY;
   const { searchBlocks } = await import("@/server/search");

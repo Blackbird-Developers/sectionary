@@ -194,8 +194,9 @@ try {
     const r = await blocksRoute.GET(req(path, { cookie }));
     return { total: (await r.json()).total as number, cache: r.headers.get("cache-control") ?? "" };
   };
-  const all = await totalOf("/api/blocks?limit=1"), freeVp = await totalOf("/api/blocks?limit=1&vp=mobile", ana.cookie);
-  check("Free: filters other than Store and Block type are dropped, and not CDN-cached", freeVp.total === all.total && freeVp.cache.includes("no-store"), `${freeVp.total} vs ${all.total}`);
+  // Page type, not vp: the Web / Mobile switch is a Free filter (FREE_FILTERS in server/plans.ts).
+  const all = await totalOf("/api/blocks?limit=1"), freePage = await totalOf("/api/blocks?limit=1&page=home", ana.cookie);
+  check("Free: filters other than Store, Block type and Web / Mobile are dropped, and not CDN-cached", freePage.total === all.total && freePage.cache.includes("no-store"), `${freePage.total} vs ${all.total}`);
   const { host } = (await local.db.query<{ host: string }>("SELECT host FROM sites ORDER BY host LIMIT 1")).rows[0];
   const freeHost = await totalOf(`/api/blocks?limit=1&host=${encodeURIComponent(host)}`, ana.cookie);
   check("Free: the Store filter still works", freeHost.total > 0 && freeHost.total < all.total, `${freeHost.total}`);
