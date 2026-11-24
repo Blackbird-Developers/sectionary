@@ -28,6 +28,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ host
       return design
         ? { body: design }
         : { body: { error: "Site not found", code: "NOT_FOUND" }, status: 404 };
-    });
+    }, request);
   } catch (error) { return apiError(error); }
 }

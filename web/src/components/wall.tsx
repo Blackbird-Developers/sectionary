@@ -522,12 +522,8 @@ export function Wall() {
       />
 
       {/* A filter or search changed and its results are on the way: the blimp flies over the old ones,
-          held in view as the page scrolls (sticky, no height of its own, so nothing below moves). */}
-      {ready && !settled && !error && (
-        <div className="pointer-events-none sticky top-16 z-20 h-0">
-          <BlimpLoader overlay label={query.q ? "Searching…" : "Filtering blocks…"} className="top-6" />
-        </div>
-      )}
+          in the middle of the window (fixed, so nothing below moves). */}
+      {ready && !settled && !error && <BlimpLoader overlay label={query.q ? "Searching…" : "Filtering blocks…"} />}
       {error ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-muted-foreground">
           <p>The block set could not be loaded ({error}).</p>

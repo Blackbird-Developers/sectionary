@@ -47,6 +47,18 @@ export const IMAGE_ORIGIN = process.env.NEXT_PUBLIC_IMAGE_ORIGIN || null;
 export const SITES_SRC = process.env.NEXT_PUBLIC_SITES_SRC ?? "";
 
 /**
+ * The first requests the Sites page makes from the API: the first 200 stores
+ * (which also says how many there are, so the rest can be asked for together)
+ * and the library's counts for its directory of block types. The page preloads
+ * them, as the home page does the wall's, so they download alongside the
+ * JavaScript instead of after it. They must stay byte-for-byte what
+ * lib/load-blocks.ts asks for (loadSiteSummaries, loadSitesDirectory), or the
+ * browser fetches them twice. Null on the sample, which has neither.
+ */
+export const FIRST_SITES_SRC = SITES_SRC ? `${SITES_SRC}?limit=200` : null;
+export const LIBRARY_COUNTS_SRC = SITES_SRC && API_MODE ? `${BLOCKS_SRC}?limit=1` : null;
+
+/**
  * Scale fixture (SEC-46). Unset in normal use. Set NEXT_PUBLIC_MOCK_BLOCKS=30000
  * in web/.env.local to multiply the sample into a capture-sized set in the
  * browser, which is how the wall's virtualisation and the filters get tested

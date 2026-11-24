@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       const { body, headers } = await answer(url, sql, gated.f);
       return Response.json(body, { headers: { ...PRIVATE, ...headers } });
     }
-    return await cachedJson(keyOf(url), PUBLIC_CACHE, () => answer(url, sql, gated.f));
+    return await cachedJson(keyOf(url), PUBLIC_CACHE, () => answer(url, sql, gated.f), request);
   } catch (error) { return apiError(error); }
 }
 

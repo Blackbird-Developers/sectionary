@@ -12,6 +12,6 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   try {
-    return await cachedJson(keyOf(new URL(request.url)), PUBLIC_CACHE, async () => ({ body: await libraryTaxonomy() }));
+    return await cachedJson(keyOf(new URL(request.url)), PUBLIC_CACHE, async () => ({ body: await libraryTaxonomy() }), request);
   } catch (error) { return apiError(error); }
 }

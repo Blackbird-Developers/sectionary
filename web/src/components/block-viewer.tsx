@@ -63,10 +63,12 @@ type ViewerProps = {
  * a site's pages, a flow, a board, a shared board.
  *
  * The screenshot is the full-resolution capture (2x), not the wall's
- * thumbnail, fitted to the window and never drawn wider than the block was
- * captured, so it stays sharp. The thumbnail the wall already loaded sits
- * underneath while it arrives, so the picture is there at once and sharpens.
- * A click zooms to the capture's real pixels; a second click fits it again.
+ * thumbnail, fitted whole to the window, however tall the block, and never
+ * drawn wider than the block was captured, so it stays sharp. The thumbnail
+ * the wall already loaded sits underneath while it arrives, so the picture is
+ * there at once and sharpens. A click goes closer (a tall block to the width
+ * it reads at, any other to the capture's real pixels); a second click fits
+ * it again.
  *
  * Arrows (on screen and on the keyboard) step through the list it was opened
  * from. "More info" opens the details (and the brief and time machine) in a
@@ -448,8 +450,10 @@ function usePresence(open: boolean, ms: number): { mounted: boolean; shown: bool
 }
 
 /**
- * Where the screenshot sits: fitted to the room, or, for a block so tall that
- * fitting would shrink it to a strip, at a readable width and scrolled.
+ * Where the screenshot sits: always fitted whole to the room, however tall the
+ * block is, so a block opens as the block and never as a part of it. A click
+ * goes closer (see zoomedWidth): a tall block, small when fitted, to the width
+ * it reads at, scrolled top to bottom; a second click fits it again.
  */
 function Stage({ block }: { block: Block }) {
   const mobile = block.viewport === "mobile";
@@ -462,6 +466,13 @@ function Stage({ block }: { block: Block }) {
   // (see shotsOf). A slice that was worked out and is not there is left out.
   const shots = shotsOf(block);
   const [missing, setMissing] = useState<string[]>([]);
+  // The file's own shape, once it is in: a few captures are a little taller or
+  // shorter than the size recorded for the block, and fitting by the recorded
+  // one would cut the bottom off those.
+  const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
+  const shape = shots.length > 1 ? { w: shots[0].w, h: shots.reduce((sum, shot) => sum + (shot.h * shots[0].w) / shot.w, 0) } : (natural ?? { w: block.w, h: block.h });
+  // How many pixels wide the screenshot is: the file says, and until it is in, twice the block (captures are 2x).
+  const pixels = shots.length > 1 ? shots[0].w : (natural?.w ?? block.w * 2);
 
   useLayoutEffect(() => {
     const el = scroller.current;
@@ -479,41 +490,42 @@ function Stage({ block }: { block: Block }) {
     return () => observer.disconnect();
   }, []);
 
-  const fitted = room ? fit(block, room) : null;
+  const fitted = room && room.w > 0 && room.h > 0 ? fit(block, shape, room) : null;
 
   // Zoomed width in CSS pixels, and the point that was clicked, so the zoomed
-  // picture can be scrolled to keep that point under the pointer.
-  const [zoom, setZoom] = useState<number | null>(null);
+  // picture can be scrolled to keep that point under the pointer. `reading` is
+  // a tall block at the width it reads at: that follows the room (a scrollbar
+  // appearing narrows it), so it never scrolls sideways.
+  const [zoom, setZoom] = useState<{ w: number; reading: boolean } | null>(null);
   const anchor = useRef<{ fx: number; fy: number; x: number; y: number } | null>(null);
 
-  const toggleZoom = useCallback(
-    (at: { clientX: number; clientY: number }) => {
-      const img = image.current, el = scroller.current;
-      if (!img || !el) return;
-      if (zoom) {
-        setZoom(null);
-        return;
-      }
-      const box = img.getBoundingClientRect(), view = el.getBoundingClientRect();
-      const width = zoomWidth(img.naturalWidth || block.w * 2, box.width, window.devicePixelRatio || 1);
-      if (width <= box.width * 1.05) return;
-      anchor.current = { fx: (at.clientX - box.left) / box.width, fy: (at.clientY - box.top) / box.height, x: at.clientX - view.left, y: at.clientY - view.top };
-      setZoom(width);
-    },
-    [zoom, block.w],
-  );
+  const toggleZoom = (at: { clientX: number; clientY: number }) => {
+    const img = image.current, el = scroller.current;
+    if (!img || !el || !room) return;
+    if (zoom) {
+      setZoom(null);
+      return;
+    }
+    const box = img.getBoundingClientRect(), view = el.getBoundingClientRect();
+    const width = zoomedWidth(block, img.naturalWidth || pixels, box.width, room, window.devicePixelRatio || 1);
+    if (width <= box.width * 1.05) return;
+    // Measured over the whole picture, every slice of it, not the first file alone.
+    const whole = img.parentElement?.getBoundingClientRect() ?? box;
+    anchor.current = { fx: (at.clientX - whole.left) / whole.width, fy: (at.clientY - whole.top) / whole.height, x: at.clientX - view.left, y: at.clientY - view.top };
+    setZoom({ w: width, reading: width <= room.w });
+  };
 
   useLayoutEffect(() => {
-    const img = image.current, el = scroller.current, at = anchor.current;
+    const frame = image.current?.parentElement, el = scroller.current, at = anchor.current;
     anchor.current = null;
-    if (!zoom || !img || !el || !at) return;
-    const box = img.getBoundingClientRect(), view = el.getBoundingClientRect();
+    if (!zoom || !frame || !el || !at) return;
+    const box = frame.getBoundingClientRect(), view = el.getBoundingClientRect();
     el.scrollLeft += box.left + at.fx * box.width - (view.left + at.x);
     el.scrollTop += box.top + at.fy * box.height - (view.top + at.y);
   }, [zoom]);
 
-  const width = zoom ?? fitted?.w ?? 0;
-  const canZoom = Boolean(fitted && zoomWidth(block.w * 2, fitted.w, 2) > fitted.w * 1.05);
+  const width = zoom ? (zoom.reading && room ? Math.min(zoom.w, Math.floor(room.w)) : zoom.w) : (fitted?.w ?? 0);
+  const canZoom = Boolean(fitted && room && zoomedWidth(block, pixels, fitted.w, room, 2) > fitted.w * 1.05);
 
   return (
     <div
@@ -524,15 +536,15 @@ function Stage({ block }: { block: Block }) {
           room and lets a zoomed picture overflow to the right and bottom,
           where it can be scrolled, instead of off the left edge. */}
       <div className="flex min-h-full">
-        {fitted && (
+        {!block.src ? (
+          // A capture whose screenshot never reached storage: say so, rather than shimmer for good.
+          <p className="m-auto max-w-xs text-center text-[13px] text-muted-foreground">No screenshot was stored for this block.</p>
+        ) : fitted ? (
           <div
-            className={cn(
-              "relative m-auto shrink-0 overflow-hidden",
-              mobile ? "rounded-[28px] ring-1 ring-border" : "rounded-lg ring-1 ring-border",
-              !zoom && "shadow-xl",
-            )}
+            className={cn("relative m-auto shrink-0 overflow-hidden ring-1 ring-border", !mobile && "rounded-lg", !zoom && "shadow-xl")}
             // The recorded shape holds the room until the screenshot is in; then the frame takes the picture's own.
-            style={{ width, aspectRatio: loaded ? undefined : `${block.w} / ${block.h}`, background: block.bg }}
+            // A phone's corners, in proportion: a tall block fitted whole is narrow, and full-size corners would round it into a pill.
+            style={{ width, aspectRatio: loaded ? undefined : `${shape.w} / ${shape.h}`, background: block.bg, borderRadius: mobile ? Math.min(28, width * 0.072) : undefined }}
           >
             {/* What the wall already loaded, so there is a picture at once. */}
             {!loaded && thumb && (
@@ -554,7 +566,15 @@ function Stage({ block }: { block: Block }) {
                   height={shot.h}
                   decoding="async"
                   fetchPriority={n === 0 ? "high" : "auto"}
-                  onLoad={n === 0 ? () => setLoaded(true) : undefined}
+                  onLoad={
+                    n === 0
+                      ? (e) => {
+                          const img = e.currentTarget;
+                          if (img.naturalWidth > 0 && img.naturalHeight > 0) setNatural({ w: img.naturalWidth, h: img.naturalHeight });
+                          setLoaded(true);
+                        }
+                      : undefined
+                  }
                   onError={n === 0 ? undefined : () => setMissing((gone) => [...gone, shot.src])}
                   onClick={(e) => canZoom && toggleZoom(e)}
                   className={cn(
@@ -567,23 +587,35 @@ function Stage({ block }: { block: Block }) {
             {/* A block that moves plays its clip over the screenshot while it is on screen; clicks still zoom. */}
             <BlockClip block={block} mode="view" />
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
 
 /**
- * The screenshot's width in the room. Fitted whole when that leaves it
- * readable; a tall block that would shrink to a sliver is drawn at a readable
- * width instead and scrolls. Never wider than captured: the capture is 2x, so
- * up to its own width it is sharp on any screen.
+ * The screenshot's width in the room: the widest at which all of it shows,
+ * whatever its shape (`shape` is the picture's own, in any unit). Never wider
+ * than the block was captured: the capture is 2x, so up to its own width it is
+ * sharp on any screen. Rounded down, so the fitted picture never overflows the
+ * room by a fraction of a pixel and grows a scrollbar.
  */
-function fit(block: Block, room: { w: number; h: number }): { w: number } {
+function fit(block: Block, shape: { w: number; h: number }, room: { w: number; h: number }): { w: number } {
   const cap = Math.min(block.w, room.w);
-  const whole = Math.min(cap, (room.h / block.h) * block.w);
-  const readable = block.viewport === "mobile" ? Math.min(cap, 340) : Math.min(cap, room.w * 0.6);
-  return { w: Math.max(1, Math.round(Math.max(whole, readable))) };
+  const whole = Math.min(cap, (room.h / shape.h) * shape.w);
+  return { w: Math.max(1, Math.floor(whole)) };
+}
+
+/**
+ * How wide a click draws the screenshot, in CSS pixels. A block fitted by its
+ * height sits small in the room (a long page section, most phone captures): it
+ * goes to the width it reads at, the one it was captured at or the room's if
+ * that is less, so it scrolls top to bottom and never sideways. One that
+ * already fills most of that width goes to its real pixels (see zoomWidth).
+ */
+function zoomedWidth(block: Block, natural: number, fitted: number, room: { w: number; h: number }, dpr: number): number {
+  const reading = Math.min(block.w, room.w);
+  return reading >= fitted * 1.5 ? reading : zoomWidth(natural, fitted, dpr);
 }
 
 function Arrow({ side, onClick }: { side: "left" | "right"; onClick?: () => void }) {

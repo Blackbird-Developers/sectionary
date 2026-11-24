@@ -932,7 +932,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 export function FlowSkeleton() {
   return (
     <div className="relative flex flex-col gap-5" aria-busy="true" aria-label="Loading flow">
-      <BlimpLoader overlay label="Loading flow…" className="top-24" />
+      <BlimpLoader overlay label="Loading flow…" />
       <div className="flex flex-col gap-3">
         <div className="shimmer h-3 w-20 rounded bg-muted" />
         <div className="flex items-center gap-3">

@@ -18,6 +18,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ host
     ]);
     return { body: { store: toStore(site), pages: pages.get(site.id) ?? [],
       captures: captureRows.map((c) => ({ capturedAt: c.captured_at.toISOString(), pages: c.pages })) } };
-    });
+    }, request);
   } catch (error) { return apiError(error); }
 }

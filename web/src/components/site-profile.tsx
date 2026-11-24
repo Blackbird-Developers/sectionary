@@ -8,7 +8,7 @@ import { ArrowRight, ExternalLink, Route } from "lucide-react";
 import { StoreIcon } from "@/components/store-icon";
 import { BlockViewer } from "@/components/block-viewer";
 import { ViewportSwitch } from "@/components/viewport-switch";
-import { PageModeSwitch, PageViewer, preloadCapture, type PageBlocks, type PageMode } from "@/components/page-viewer";
+import { BackToPageButton, PageModeSwitch, PageViewer, preloadCapture, type PageBlocks, type PageMode } from "@/components/page-viewer";
 import { cn } from "@/lib/utils";
 import { PREVIEW_BLUR, usePreviewOnly } from "@/lib/account";
 import { assetUrl } from "@/lib/data-source";
@@ -247,10 +247,13 @@ export function SiteProfileView({ host }: { host: string }) {
         page={open?.mode === "page" ? open.page : null}
         blocks={open?.blocks ?? null}
         viewport={open?.viewport ?? "desktop"}
-        onViewport={(viewport) => setOpen((o) => (o ? { ...o, viewport, at: 0, cameFrom: undefined } : o))}
-        onBlock={(at) => setOpen((o) => (o ? { ...o, mode: "blocks", at, cameFrom: undefined } : o))}
+        onViewport={(viewport) => setOpen((o) => (o ? { ...o, viewport, at: 0, cameFrom: undefined, left: undefined } : o))}
+        onBlock={(at, top) =>
+          setOpen((o) => (o ? { ...o, mode: "blocks", at, cameFrom: undefined, left: top === undefined ? undefined : { at, viewport: o.viewport, top } } : o))
+        }
         onMode={setMode}
         focus={open?.at ?? 0}
+        restore={open?.left && open.left.at === open.at && open.left.viewport === open.viewport ? open.left.top : null}
         onClose={() => closeMode("page")}
         siteHost={store.host}
         pageHost={open?.host}
@@ -262,6 +265,8 @@ export function SiteProfileView({ host }: { host: string }) {
         onAt={(at) => setOpen((o) => (o ? { ...o, at } : o))}
         toolbar={
           <>
+            {/* Back to the page the block was opened from, where it was left. */}
+            <BackToPageButton onClick={() => setMode("page")} />
             <PageModeSwitch value="blocks" onChange={setMode} />
             {bothViewports && <ViewportSwitch value={open?.viewport ?? "desktop"} onChange={setBlocksViewport} size="sm" />}
           </>
@@ -388,6 +393,8 @@ type OpenPage = {
   at: number;
   /** The last Web / Mobile switch: from which block, and where it landed. */
   cameFrom?: { viewport: Viewport; at: number; landed: number };
+  /** Where the full page was left for the Blocks view: the block clicked, and how far down the page was scrolled. */
+  left?: { at: number; viewport: Viewport; top: number };
 };
 
 /**
@@ -571,7 +578,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 export function SiteProfileSkeleton() {
   return (
     <div className="relative flex flex-col gap-5" aria-busy="true" aria-label="Loading site">
-      <BlimpLoader overlay label="Loading site…" className="top-24" />
+      <BlimpLoader overlay label="Loading site…" />
       <div className="flex flex-col gap-3">
         <div className="shimmer h-3 w-12 rounded bg-muted" />
         <div className="shimmer h-6 w-48 rounded bg-muted" />
