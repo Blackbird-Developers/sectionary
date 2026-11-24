@@ -37,6 +37,6 @@ export async function GET(request: Request) {
       const { rows, stores } = await benchmarks({ industry, pageType, viewport, metrics });
       const body: BenchmarksResponse = { industry, pageType, viewport, stores, minN: MIN_BENCHMARK_N, items: rows };
       return { body };
-    });
+    }, request);
   } catch (error) { return apiError(error); }
 }

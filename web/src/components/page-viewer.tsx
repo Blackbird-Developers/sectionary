@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ExternalLink, Lock, RectangleVertical, Rows3, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ExternalLink, Lock, RectangleVertical, Rows3, X } from "lucide-react";
 import { StoreIcon } from "@/components/store-icon";
 import { INSET } from "@/components/block-viewer";
 import { useSlidingThumb, ViewportSwitch } from "@/components/viewport-switch";
@@ -123,6 +123,31 @@ export function PageModeSwitch({ value, onChange, className }: { value: PageMode
   );
 }
 
+/**
+ * Back to the whole page from one of its blocks: a pill of its own beside the
+ * Full page / Blocks and Web / Mobile switches, the same height and shape as
+ * theirs. The page comes back where it was left (see `restore` on PageViewer).
+ * On a narrow window the words drop and the arrow stays.
+ */
+export function BackToPageButton({ onClick, className }: { onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Back to the full page"
+      title="Back to the full page"
+      className={cn(
+        // 38px: a switch's height (its border, its padding and an option inside); 54px where its options are 44px tall for touch.
+        "inline-flex h-[38px] shrink-0 items-center gap-1.5 rounded-full border bg-muted/60 px-3.5 text-[12px] font-medium text-muted-foreground transition-colors duration-200 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:h-[54px] touch:px-4",
+        className,
+      )}
+    >
+      <ArrowLeft className="size-3.5" aria-hidden />
+      <span className="hidden lg:inline">Back to page</span>
+    </button>
+  );
+}
+
 type PageViewerProps = {
   /** The page to show; null keeps the window closed. */
   page: ProfilePage | null;
@@ -130,11 +155,13 @@ type PageViewerProps = {
   blocks: PageBlocks | null;
   viewport: Viewport;
   onViewport: (viewport: Viewport) => void;
-  /** Open block `at` of the shown viewport, block by block. */
-  onBlock: (at: number) => void;
+  /** Open block `at` of the shown viewport, block by block. `scrollTop` is how far down the page was scrolled when it was clicked. */
+  onBlock: (at: number, scrollTop?: number) => void;
   onMode: (mode: PageMode) => void;
   /** The block to bring into view on opening: the one the Blocks view was on. */
   focus: number;
+  /** Coming back to the page as it was left: the scroll position to return to, instead of bringing `focus` into view. */
+  restore?: number | null;
   onClose: () => void;
   /** The store whose profile this opened from; another store's page (a similar one) links to its own. */
   siteHost?: string;
@@ -224,6 +251,7 @@ function Window({
   onBlock,
   onMode,
   focus,
+  restore = null,
   onClose,
   siteHost,
   pageHost,
@@ -326,6 +354,7 @@ function Window({
           shots={blocks?.shots?.[viewport] ?? null}
           viewport={viewport}
           focus={focus}
+          restore={restore}
           onBlock={onBlock}
         />
 
@@ -375,6 +404,7 @@ function FullPage({
   shots,
   viewport,
   focus,
+  restore,
   onBlock,
 }: {
   page: ProfilePage;
@@ -383,10 +413,13 @@ function FullPage({
   shots: Shot[] | null;
   viewport: Viewport;
   focus: number;
-  onBlock: (at: number) => void;
+  restore: number | null;
+  onBlock: (at: number, scrollTop?: number) => void;
 }) {
   const mobile = viewport === "mobile";
   const scroller = useRef<HTMLDivElement>(null);
+  // A block opens with where the page was scrolled to, so coming back finds the page as it was left.
+  const open = (at: number) => onBlock(at, scroller.current?.scrollTop);
   const thumb = page[viewport];
   // The full-page screenshot: the files the source listed, or found from the thumbnail's address.
   const files = thumb ? captureFiles(thumb) : null;
@@ -401,15 +434,18 @@ function FullPage({
   const thumbOnly = blocks !== null && !capture && blocks.length === 0 && Boolean(thumb);
   const label = `${PAGE_TYPE_LABEL[page.type] ?? page.type} page, ${viewport}`;
 
-  // Back from the Blocks view, rebuilt from blocks: bring the block it was on
-  // into view. Instant, since the page has only just been drawn. (The
-  // full-page screenshot does its own, once it knows its size.)
+  // Back from the Blocks view, rebuilt from blocks: the page where it was
+  // left, or the block the Blocks view moved on to, brought into view.
+  // Instant, since the page has only just been drawn. (The full-page
+  // screenshot does its own, once it knows its size.)
   const ready = Boolean(blocks?.length) && !capture;
   useEffect(() => {
-    if (!ready || focus <= 0) return;
+    if (!ready) return;
+    if (restore !== null) return void scroller.current?.scrollTo({ top: restore });
+    if (focus <= 0) return;
     const el = scroller.current?.querySelector(`[data-at="${focus}"]`);
     el?.scrollIntoView({ block: "center" });
-  }, [ready, focus]);
+  }, [ready, focus, restore]);
 
   return (
     <div ref={scroller} data-page-scroll className="min-h-0 flex-1 overflow-auto bg-muted/40 px-3 py-4 min-[700px]:px-10 min-[700px]:py-8 [scrollbar-width:thin]">
@@ -430,13 +466,14 @@ function FullPage({
             mobile={mobile}
             blocks={blocks ?? []}
             focus={focus}
-            onBlock={onBlock}
+            restore={restore}
+            onBlock={open}
             onMissing={() => setNoCapture(true)}
           />
         ) : blocks === null ? (
           <div className="shimmer bg-muted" style={{ aspectRatio: mobile ? "9 / 19" : "16 / 20" }} aria-busy="true" aria-label="Loading the page" />
         ) : blocks.length > 0 ? (
-          <BlockStack blocks={blocks} pageW={pageW} onBlock={onBlock} />
+          <BlockStack blocks={blocks} pageW={pageW} onBlock={open} />
         ) : thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={assetUrl(thumb)} alt={label} className={cn("block h-auto", mobile ? "w-full" : "max-w-full")} />
@@ -463,7 +500,8 @@ function FullPage({
  * after all.
  *
  * A click opens the block at that height in the block viewer; coming back
- * from it, `focus` is the block to bring into view.
+ * from it, the page returns to `restore`, where it was scrolled to, or, when
+ * the Blocks view moved on to another block, brings that one (`focus`) into view.
  */
 function PageCapture({
   shots,
@@ -473,6 +511,7 @@ function PageCapture({
   mobile,
   blocks,
   focus,
+  restore,
   onBlock,
   onMissing,
 }: {
@@ -484,6 +523,7 @@ function PageCapture({
   mobile: boolean;
   blocks: Block[];
   focus: number;
+  restore: number | null;
   onBlock: (at: number) => void;
   onMissing: () => void;
 }) {
@@ -524,17 +564,20 @@ function PageCapture({
     return { el, rect, perPixel, pageHeight: rect.height * perPixel };
   };
 
-  // Back from the Blocks view: bring the block it was on into view, once the page has a size.
+  // Back from the Blocks view, once the page has a size: where the page was
+  // left, or the block the Blocks view moved on to, brought into view.
   useEffect(() => {
-    if (!seen || focus <= 0 || blocks.length === 0) return;
+    if (!seen) return;
     const m = measure();
     const view = m?.el.closest("[data-page-scroll]");
     if (!m || !view) return;
+    if (restore !== null) return void view.scrollTo({ top: restore });
+    if (focus <= 0 || blocks.length === 0) return;
     const top = blockTop(blocks, focus, m.pageHeight) / m.perPixel;
     view.scrollTo({ top: Math.max(0, m.rect.top - view.getBoundingClientRect().top + view.scrollTop + top - 24) });
     // Only on arriving: `blocks` does not change while this page is open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seen, focus]);
+  }, [seen, focus, restore]);
 
   const clickable = blocks.length > 0;
   return (

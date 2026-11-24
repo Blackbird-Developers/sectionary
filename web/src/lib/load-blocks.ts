@@ -265,21 +265,44 @@ export function loadPageBlocks(host: string, url: string): Promise<PageBlocks> {
 
 /**
  * Every store with its pages, from GET /api/sites when NEXT_PUBLIC_SITES_SRC
- * is set (SEC-47). 200 a request, so the 1,005 validated stores take six;
- * fetched once per page session and shared by the Sites grid and Flows.
+ * is set (SEC-47). 200 a request, so the 924 stores take five. The first page
+ * says how many there are, and the rest are then asked for together, not one
+ * after another: each used to wait on the one before, which made the Sites
+ * page five round trips long. Fetched once per page session and shared by the
+ * Sites grid and Flows.
  */
 function loadSiteSummaries(): Promise<SiteSummary[]> {
   return once(siteLists, SITES_SRC, async () => {
-    const sites: SiteSummary[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await getJson<{ items: SiteSummary[]; nextCursor: string | null }>(withQuery(SITES_SRC, { cursor, limit: MAX_LIMIT }));
-      sites.push(...page.items);
-      cursor = page.nextCursor ?? undefined;
-    } while (cursor);
+    type Page = { items: SiteSummary[]; nextCursor: string | null; total?: number };
+    // The same addresses the server's warm-up asks for (instrumentation.ts), so each is answered from its cache.
+    const page = (cursor?: string) => getJson<Page>(withQuery(SITES_SRC, { cursor, limit: MAX_LIMIT }));
+    const first = await page();
+    const sites = [...first.items];
+    let cursor = first.nextCursor ?? undefined;
+    // The cursor is how many stores came before (api/sites/route.ts), so with the total every later page's is known.
+    const size = first.items.length;
+    if (cursor === String(size) && first.total && size > 0) {
+      const cursors: string[] = [];
+      for (let at = size; at < first.total; at += size) cursors.push(String(at));
+      // Together, a few at a time. (When the server has to build them it does so one by one: api/sites/route.ts.)
+      for (let i = 0; i < cursors.length; i += SITE_PAGES_AT_ONCE) {
+        const pages = await Promise.all(cursors.slice(i, i + SITE_PAGES_AT_ONCE).map(page));
+        for (const p of pages) sites.push(...p.items);
+        cursor = pages.at(-1)?.nextCursor ?? undefined;
+      }
+    }
+    // Whatever is left: a list that grew meanwhile, or a server whose cursors are not counts.
+    while (cursor) {
+      const next = await page(cursor);
+      sites.push(...next.items);
+      cursor = next.nextCursor ?? undefined;
+    }
     return sites;
   });
 }
+
+/** How many pages of the Sites list are asked for at once: all of today's list after its first page. */
+const SITE_PAGES_AT_ONCE = 4;
 
 const siteLists = new Map<string, Promise<SiteSummary[]>>();
 

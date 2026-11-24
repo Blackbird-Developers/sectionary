@@ -50,6 +50,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ host
       desktop: blocks.filter((b) => b.viewport === "desktop"), mobile: blocks.filter((b) => b.viewport === "mobile"),
       shots: { desktop: shotsOf(capture?.desktop as StoredViewport), mobile: shotsOf(capture?.mobile as StoredViewport) },
     } };
-    });
+    }, request);
   } catch (error) { return apiError(error); }
 }
