@@ -8,12 +8,18 @@ import { cn } from "@/lib/utils";
  * the light and the dark theme alike; the wind and clouds take the theme's
  * muted colour.
  *
+ * Large, and lifted off the page: a thin edge in the page's colour and a soft
+ * shadow under it, so the mark holds its shape over white block previews,
+ * dark ones and pale skeletons alike.
+ *
  * It only shows for a real wait: it fades in after a short delay
  * (.blimp-appear in globals.css), so something that loads quickly never
  * flashes it. With reduced motion it appears still.
  *
- * `overlay` floats it over a skeleton (the page's shape stays, so nothing
- * jumps when the content arrives); otherwise it takes a block of its own.
+ * `overlay` floats it in the middle of the window, over a skeleton or over
+ * results that are about to change (the page's shape stays, so nothing jumps
+ * when the content arrives), and stays there as the page scrolls; otherwise it
+ * takes a block of its own. Clicks pass through it.
  */
 export function BlimpLoader({ label = "Loading…", overlay = false, className }: { label?: string; overlay?: boolean; className?: string }) {
   return (
@@ -21,12 +27,15 @@ export function BlimpLoader({ label = "Loading…", overlay = false, className }
       role="status"
       aria-live="polite"
       className={cn(
-        "blimp-appear flex justify-center",
-        overlay ? "pointer-events-none absolute inset-x-0 top-10 z-10" : "min-h-[50vh] items-center py-16",
+        "blimp-appear flex items-center justify-center",
+        overlay ? "pointer-events-none fixed inset-0 z-30 p-4" : "min-h-[50vh] py-16",
         className,
       )}
     >
-      <BlimpFlying width={180} />
+      <BlimpFlying
+        width={320}
+        className="h-auto max-w-[70vw] [filter:drop-shadow(0_0_1.5px_var(--background))_drop-shadow(0_0_1.5px_var(--background))_drop-shadow(0_14px_22px_rgb(0_0_0/0.28))]"
+      />
       <span className="sr-only">{label}</span>
     </div>
   );
