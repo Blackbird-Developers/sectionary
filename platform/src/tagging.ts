@@ -31,6 +31,8 @@ const LIST_PRICES: [RegExp, Price][] = [
   [/^claude-sonnet-5-5/, { input: 2, output: 10 }],
   [/^claude-sonnet-5(?!-5)/, { input: 2, output: 10 }],
   [/^claude-haiku-4-5/, { input: 1, output: 5 }],
+  // Prompts up to 100K tokens (a block request is about 3K); above that Haiku 5.5 bills 0.5 / 2.5.
+  [/^claude-haiku-5-5/, { input: 0.1, output: 0.5 }],
 ];
 export const BATCH_DISCOUNT = 0.5;
 export const CACHE_WRITE = 1.25; // x input price
@@ -112,10 +114,12 @@ export function inputHash(b: BlockInput, model: string): string {
   return createHash("sha256").update(parts.join("\n")).digest("hex");
 }
 
-/** Thinking off for a classification: Haiku takes no thinking field; current Sonnet and Opus turn it off with between_tools. */
+/** Thinking off for a classification: Haiku 4.5 takes no thinking field, Haiku 5.5 takes disabled; current Sonnet and Opus turn it off with between_tools. */
 export function thinkingFor(model: string, env: NodeJS.ProcessEnv = process.env): { thinking?: Anthropic.Messages.ThinkingConfigParam } {
   if (env.TAGGER_THINKING === "adaptive") return { thinking: { type: "adaptive" } };
-  if (/^claude-haiku/.test(model)) return {};
+  if (/^claude-haiku-4/.test(model)) return {};
+  // Haiku 5.5 thinks unless told not to (allowed at its default medium effort); thinking would also eat into MAX_TOKENS.
+  if (/^claude-haiku/.test(model)) return { thinking: { type: "disabled" } };
   return { thinking: { type: "between_tools" } };
 }
 
