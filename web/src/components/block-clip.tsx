@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { assetUrl } from "@/lib/data-source";
 import { cn } from "@/lib/utils";
-import type { Block } from "@/lib/blocks";
+import { playableClip, type Block } from "@/lib/blocks";
 
 /** How the screenshot under the clip is drawn: at the box's width, cropped from the top, or whole and centred. */
 type Fit = "width" | "cover" | "contain";
@@ -23,7 +23,8 @@ type Fit = "width" | "cover" | "contain";
  * Never when the system asks for reduced motion or Save-Data is on: the
  * screenshot stays. The MP4 is not fetched until the clip first plays.
  * `hidden` (a blurred preview) draws nothing, so a clip never shows what the
- * preview blurs.
+ * preview blurs. Nor does a clip that covers only part of a tall block
+ * (playableClip in lib/blocks.ts): its moving part would not line up.
  *
  * Put it inside the screenshot's box (position: relative), after the image.
  */
@@ -43,7 +44,8 @@ export function BlockClip({
   /** For the box over the screenshot, e.g. the same hover scale as the image so the two stay aligned. */
   className?: string;
 }) {
-  const clip = hidden ? undefined : block.clip;
+  // A clip that covers only part of a tall block is not played: it would not line up with the screenshot (playableClip).
+  const clip = hidden ? undefined : playableClip(block);
   const box = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const [me] = useState(() => Symbol("clip"));

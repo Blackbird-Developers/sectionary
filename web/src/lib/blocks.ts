@@ -89,6 +89,26 @@ export function blurOf(block: Block): string | undefined {
   return (block as Block & { blur?: string }).blur;
 }
 
+/** The share of a block's height its clip must cover to play over the screenshot (playableClip). */
+export const CLIP_MIN_COVER = 0.9;
+
+/**
+ * The block's clip, when it can play over the screenshot without a seam; else
+ * undefined, and the screenshot stays still. The crawler records at most one
+ * screen (900 px tall on desktop, 844 on mobile), so the clip of a taller block
+ * covers only part of it, and when the page moved between the screenshot and
+ * the recording the moving part no longer lines up with the still one: a video
+ * cut across (bonvelo.de), a product gallery drawn twice (bensly.com). On 26 Nov
+ * 2026, 246 of the 886 clips on the wall covered under 90% of their block's
+ * height, nearly all cut at exactly one screen. A clip without `rect` covers the
+ * whole block.
+ */
+export function playableClip(block: Pick<Block, "h" | "clip">): Block["clip"] {
+  const clip = block.clip;
+  if (!clip?.rect || !(block.h > 0)) return clip;
+  return clip.rect.h >= block.h * CLIP_MIN_COVER ? clip : undefined;
+}
+
 /**
  * The block's 600px thumbnail, when it shows the whole block. The wall's
  * cards are at most a few hundred pixels wide, and the full screenshot is
