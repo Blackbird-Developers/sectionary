@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useId, useState } from "react";
+import { useFinishSignIn } from "@/lib/finish-sign-in";
 import Link from "next/link";
 import { submitTwoStepCode, type ConfirmState } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,8 @@ const idle: ConfirmState = { status: "idle" };
 
 /** The authenticator code after the email link; a recovery code when the phone is not at hand. */
 export function TwoStepSignIn() {
-  const [state, submit, pending] = useActionState(submitTwoStepCode, idle);
+  const [state, submit, submitting] = useActionState(submitTwoStepCode, idle);
+  const pending = useFinishSignIn(state) || submitting;
   const [recovery, setRecovery] = useState(false);
   const id = useId();
   const error = state.status === "error" ? state.message : null;

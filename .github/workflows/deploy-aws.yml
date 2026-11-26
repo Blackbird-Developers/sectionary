@@ -46,6 +46,7 @@ jobs:
             --build-arg NEXT_PUBLIC_SITES_SRC="${{ vars.NEXT_PUBLIC_SITES_SRC }}" \
             --build-arg NEXT_PUBLIC_ASSET_BASE="${{ vars.NEXT_PUBLIC_ASSET_BASE }}" \
             --build-arg NEXT_PUBLIC_CONTACT_EMAIL="${{ vars.NEXT_PUBLIC_CONTACT_EMAIL }}" \
+            --build-arg NEXT_PUBLIC_AUTH_GOOGLE="${{ vars.NEXT_PUBLIC_AUTH_GOOGLE }}" \
             -t "$IMAGE:${{ github.sha }}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"

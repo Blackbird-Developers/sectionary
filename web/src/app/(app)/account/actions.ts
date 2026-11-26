@@ -11,6 +11,13 @@ import { revalidatePath } from "next/cache";
 import { clientIp, hit, limitKey, RateLimitError } from "@/server/rate-limit";
 import { configuredOrigin } from "@/server/site-url";
 import { ApiKeyError, createApiKey, revokeApiKey } from "@/server/api-keys";
+import { saveOnboarding } from "@/server/accounts";
+import { PAGES, ROLES } from "@/lib/sign-in";
+import { INDUSTRY_LABEL } from "@/lib/stores";
+
+const ROLE_VALUES = new Set<string>(ROLES.map((r) => r.value));
+const PAGE_VALUES = new Set<string>(PAGES.map((p) => p.value));
+const INDUSTRY_VALUES = new Set(Object.keys(INDUSTRY_LABEL));
 
 // SEC-27 sign-in and SEC-28 billing actions. Thin: the work is in src/server.
 
@@ -41,6 +48,8 @@ const accountCodeLimits = (userId: string) => [{ key: `two-step:u:${userId}`, ma
 export type SignInState =
   | { status: "idle" }
   | { status: "sent"; email: string }
+  /** Signed in: the page loads `next` in full (lib/finish-sign-in.ts), so the header and everything else read the new account. */
+  | { status: "done"; next: string }
   | { status: "error"; message: string; email: string; step: "email" | "code" };
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -93,10 +102,10 @@ export async function signInWithCode(_prev: SignInState, form: FormData): Promis
   } catch (error) {
     return { status: "error", message: message(error), email, step: "code" };
   }
-  redirect(next);
+  return { status: "done", next };
 }
 
-export type ConfirmState = { status: "idle" } | { status: "error"; message: string };
+export type ConfirmState = { status: "idle" } | { status: "error"; message: string } | { status: "done"; next: string };
 
 /**
  * The link from the email, on any device. A button press rather than on page
@@ -113,7 +122,7 @@ export async function confirmSignIn(_prev: ConfirmState, form: FormData): Promis
   } catch (error) {
     return { status: "error", message: message(error) };
   }
-  redirect(next);
+  return { status: "done", next };
 }
 
 /**
@@ -130,12 +139,17 @@ export async function signInWithAccessToken(_prev: ConfirmState, form: FormData)
   } catch (error) {
     return { status: "error", message: message(error) };
   }
-  redirect(next);
+  return { status: "done", next };
 }
 
 export async function signOutAction() {
   await signOut();
   redirect("/account");
+}
+
+/** Log out from the avatar menu. No redirect: the menu loads the page in full, so the header reads the signed-out account. */
+export async function logOutAction(): Promise<void> {
+  await signOut();
 }
 
 export async function signOutEverywhereAction() {
@@ -155,7 +169,7 @@ export async function submitTwoStepCode(_prev: ConfirmState, form: FormData): Pr
   } catch (error) {
     return { status: "error", message: message(error) };
   }
-  redirect(next);
+  return { status: "done", next };
 }
 
 export type TwoStepState =
@@ -263,4 +277,26 @@ export async function revokeApiKeyAction(form: FormData) {
   const id = String(form.get("id") ?? "");
   if (user && /^[0-9a-f-]{36}$/i.test(id)) await revokeApiKey(user.id, id);
   revalidatePath("/account");
+}
+
+// ---------------------------------------------------------------- after the first sign-in
+
+/**
+ * The answers to "What do you do?" and "What do you want to see?", or none
+ * (Skip). Either way the questions are not asked again. Values outside the
+ * lists are dropped, not refused: nothing reads them for access.
+ */
+export async function saveOnboardingAction(answers: { role: string | null; pages: string[]; industries: string[] }): Promise<{ ok: boolean }> {
+  const user = await currentUser();
+  if (!user) return { ok: false };
+  const pick = (values: unknown, allowed: Set<string>) =>
+    [...new Set(Array.isArray(values) ? values.filter((v): v is string => typeof v === "string" && allowed.has(v)) : [])];
+  const role = typeof answers?.role === "string" && ROLE_VALUES.has(answers.role) ? answers.role : null;
+  try {
+    await saveOnboarding(user.id, { role, pages: pick(answers?.pages, PAGE_VALUES), industries: pick(answers?.industries, INDUSTRY_VALUES) });
+    return { ok: true };
+  } catch (error) {
+    console.error("[onboarding]", error);
+    return { ok: false };
+  }
 }

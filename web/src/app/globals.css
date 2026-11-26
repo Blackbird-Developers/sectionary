@@ -548,4 +548,19 @@
       background-position: -200% 0;
     }
   }
+
+  /* Popups on <dialog> (components/ui/dialog.tsx): a short rise, the backdrop fades. */
+  .dialog-in[open] {
+    animation: dialog-in 220ms var(--ease-out-expo) both;
+  }
+  .dialog-in[open]::backdrop {
+    animation: palette-fade 220ms ease-out both;
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      translate: 0 8px;
+      scale: 0.98;
+    }
+  }
 }

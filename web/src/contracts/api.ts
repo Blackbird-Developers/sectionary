@@ -141,6 +141,11 @@ export type Account = {
   access: Plan;
   /** Two-step sign-in with an authenticator app is on. */
   twoStep: boolean;
+  /** The questions after the first sign-in ("What do you do?") were answered or skipped. */
+  onboarded: boolean;
+  /** From Google sign-in; null for an email-only account. */
+  name: string | null;
+  avatarUrl: string | null;
 };
 /** Pro-only things the UI locks for Free and signed-out viewers ("open" is opening a block at all). */
 // "mcp": the MCP server at /api/mcp with an API key (SEC-31). Pro and Team (owner decision, 18 Nov 2026).

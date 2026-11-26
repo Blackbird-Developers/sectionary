@@ -1,0 +1,21 @@
+<!--
+  Blimp sign-in email: paste into Supabase → Authentication → Emails → Templates,
+  into both "Magic Link" and "Confirm signup" (a new address gets the second).
+  Unlocked once custom SMTP is set up (docs/AUTH-AND-BILLING.md, section 2).
+
+  Subject: Your Blimp sign-in code is {{ .Token }}
+  (Code in the subject so it shows in the phone's notification. If Supabase
+  sends the subject without the number filled in, use "Your Blimp sign-in code".)
+
+  Code only, no link: a code works on any device, and a mail scanner cannot use
+  it up by opening it. /auth/confirm and /auth/callback stay for old emails.
+-->
+<div style="margin:0;padding:32px 16px;background:#f6f6f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111;">
+  <div style="max-width:440px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px 28px;">
+    <p style="margin:0 0 24px;font-size:18px;font-weight:800;letter-spacing:-0.04em;">blimp</p>
+    <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;">Your sign-in code</h1>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.5;color:#555;">Type this code on the Blimp sign-in screen.</p>
+    <p style="margin:0 0 20px;padding:16px 0;background:#f2f2f4;border-radius:12px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:0.3em;">{{ .Token }}</p>
+    <p style="margin:0;font-size:13px;line-height:1.5;color:#777;">It works once, for one hour. If you didn't ask to sign in to Blimp, you can ignore this email.</p>
+  </div>
+</div>

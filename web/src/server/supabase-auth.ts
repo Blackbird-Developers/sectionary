@@ -20,7 +20,8 @@ export class AuthError extends Error {
   }
 }
 
-export type VerifiedUser = { id: string; email: string };
+/** name and avatarUrl come with Google sign-in (Supabase's user_metadata); an email sign-in has neither. */
+export type VerifiedUser = { id: string; email: string; name?: string | null; avatarUrl?: string | null };
 
 function config() {
   const url = process.env.SUPABASE_URL?.replace(/\/+$/, "");
@@ -91,12 +92,15 @@ export async function userFromAccessToken(accessToken: string): Promise<Verified
     throw new AuthError("We couldn't reach the sign-in service. Try again in a minute.", "UPSTREAM");
   }
   if (res.status === 401 || res.status === 403) throw new AuthError("That link has expired or was already used. Ask for a new one.", "EXPIRED");
-  const json = (await res.json().catch(() => ({}))) as { id?: string; email?: string };
+  const json = (await res.json().catch(() => ({}))) as { id?: string; email?: string; user_metadata?: Record<string, unknown> };
   if (!res.ok || !json.id || !json.email) {
     console.error("[auth] /user", res.status);
     throw new AuthError("Sign-in failed. Ask for a new link and try again.", "UPSTREAM");
   }
-  return { id: json.id, email: json.email };
+  const meta = json.user_metadata ?? {};
+  const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+  const avatar = text(meta.avatar_url ?? meta.picture, 500);
+  return { id: json.id, email: json.email, name: text(meta.full_name ?? meta.name, 120), avatarUrl: avatar?.startsWith("https://") ? avatar : null };
 }
 
 function userFrom(json: Record<string, unknown>): VerifiedUser {

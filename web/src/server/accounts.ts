@@ -24,25 +24,35 @@ export type SessionUser = { id: string; email: string; plan: Plan; planStatus: s
   /** End of the seven-day Pro trial. */
   trialEndsAt: string | null;
   /** When two-step sign-in (authenticator app) was turned on, or null when it is off. */
-  twoStepSince: string | null };
+  twoStepSince: string | null;
+  /** When the questions after the first sign-in were answered or skipped, or null when they have not been asked yet. */
+  onboardedAt: string | null;
+  /** From Google sign-in; null for an email-only account. */
+  name: string | null; avatarUrl: string | null };
 
 const userColumns = (sql: ReturnType<typeof database>) =>
   sql`u.id, u.email, u.plan, u.plan_status, u.plan_seats, u.plan_renews_at, u.plan_cancel_at, u.paddle_customer_id, u.paddle_subscription_id,
-    u.trial_ends_at, u.totp_enabled_at`;
+    u.trial_ends_at, u.totp_enabled_at, u.onboarded_at, u.name, u.avatar_url`;
 
 const toUser = (r: Record<string, unknown>): SessionUser => ({
   id: r.id as string, email: (r.email as string) ?? "", plan: r.plan as Plan, planStatus: (r.plan_status as string | null) ?? null,
   seats: Number(r.plan_seats ?? 1), renewsAt: iso(r.plan_renews_at), cancelAt: iso(r.plan_cancel_at),
   paddleCustomerId: (r.paddle_customer_id as string | null) ?? null, paddleSubscriptionId: (r.paddle_subscription_id as string | null) ?? null,
-  trialEndsAt: iso(r.trial_ends_at), twoStepSince: iso(r.totp_enabled_at),
+  trialEndsAt: iso(r.trial_ends_at), twoStepSince: iso(r.totp_enabled_at), onboardedAt: iso(r.onboarded_at),
+  name: (r.name as string | null) ?? null, avatarUrl: (r.avatar_url as string | null) ?? null,
 });
 
-/** The users row for a Supabase user who just proved their address. Same id as auth.users. A new row starts the trial. */
-export async function upsertUser(id: string, email: string): Promise<SessionUser> {
+/**
+ * The users row for a Supabase user who just proved their address. Same id as
+ * auth.users. A new row starts the trial. A name and photo (from Google) fill
+ * in only what the row does not have yet.
+ */
+export async function upsertUser(id: string, email: string, profile: { name?: string | null; avatarUrl?: string | null } = {}): Promise<SessionUser> {
   const sql = database();
-  const [row] = await sql`INSERT INTO users AS u (id, email, last_sign_in_at, trial_ends_at)
-    VALUES (${id}, ${email.toLowerCase()}, now(), now() + make_interval(days => ${TRIAL_DAYS}))
-    ON CONFLICT (id) DO UPDATE SET email=excluded.email, last_sign_in_at=now(), updated_at=now()
+  const [row] = await sql`INSERT INTO users AS u (id, email, name, avatar_url, last_sign_in_at, trial_ends_at)
+    VALUES (${id}, ${email.toLowerCase()}, ${profile.name ?? null}, ${profile.avatarUrl ?? null}, now(), now() + make_interval(days => ${TRIAL_DAYS}))
+    ON CONFLICT (id) DO UPDATE SET email=excluded.email, name=COALESCE(u.name, excluded.name), avatar_url=COALESCE(u.avatar_url, excluded.avatar_url),
+      last_sign_in_at=now(), updated_at=now()
     RETURNING ${userColumns(sql)}`;
   return toUser(row);
 }
@@ -116,7 +126,16 @@ export function sessionCookie(token: string, expires: Date): string {
 /** The account as the API shows it: no Paddle ids. */
 export function toAccount(user: SessionUser, access: Plan): Account {
   return { id: user.id, email: user.email, plan: user.plan, planStatus: user.planStatus, seats: user.seats,
-    renewsAt: user.renewsAt, cancelAt: user.cancelAt, trialEndsAt: user.trialEndsAt, access, twoStep: Boolean(user.twoStepSince) };
+    renewsAt: user.renewsAt, cancelAt: user.cancelAt, trialEndsAt: user.trialEndsAt, access, twoStep: Boolean(user.twoStepSince),
+    onboarded: Boolean(user.onboardedAt), name: user.name, avatarUrl: user.avatarUrl };
+}
+
+export type Onboarding = { role: string | null; pages: string[]; industries: string[] };
+
+/** The answers to the questions after the first sign-in (Skip saves empty ones). Asked once: this marks the account as onboarded. */
+export async function saveOnboarding(userId: string, answers: Onboarding) {
+  await database()`UPDATE users SET role=${answers.role}, interest_pages=${answers.pages}, interest_industries=${answers.industries},
+    onboarded_at=now(), updated_at=now() WHERE id=${userId}`;
 }
 
 /** One cookie value out of a Cookie header, for route handlers tested outside Next.js. */

@@ -21,6 +21,7 @@ ARG NEXT_PUBLIC_STORES_SRC
 ARG NEXT_PUBLIC_SITES_SRC
 ARG NEXT_PUBLIC_ASSET_BASE
 ARG NEXT_PUBLIC_CONTACT_EMAIL
+ARG NEXT_PUBLIC_AUTH_GOOGLE
 # An argument left out arrives as an empty string, which is not the same as
 # unset (NEXT_PUBLIC_BLOCKS_SRC="" would point the wall at nothing); empty ones are dropped.
 RUN cd web \

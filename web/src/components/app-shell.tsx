@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { CircleUser } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { MobileTabs, NavLinks, ScrollFlag } from "@/components/nav-links";
 import { CommandPalette } from "@/components/command-palette";
@@ -8,6 +7,9 @@ import { PlanBadge } from "@/components/plan-badge";
 import { AuthHashRedirect } from "@/components/auth-hash-redirect";
 import { DevPlanSwitch } from "@/components/dev-plan-switch";
 import { NavTracker } from "@/components/back-link";
+import { AccountMenu } from "@/components/account-menu";
+import { SignInDialog } from "@/components/sign-in-dialog";
+import { Onboarding } from "@/components/onboarding";
 import { cn } from "@/lib/utils";
 
 /**
@@ -58,14 +60,7 @@ export function AppShell({
             <span className="hidden font-mono text-[11px] tabular-nums text-muted-foreground xl:inline">preview · sample data</span>
             <PlanBadge />
             <ThemeToggle />
-            <Link
-              href="/account"
-              aria-label="Account"
-              title="Account"
-              className="inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring touch:size-11"
-            >
-              <CircleUser className="size-4" />
-            </Link>
+            <AccountMenu />
           </div>
         </div>
       </header>
@@ -81,6 +76,8 @@ export function AppShell({
       )}
       {footer && <div className={cn(landing && "pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0")}>{footer}</div>}
       <MobileTabs />
+      <SignInDialog />
+      <Onboarding />
       {process.env.NODE_ENV === "development" && <DevPlanSwitch />}
     </div>
   );

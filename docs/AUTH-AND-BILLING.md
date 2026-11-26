@@ -5,6 +5,31 @@ Paddle). This page is how it works and the one-time setup in Supabase, Paddle
 and Vercel. The code is in `web/src/server/` (accounts, auth, supabase-auth,
 plans, paddle, views) and `platform/drizzle/0009_accounts_billing.sql`.
 
+## Log in and sign up (the screens)
+
+One flow for both, as on Pixlpin: a new address simply gets an account.
+
+- **Header:** signed out, a **Log in** button; signed in, a round avatar (the
+  Google photo, or the first letter of the name or email) that opens a menu:
+  name, email and plan, then Boards, Account & security, API keys & MCP, Plan &
+  billing, Log out (`components/account-menu.tsx`).
+- **The popup** (`components/sign-in-dialog.tsx`) opens over the page from Log
+  in, and from any link to `/account` while signed out, so every "Sign in"
+  link in the app opens it in place. It has **Continue with Google** (once
+  turned on, below), then email and **Send code**, then six boxes for the code
+  with Resend (after 60 s) and Use a different email. "New to Blimp? Join" only
+  changes the title. Continuing is agreeing to the Terms and Privacy Policy,
+  so there is no checkbox. `/account` shows the same form as a page.
+- **After signing in** the page loads in full where the person was, and a new
+  account gets two questions once (`components/onboarding-dialog.tsx`):
+  "What do you do?" (one role) and "What do you want to see?" (page types and
+  industries). Skip and Continue both mark it done (`users.onboarded_at`,
+  migration 0020). The answers are stored for picking designs later; nothing
+  reads them for access. In development, `?onboarding` in the address shows
+  the questions without a database.
+
+Plans, the trial and the gates are unchanged by these screens.
+
 ## How sign-in works
 
 1. `/account` asks for an email. The server calls Supabase Auth's `/otp`
@@ -180,23 +205,25 @@ cd platform && npm run db:migrate     # applies 0009 to 0012
   so Supabase's default link may come back to `/auth/callback`. (For local
   development add `http://localhost:3000/**` too.)
 - **Authentication → Emails → SMTP**: set up custom SMTP (Resend, Postmark or
-  SES). Supabase's built-in sender only delivers to members of the Supabase
+  SES). Sender name **Blimp**, sender address e.g. `login@<our domain>` (the
+  domain must be verified with the email provider first). Supabase's built-in sender only delivers to members of the Supabase
   organisation and a few emails an hour, so it is fine for testing and not for
   users.
 - **Authentication → Sign In / Providers → Email**: email provider on; OTP
   length 6; OTP expiry 3600 seconds.
-- **Authentication → Emails → Templates** (unlocked by custom SMTP; until then the default email works, see above): paste this into both **Magic Link**
-  and **Confirm signup** (a new address gets the second one):
-
-  Subject: `Your Sectionary sign-in link`
-
-  ```html
-  <h2>Sign in to Sectionary</h2>
-  <p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email">Sign in to Sectionary</a></p>
-  <p>Or type this code on the sign-in page: <strong>{{ .Token }}</strong></p>
-  <p>The link and the code work once, for one hour. If you did not ask to sign in, you can ignore this email.</p>
-  ```
-
+- **Authentication → Emails → Templates** (unlocked by custom SMTP; until then
+  Supabase's default email, a link, works): paste `docs/email/sign-in-code.html`
+  into both **Magic Link** and **Confirm signup** (a new address gets the
+  second), with the subject written at the top of that file. It is the Blimp
+  email: the code only, no link. `/auth/confirm` and `/auth/callback` stay, so
+  older emails with a link still work.
+- **Authentication → Sign In / Providers → Google** (for Continue with Google):
+  in Google Cloud Console make an OAuth client (Web application) whose
+  Authorized redirect URI is `https://<project-ref>.supabase.co/auth/v1/callback`;
+  paste its client ID and secret here and turn the provider on. Then set
+  `NEXT_PUBLIC_AUTH_GOOGLE=on` (table below) and rebuild: the button only shows
+  with it. Google sign-in comes back to `/auth/callback` like the default email
+  link, so the Redirect URLs above already cover it.
 - **Project Settings → API Keys**: copy the project URL and the publishable key.
 
 ### 3. Paddle
@@ -232,6 +259,7 @@ Server-only, none of them `NEXT_PUBLIC_`. Then redeploy.
 | `PLAN_GATES` | leave unset until launch, then `on` |
 | `FREE_DAILY_VIEWS` | optional, default 3 |
 | `AUTH_ENCRYPTION_KEY` | a long random string (`openssl rand -base64 32`) for two-step secrets. Set once, never change it |
+| `NEXT_PUBLIC_AUTH_GOOGLE` | `on` once the Google provider is on in Supabase (above); unset hides Continue with Google. Build time, like every `NEXT_PUBLIC_` variable |
 | `NEXT_PUBLIC_SITE_URL` | the site's address, as in Supabase's Site URL. Sign-in links are built from it, not from the request |
 | `TRUSTED_PROXY_HOPS` | optional, default 1. See `web/.env.example` |
 | `BRIEF_DAILY_LIMIT`, `BRIEF_TRIAL_DAILY_LIMIT` | optional, default 50 and 10 briefs a day |

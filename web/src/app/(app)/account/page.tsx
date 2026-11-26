@@ -11,7 +11,7 @@ import { pendingSetupSecret, recoveryCodesLeft } from "@/server/two-step";
 import { TwoStepCard } from "@/components/two-step-card";
 import { viewsToday } from "@/server/views";
 import { openBillingPortal, signOutAction, signOutEverywhereAction } from "./actions";
-import { SignInForm } from "@/components/sign-in-form";
+import { SignInForm, TermsNote } from "@/components/sign-in-form";
 import { PlanPicker } from "@/components/plan-picker";
 import { Button } from "@/components/ui/button";
 
@@ -36,11 +36,14 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6 sm:py-12">
         <div>
-          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Sign in</h1>
-          <p className="mt-1 text-[14px] text-muted-foreground text-pretty">No password. We email you a link and a code; either one signs you in.</p>
+          <h1 className="font-heading text-[22px] font-extrabold tracking-[-0.03em]">Log in or sign up</h1>
+          <p className="mt-1 text-[14px] text-muted-foreground text-pretty">No password. New here? The same steps make your account.</p>
         </div>
         {authConfigured() ? (
-          <SignInForm next={next} />
+          <>
+            <SignInForm next={next} />
+            <TermsNote />
+          </>
         ) : (
           <p className="rounded-lg border border-dashed p-4 text-[13px] text-muted-foreground">Sign-in is not switched on for this deployment yet.</p>
         )}
@@ -81,7 +84,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </div>
       </div>
 
-      <section aria-label="Your plan" className="flex flex-col gap-3 rounded-xl border bg-card p-4">
+      <section id="plan" aria-label="Your plan" className="scroll-mt-20 flex flex-col gap-3 rounded-xl border bg-card p-4">
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="font-heading text-[15px] font-semibold">{trial ? "Pro trial" : PLAN_NAME[user.plan]}{user.plan === "team" && ` · ${user.seats} seats`}</p>
           {trial && user.trialEndsAt && <p className="text-[13px] text-muted-foreground">Everything in Pro until {day(user.trialEndsAt)}, then Free. No card needed.</p>}
@@ -112,6 +115,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         {billingNote && <p className="text-[13px] text-muted-foreground">{billingNote}</p>}
       </section>
 
+      <div id="security" className="scroll-mt-20">
       <TwoStepCard
         since={user.twoStepSince}
         codesLeft={user.twoStepSince ? await recoveryCodesLeft(user.id) : 0}
@@ -119,9 +123,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         configured={twoStepConfigured()}
         note={params.two_step === "unavailable" ? "Two-step sign-in could not start just now. Try again in a minute." : undefined}
       />
+      </div>
 
       {apiKeys && (
+        <div id="api-keys" className="scroll-mt-20">
         <ApiKeysCard keys={apiKeys} endpoint={`${configuredOrigin() ?? "http://localhost:3000"}/api/mcp`} full={can(access, "mcp")} max={MAX_KEYS} />
+        </div>
       )}
 
       <PlanPicker

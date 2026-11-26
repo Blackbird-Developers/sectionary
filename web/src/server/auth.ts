@@ -40,7 +40,7 @@ async function setSessionCookie(userId: string) {
  * /auth/two-step can finish. Says which, so the caller knows where to go.
  */
 export async function startSession(verified: VerifiedUser, next: string): Promise<{ user: SessionUser; twoStep: boolean }> {
-  const user = await upsertUser(verified.id, verified.email);
+  const user = await upsertUser(verified.id, verified.email, verified);
   const jar = await cookies();
   if (user.twoStepSince) {
     // A new sign-in replaces whatever this browser had: no old full session alongside the pending one.
@@ -103,6 +103,11 @@ export async function rememberSignIn(email: string, next: string) {
   const opts = { httpOnly: true, secure: secure(), sameSite: "lax" as const, path: "/", maxAge: 600 };
   jar.set(EMAIL_COOKIE, email, opts);
   jar.set(NEXT_COOKIE, next, opts);
+}
+
+/** Where to go after a sign-in that leaves this site and comes back (Google), on this device only (10 minutes). */
+export async function rememberNext(next: string) {
+  (await cookies()).set(NEXT_COOKIE, next, { httpOnly: true, secure: secure(), sameSite: "lax", path: "/", maxAge: 600 });
 }
 
 /** The path saved by rememberSignIn, cleared once used. */

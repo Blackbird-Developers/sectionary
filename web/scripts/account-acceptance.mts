@@ -160,6 +160,20 @@ try {
   check("signing out ends that session only", (await accounts.userForRequest(req("/", { cookie: ana2.cookie }))) === null
     && (await accounts.userForRequest(req("/", { cookie: ana.cookie })))?.id === ana.user.id);
 
+  // ------------------------------------------------------------ 1b. after the first sign-in
+  body = await (await accountRoute.GET(req("/api/account", { cookie: ana.cookie }))).json();
+  check("a new account has not answered the welcome questions", body.account?.onboarded === false && body.account.name === null && body.account.avatarUrl === null);
+  await accounts.saveOnboarding(ana.user.id, { role: "developer", pages: ["product", "cart"], industries: ["pets"] });
+  body = await (await accountRoute.GET(req("/api/account", { cookie: ana.cookie }))).json();
+  const answers = (await local.db.query<{ role: string; interest_pages: string[]; interest_industries: string[] }>(
+    "SELECT role, interest_pages, interest_industries FROM users WHERE id=$1", [ana.user.id])).rows[0];
+  check("the answers are stored and asked once", body.account?.onboarded === true && answers?.role === "developer"
+    && answers.interest_pages.join() === "product,cart" && answers.interest_industries.join() === "pets", JSON.stringify(answers));
+  const google = await accounts.upsertUser(ana.user.id, "ana@studio.test", { name: "Ana Lima", avatarUrl: "https://photos.test/ana.png" });
+  check("Google's name and photo fill in an account that has none", google.name === "Ana Lima" && google.avatarUrl === "https://photos.test/ana.png");
+  const again = await accounts.upsertUser(ana.user.id, "ana@studio.test", { name: "Someone Else", avatarUrl: null });
+  check("and do not overwrite them on a later sign-in", again.name === "Ana Lima" && again.avatarUrl === "https://photos.test/ana.png" && again.onboardedAt !== null);
+
   // ------------------------------------------------------------ 8a. the trial
   const days = (Date.parse(ana.user.trialEndsAt ?? "") - Date.now()) / 86_400_000;
   check("a new account starts a 7-day trial", days > 6.9 && days <= 7, String(days));

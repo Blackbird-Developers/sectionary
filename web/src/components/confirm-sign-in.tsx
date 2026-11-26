@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { useFinishSignIn } from "@/lib/finish-sign-in";
 import Link from "next/link";
 import { confirmSignIn, type ConfirmState } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,8 @@ const idle: ConfirmState = { status: "idle" };
 
 /** One button between the email link and the session; see confirmSignIn for why. */
 export function ConfirmSignIn({ tokenHash, type }: { tokenHash: string; type: string }) {
-  const [state, confirm, pending] = useActionState(confirmSignIn, idle);
+  const [state, confirm, submitting] = useActionState(confirmSignIn, idle);
+  const pending = useFinishSignIn(state) || submitting;
   return (
     <form action={confirm} className="flex flex-col gap-3">
       <input type="hidden" name="token_hash" value={tokenHash} />

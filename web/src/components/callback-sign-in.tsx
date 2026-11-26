@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useSyncExternalStore } from "react";
+import { useFinishSignIn } from "@/lib/finish-sign-in";
 import Link from "next/link";
 import { signInWithAccessToken, type ConfirmState } from "@/app/(app)/account/actions";
 import { Button } from "@/components/ui/button";
@@ -27,7 +28,8 @@ const subscribe = () => () => {};
 /** Signs in with the token from Supabase's default email link; on its own, no click needed. */
 export function CallbackSignIn() {
   const found = useSyncExternalStore(subscribe, readLanding, () => undefined);
-  const [state, submit, pending] = useActionState(signInWithAccessToken, idle);
+  const [state, submit, submitting] = useActionState(signInWithAccessToken, idle);
+  const pending = useFinishSignIn(state) || submitting;
   const form = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
@@ -40,8 +42,8 @@ export function CallbackSignIn() {
     const expired = found && /expired|denied/i.test(found.error);
     return (
       <p className="text-[14px] text-muted-foreground">
-        {expired ? "That link has expired or was already used." : "This link is missing its sign-in token."}{" "}
-        <Link href="/account" className="text-link underline-offset-4 hover:underline">Send a new link</Link>.
+        {expired ? "That sign-in expired, was already used or was cancelled." : "This link is missing its sign-in token."}{" "}
+        <Link href="/account" className="text-link underline-offset-4 hover:underline">Try again</Link>.
       </p>
     );
   }
