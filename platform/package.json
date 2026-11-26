@@ -9,6 +9,7 @@
     "import": "tsx src/import.ts",
     "tag-blocks": "tsx src/tagger.ts",
     "rule-tag": "tsx src/rule-tagger.ts",
+    "hide-blocks": "tsx src/hide-blocks.ts",
     "embed": "tsx src/embed.ts",
     "profile-sites": "tsx src/profile.ts",
     "benchmarks": "tsx src/benchmarks.ts",

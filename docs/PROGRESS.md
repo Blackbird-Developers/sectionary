@@ -7,6 +7,30 @@ PLAN.md changes only when scope does; the board mirrors every work item.
 Earlier sessions are in Ben's vault copy (To Do's/New APP Mobbin Recreate).
 This file starts on 2026-10-01 so every lane can append to it.
 
+## 2026-11-26 · Ben (with Claude)
+
+**Block review and the hide mark (migration 0019).** Many blocks on the Blocks
+page offer nothing to someone browsing (a lone photo, a copyright sliver, a bare
+line of text, a "collection is empty" page). They stay part of their page, so
+Sites keeps them: `blocks.wall_hidden` takes a block off the Blocks page only.
+
+- Review: Claude Haiku 5.5 over every block then on the wall (22,867, Message
+  Batches, $1.61): keep 18,122, hide 3,873, retake 801. Rules settled in a
+  300-block pilot with Ben: judge a block against its own kind; complete page
+  parts (headers, footers, carts including empty carts, grids, forms) are kept.
+  The run's files are in `_tmp/block-review/` on Ben's PC (not in the repo).
+- Migration 0019: `wall_hidden`, `wall_hidden_reason`, `wall_hidden_at`;
+  `wall_shown` rebuilt with `AND NOT b.wall_hidden`; the blocks trigger watches
+  `wall_hidden`; `blocks_wall_idx` covers it. When a shown block is hidden, the
+  store's next copy of that section takes its place.
+- `npm run hide-blocks -- --from answers.jsonl [--except ticks.txt] [--apply]`,
+  `--unhide <file>`, `--status`. Dry run unless `--apply`; rebuilds the wall after.
+- `wall.test.ts`: "nothing changed ... one rebuild" picked the lowest block id,
+  which is random per import, and failed whenever that block's section had no
+  second copy. It now picks a block that has one.
+- Waiting: the team's review and merge (the migration needs `npm run db:migrate`
+  on production), then Ben's approval of the hides before `--apply`.
+
 ## 2026-11-20 · Buna (Lane B)
 
 **SEC-31 in production (AWS).** Merging #55 and #56 deployed to ECS (checked
