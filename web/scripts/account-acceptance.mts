@@ -169,6 +169,11 @@ try {
     "SELECT role, interest_pages, interest_industries FROM users WHERE id=$1", [ana.user.id])).rows[0];
   check("the answers are stored and asked once", body.account?.onboarded === true && answers?.role === "developer"
     && answers.interest_pages.join() === "product,cart" && answers.interest_industries.join() === "pets", JSON.stringify(answers));
+  await auth.sendMagicLink("bea@studio.test");
+  const bea = await signIn(await auth.verifyTokenHash("th-bea@studio.test", "email"));
+  const skipped = await accounts.saveOnboarding(bea.user.id, { role: null, pages: [], industries: [] }).then(() => "saved", (e: Error) => e.message);
+  body = await (await accountRoute.GET(req("/api/account", { cookie: bea.cookie }))).json();
+  check("Skip (no answers) is saved too, so the questions do not come back", skipped === "saved" && body.account?.onboarded === true, skipped);
   const google = await accounts.upsertUser(ana.user.id, "ana@studio.test", { name: "Ana Lima", avatarUrl: "https://photos.test/ana.png" });
   check("Google's name and photo fill in an account that has none", google.name === "Ana Lima" && google.avatarUrl === "https://photos.test/ana.png");
   const again = await accounts.upsertUser(ana.user.id, "ana@studio.test", { name: "Someone Else", avatarUrl: null });

@@ -24,7 +24,7 @@ One flow for both, as on Pixlpin: a new address simply gets an account.
   account gets two questions once (`components/onboarding-dialog.tsx`):
   "What do you do?" (one role) and "What do you want to see?" (page types and
   industries). Skip and Continue both mark it done (`users.onboarded_at`,
-  migration 0020). The answers are stored for picking designs later; nothing
+  migration 0020; accounts made before the release count as done, 0021). The answers are stored for picking designs later; nothing
   reads them for access. In development, `?onboarding` in the address shows
   the questions without a database.
 
