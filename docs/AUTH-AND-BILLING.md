@@ -176,6 +176,12 @@ out by Payoneer or IBAN).
   `users` in the same transaction. A redelivered event is a no-op; an event
   older than the last one applied is ignored (`stale`); a cancelled old
   subscription does not downgrade a newer one.
+- Who an event is for: the account already on that subscription; for a
+  subscription not seen before, the account in `customData.userId`, else the
+  one holding the Paddle customer. `customData` is set in the browser, so it
+  is not trusted further: an account on a live subscription changes only
+  through that subscription (`other_subscription` otherwise), and a Paddle
+  customer id is stored on one account only, since it opens the billing portal.
 - Statuses `active`, `trialing` and `past_due` keep the paid plan (past_due
   while Paddle retries the card); `paused` and `canceled` mean Free.
 - A cancellation in Paddle is scheduled for the end of the period. The account

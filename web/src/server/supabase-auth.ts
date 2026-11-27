@@ -71,6 +71,25 @@ export async function sendMagicLink(email: string, redirectTo?: string) {
   await gotrue(redirectTo ? `otp?redirect_to=${encodeURIComponent(redirectTo)}` : "otp", { email, create_user: true });
 }
 
+/** Ways a Supabase session can begin that prove nothing about who reads the address. */
+const UNPROVEN_METHODS = new Set(["password", "anonymous"]);
+
+/**
+ * How the session behind an access token began: the methods in its `amr` claim
+ * ("otp", "oauth", "password", ...). The claims are read without checking the
+ * signature, so only for a token Supabase has just accepted. None when the
+ * token carries no such claim.
+ */
+function sessionMethods(accessToken: string): string[] {
+  try {
+    const claims = JSON.parse(Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8")) as { amr?: unknown };
+    if (!Array.isArray(claims.amr)) return [];
+    return claims.amr.map((entry) => (typeof entry === "string" ? entry : String((entry as { method?: unknown } | null)?.method ?? "")));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Supabase's default email (the one sent until custom SMTP lets us change the
  * template) links to Supabase, which verifies it and redirects to
@@ -92,10 +111,19 @@ export async function userFromAccessToken(accessToken: string): Promise<Verified
     throw new AuthError("We couldn't reach the sign-in service. Try again in a minute.", "UPSTREAM");
   }
   if (res.status === 401 || res.status === 403) throw new AuthError("That link has expired or was already used. Ask for a new one.", "EXPIRED");
-  const json = (await res.json().catch(() => ({}))) as { id?: string; email?: string; user_metadata?: Record<string, unknown> };
+  const json = (await res.json().catch(() => ({}))) as { id?: string; email?: string; email_confirmed_at?: string | null; user_metadata?: Record<string, unknown> };
   if (!res.ok || !json.id || !json.email) {
     console.error("[auth] /user", res.status);
     throw new AuthError("Sign-in failed. Ask for a new link and try again.", "UPSTREAM");
+  }
+  // Supabase vouches for the token, not for the address. Only the emailed link or
+  // code and Google prove an inbox, so an address Supabase has not confirmed is
+  // refused, and so is a session that began with a password: with "Confirm email"
+  // off, Supabase marks a password sign-up confirmed for any address typed in.
+  const unproven = sessionMethods(accessToken).find((method) => UNPROVEN_METHODS.has(method));
+  if (!json.email_confirmed_at || unproven) {
+    console.error("[auth] /user: address not proven", unproven ?? "unconfirmed");
+    throw new AuthError("We couldn't confirm that email address. Ask for a new sign-in link.", "INVALID");
   }
   const meta = json.user_metadata ?? {};
   const text = (v: unknown, max: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);

@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { Account, Plan } from "@/contracts/api";
-import { database } from "@/server/db";
+import { database, pgArray } from "@/server/db";
 
 // Accounts and sessions (SEC-27). Supabase proves the email address (see
 // supabase-auth.ts); from then on the browser holds our own session: a random
@@ -134,7 +134,7 @@ export type Onboarding = { role: string | null; pages: string[]; industries: str
 
 /** The answers to the questions after the first sign-in (Skip saves empty ones). Asked once: this marks the account as onboarded. */
 export async function saveOnboarding(userId: string, answers: Onboarding) {
-  await database()`UPDATE users SET role=${answers.role}, interest_pages=${answers.pages}, interest_industries=${answers.industries},
+  await database()`UPDATE users SET role=${answers.role}, interest_pages=${pgArray(answers.pages)}::text[], interest_industries=${pgArray(answers.industries)}::text[],
     onboarded_at=now(), updated_at=now() WHERE id=${userId}`;
 }
 
