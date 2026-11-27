@@ -39,6 +39,7 @@ const local = await startLocalDb();
 const ids = new Map<string, string>();
 const sentTo: string[] = [];
 const used = new Set<string>();
+const unconfirmed = new Set<string>();
 const redirects: string[] = [];
 const gotrue = createServer((req, res) => {
   let body = "";
@@ -49,9 +50,12 @@ const gotrue = createServer((req, res) => {
     if (req.headers.apikey !== "sb_publishable_test") return reply(401, { msg: "No API key found in request" });
     const path = (req.url ?? "").split("?")[0];
     if (path === "/auth/v1/user") {
-      // Supabase's default link: an access token "at-<email>" stands in for the JWT.
-      const email = String(req.headers.authorization ?? "").replace(/^Bearer at-/, "");
-      return ids.has(email) ? reply(200, { id: ids.get(email), email }) : reply(401, { msg: "invalid JWT" });
+      // Supabase's default link: an access token "at-<email>" stands in for the JWT. One shaped like
+      // a JWT (header.claims.signature) says whose it is and how its session began in its claims.
+      const token = String(req.headers.authorization ?? "").replace(/^Bearer /, "");
+      const email = token.startsWith("at-") ? token.slice(3) : String(JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString() || "{}").email ?? "");
+      // Like Supabase, email_confirmed_at is left out until the address is confirmed.
+      return ids.has(email) ? reply(200, { id: ids.get(email), email, ...(!unconfirmed.has(email) && { email_confirmed_at: "2026-10-01T00:00:00Z" }) }) : reply(401, { msg: "invalid JWT" });
     }
     if (path === "/auth/v1/otp") {
       sentTo.push(json.email);
@@ -148,6 +152,17 @@ try {
   check("Supabase's default link: an access token Supabase vouches for signs the same person in", viaDefault.id === ana.user.id && viaDefault.email === "ana@studio.test");
   const badToken = await auth.userFromAccessToken("at-nobody@studio.test").then(() => "accepted", (e: { code?: string }) => e.code);
   check("an access token Supabase refuses is refused", badToken === "EXPIRED", String(badToken));
+  // A token Supabase accepts is not enough: the address must be one its owner proved.
+  const jwt = (email: string, method: string) => `h.${Buffer.from(JSON.stringify({ email, amr: [{ method, timestamp: 1 }] })).toString("base64url")}.s`;
+  const refusal = (token: string) => auth.userFromAccessToken(token).then(() => "accepted", (e: { code?: string }) => e.code);
+  check("a session that began with the emailed link or code is accepted", (await auth.userFromAccessToken(jwt("ana@studio.test", "otp"))).id === ana.user.id);
+  ids.set("eve@studio.test", crypto.randomUUID());
+  unconfirmed.add("eve@studio.test");
+  const unproven = await refusal("at-eve@studio.test");
+  check("an address Supabase has not confirmed is refused", unproven === "INVALID", String(unproven));
+  unconfirmed.delete("eve@studio.test");
+  const viaPassword = await refusal(jwt("eve@studio.test", "password"));
+  check("a session that began with a password, which proves no inbox, is refused", viaPassword === "INVALID", String(viaPassword));
   const badType = await auth.verifyTokenHash("th-x", "recovery").then(() => "accepted", (e: { code?: string }) => e.code);
   check("link types other than email sign-in are refused", badType === "INVALID");
   let body = await (await accountRoute.GET(req("/api/account", { cookie: ana.cookie }))).json();
@@ -282,6 +297,36 @@ try {
   check("other event types are accepted and ignored", (await res.json()).outcome === "ignored");
   res = await send(event("subscription.created", { ...sub("active"), id: "sub_03", customer_id: "ctm_nobody", custom_data: null }));
   check("a subscription for nobody we know is recorded, not applied", (await res.json()).outcome === "unmatched");
+
+  // Checkout's custom data is set in the browser, so anyone can put another account's id in it.
+  const evil = { id: "sub_evil", customer_id: "ctm_evil" };
+  res = await send(event("subscription.created", { ...sub("active"), ...evil }));
+  let outcome = (await res.json()).outcome;
+  me = await plan();
+  check("a purchase tagged with a paying account's id does not take over its billing",
+    outcome === "other_subscription" && me.plan === "team" && me.paddleSubscriptionId === "sub_02" && me.paddleCustomerId === "ctm_01", `${outcome} ${me.plan} ${me.paddleSubscriptionId} ${me.paddleCustomerId}`);
+  res = await send(event("subscription.canceled", { ...sub("canceled"), ...evil }));
+  outcome = (await res.json()).outcome;
+  check("and cancelling that purchase leaves the account's plan", outcome === "other_subscription" && (await plan()).plan === "team", outcome);
+  const team = { id: "sub_02", items: [{ price: { id: "pri_team_m" }, quantity: 4 }] };
+  res = await send(event("subscription.updated", { ...sub("active"), ...team, custom_data: { userId: bea.user.id } }));
+  outcome = (await res.json()).outcome;
+  check("a subscription on file stays with its account, whatever its custom data says",
+    outcome === "applied:team" && (await accounts.userById(bea.user.id))?.plan === "free" && (await plan()).paddleSubscriptionId === "sub_02", outcome);
+  // Paddle reuses a customer for whoever types its email at checkout, and the customer id opens the billing portal.
+  res = await send(event("subscription.created", { ...sub("active"), id: "sub_bea", custom_data: { userId: bea.user.id } }));
+  outcome = (await res.json()).outcome;
+  let beaNow = (await accounts.userById(bea.user.id))!;
+  me = await plan();
+  check("a purchase under another account's Paddle customer gets its plan, not that customer's billing portal",
+    outcome === "applied:pro" && beaNow.plan === "pro" && beaNow.paddleSubscriptionId === "sub_bea" && beaNow.paddleCustomerId === null
+      && me.paddleCustomerId === "ctm_01" && me.paddleSubscriptionId === "sub_02", `${outcome} ${beaNow.plan} ${beaNow.paddleCustomerId}`);
+  await send(event("subscription.canceled", { ...sub("canceled"), id: "sub_bea", custom_data: { userId: bea.user.id } }));
+  res = await send(event("subscription.created", { ...sub("active"), id: "sub_bea2", customer_id: "ctm_bea", custom_data: { userId: bea.user.id } }));
+  outcome = (await res.json()).outcome;
+  beaNow = (await accounts.userById(bea.user.id))!;
+  check("an account whose subscription ended can buy again, under a new Paddle customer too",
+    outcome === "applied:pro" && beaNow.plan === "pro" && beaNow.paddleSubscriptionId === "sub_bea2" && beaNow.paddleCustomerId === "ctm_bea", `${outcome} ${beaNow.paddleCustomerId}`);
 
   // ------------------------------------------------------------ 6. views
   await auth.sendMagicLink("bo@studio.test");

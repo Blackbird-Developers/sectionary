@@ -67,16 +67,29 @@ export async function handlePaddleEvent(event: PaddleEvent): Promise<EventOutcom
     const sub = event.data as Sub;
     if (!sub.id || !sub.status) return finish("ignored");
     const claimed = typeof sub.custom_data?.userId === "string" && UUID.test(sub.custom_data.userId) ? sub.custom_data.userId : null;
-    // Who: the account that opened checkout (custom data), else whoever already holds this subscription or customer.
-    const [user] = await tx`SELECT id, plan, plan_event_at, paddle_subscription_id FROM users
-      WHERE id=${claimed} OR paddle_subscription_id=${sub.id} OR paddle_customer_id=${sub.customer_id ?? null}
-      ORDER BY (id=${claimed}) DESC NULLS LAST, (paddle_subscription_id=${sub.id}) DESC NULLS LAST LIMIT 1 FOR UPDATE`;
+    const customer = typeof sub.customer_id === "string" && sub.customer_id ? sub.customer_id : null;
+    // Who. Checkout's custom data is set in the browser, so anyone can put another
+    // account's id in it: it only says who opened checkout for a subscription we
+    // have not seen. One we have on file stays with the account that holds it.
+    // Without either, the account that holds the Paddle customer.
+    let [user] = await tx`SELECT id, plan_status, plan_event_at, paddle_subscription_id FROM users
+      WHERE paddle_subscription_id=${sub.id} ORDER BY id LIMIT 1 FOR UPDATE`;
+    if (!user && claimed) {
+      [user] = await tx`SELECT id, plan_status, plan_event_at, paddle_subscription_id FROM users WHERE id=${claimed} FOR UPDATE`;
+    }
+    if (!user && customer) {
+      [user] = await tx`SELECT id, plan_status, plan_event_at, paddle_subscription_id FROM users
+        WHERE paddle_customer_id=${customer} ORDER BY id LIMIT 1 FOR UPDATE`;
+    }
     if (!user) return finish("unmatched");
     if (user.plan_event_at && new Date(event.occurred_at) < new Date(user.plan_event_at)) return finish("stale", user.id);
 
     const keeps = KEEPS_PLAN.has(sub.status);
-    // An old subscription ending must not take away the plan a newer one pays for.
-    if (!keeps && user.paddle_subscription_id && user.paddle_subscription_id !== sub.id) return finish("other_subscription", user.id);
+    // An account on a live subscription changes only through that subscription: another
+    // one must not take its billing over (the account page offers checkout to Free
+    // accounts only), and an old one ending must not take away the plan a newer one pays for.
+    const other = Boolean(user.paddle_subscription_id) && user.paddle_subscription_id !== sub.id;
+    if (other && (!keeps || KEEPS_PLAN.has(user.plan_status))) return finish("other_subscription", user.id);
 
     let plan: Plan = "free";
     let seats = 1;
@@ -91,9 +104,13 @@ export async function handlePaddleEvent(event: PaddleEvent): Promise<EventOutcom
     const cancelAt = sub.scheduled_change?.action === "cancel" ? (sub.scheduled_change.effective_at ?? null)
       : sub.status === "canceled" ? (sub.canceled_at ?? event.occurred_at) : null;
 
+    // A Paddle customer belongs to one account. Paddle reuses a customer for whoever types
+    // its email at checkout, and the customer id is what opens the billing portal (portalUrl),
+    // so a second account paying under it gets its plan but never that customer's portal.
+    const [taken] = customer ? await tx`SELECT 1 FROM users WHERE paddle_customer_id=${customer} AND id<>${user.id} LIMIT 1` : [];
     await tx`UPDATE users SET plan=${plan}, plan_status=${sub.status}, plan_seats=${seats},
       plan_renews_at=${renewsAt}, plan_cancel_at=${cancelAt}, plan_event_at=${event.occurred_at},
-      paddle_customer_id=coalesce(${sub.customer_id ?? null}, paddle_customer_id), paddle_subscription_id=${sub.id}, updated_at=now()
+      paddle_customer_id=coalesce(${taken ? null : customer}, paddle_customer_id), paddle_subscription_id=${sub.id}, updated_at=now()
       WHERE id=${user.id}`;
     return finish(`applied:${plan}`, user.id);
   });
