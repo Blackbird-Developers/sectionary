@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -8,13 +8,25 @@ import { Button } from "@/components/ui/button";
 import { StoreIcon } from "@/components/store-icon";
 import { Stack } from "@/components/site-profile";
 import { cn } from "@/lib/utils";
-import { loadFlowSummaries } from "@/lib/load-blocks";
+import { loadFlowPage, loadFlowSummaries } from "@/lib/load-blocks";
 import { PAGE_TYPE_LABEL } from "@/lib/blocks";
-import { flowCounts, type FlowSummary } from "@/lib/flows";
+import { flowCounts, type FlowCounts, type FlowSummary } from "@/lib/flows";
 import { BlimpLoader } from "@/components/blimp-loader";
 
-/** Rows rendered per step; more join as the end of the list scrolls into view. */
+/**
+ * Flows per load. From the API each load is one request for the next 40
+ * (loadFlowPage); on the sample the whole index is already in the browser and
+ * 40 more rows are drawn. More join as the end of the list scrolls into view.
+ */
 const STEP = 40;
+
+/**
+ * What has been loaded. `flows` is the index from its start, in order,
+ * complete flows first. `paged` when it arrives a page at a time, and then
+ * `ended` says which of the two lists, complete only and all, has no more to
+ * ask for. Otherwise `flows` is the whole index.
+ */
+type Loaded = { flows: FlowSummary[]; counts: FlowCounts; paged: boolean; ended: { complete: boolean; all: boolean } };
 
 /** Step thumbnails are cut to this shape (height over width). */
 const THUMB_RATIO = 4 / 3;
@@ -27,44 +39,102 @@ const THUMB_RATIO = 4 / 3;
  * Counted from /api/sites when NEXT_PUBLIC_SITES_SRC is set (SEC-47), the
  * same source each store's flow page reads, so the two always agree. Without
  * it, from the block set, which every store's blocks pass through.
+ *
+ * From the API the index loads 40 flows at a time, already in order
+ * (`order=flow`), so the first rows do not wait for every store's pages: the
+ * whole list is five requests and 2 MB, and took seconds whenever the server
+ * had to build it. The counts in the heading come with the first page.
  */
 export function FlowsIndex() {
-  const [list, setList] = useState<FlowSummary[] | null>(null);
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** The next page: being fetched, or failed (the list stays, with a way to try again). */
+  const [next, setNext] = useState<"idle" | "loading" | "failed">("idle");
 
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const all = params.get("all") === "1";
 
+  const alive = useRef(true);
   useEffect(() => {
-    let alive = true;
-    loadFlowSummaries().then(
-      (summaries) => alive && setList(summaries),
-      (e: Error) => alive && setError(e.message),
-    );
+    alive.current = true;
+    // Always the complete flows first, whatever the toggle says: they open both lists.
+    loadFlowPage(false, 0)
+      .then(async (page): Promise<Loaded> => {
+        if (page) return { flows: page.flows, counts: page.counts, paged: true, ended: { complete: !page.more, all: false } };
+        const flows = await loadFlowSummaries();
+        return { flows, counts: flowCounts(flows), paged: false, ended: { complete: true, all: true } };
+      })
+      .then(
+        (first) => alive.current && setLoaded(first),
+        (e: Error) => alive.current && setError(e.message),
+      );
     return () => {
-      alive = false;
+      alive.current = false;
     };
   }, []);
 
-  const counts = useMemo(() => flowCounts(list ?? []), [list]);
+  const list = loaded?.flows ?? null;
+  const counts = loaded?.counts ?? { complete: 0, withCart: 0, captured: 0 };
   const shown = useMemo(() => (list ?? []).filter((s) => all || s.flow.complete), [list, all]);
   const incomplete = counts.captured - counts.complete;
 
-  // Grow the list as its end comes into view. Reset when the toggle changes.
+  // On the sample the whole index is here: draw it a step at a time. Reset when the toggle changes.
   const [limit, setLimit] = useState({ all, n: STEP });
   const n = limit.all === all ? limit.n : STEP;
+  const rows = loaded?.paged ? shown : shown.slice(0, n);
+  const paged = loaded?.paged ?? false;
+  const loadedCount = list?.length ?? 0;
+  // The complete list has ended once an incomplete flow has arrived, too.
+  const ended = !loaded || (all ? loaded.ended.all : loaded.ended.complete || loadedCount > shown.length);
+  const more = paged ? !ended : n < shown.length;
+
+  /** Asks for the page after what is loaded and adds it to the end. One at a time. */
+  const fetching = useRef(false);
+  const loadNext = useCallback(() => {
+    if (fetching.current) return;
+    fetching.current = true;
+    setNext("loading");
+    loadFlowPage(all, loadedCount).then(
+      (page) => {
+        fetching.current = false;
+        if (!alive.current) return;
+        setNext("idle");
+        setLoaded((was) => {
+          // Not the list this page was asked for (it cannot change under one request, but never add a page twice).
+          if (!was || was.flows.length !== loadedCount) return was;
+          const done = !page || !page.more;
+          const have = new Set(was.flows.map((f) => f.store.host));
+          return {
+            flows: [...was.flows, ...(page?.flows ?? []).filter((f) => !have.has(f.store.host))],
+            counts: page?.counts ?? was.counts,
+            paged: true,
+            // A page of all of them may still be complete flows: only the end of all ends both.
+            ended: all ? { complete: was.ended.complete || done, all: done } : { complete: done, all: was.ended.all },
+          };
+        });
+      },
+      () => {
+        fetching.current = false;
+        if (alive.current) setNext("failed");
+      },
+    );
+  }, [all, loadedCount]);
+
+  // Grow the list as its end comes into view.
   const sentinel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = sentinel.current;
-    if (!el) return;
+    if (!el || !more || next === "failed") return;
     const observer = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) setLimit({ all, n: n + STEP });
+      if (!entries.some((e) => e.isIntersecting)) return;
+      if (paged) loadNext();
+      else setLimit({ all, n: n + STEP });
     }, { rootMargin: "1200px 0px" });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [all, n, shown.length]);
+  }, [all, n, more, paged, next, loadNext, rows.length]);
 
   const toggle = () => {
     const next = new URLSearchParams(params.toString());
@@ -123,7 +193,7 @@ export function FlowsIndex() {
         <Empty>The flows could not be loaded ({error}).</Empty>
       ) : !list ? (
         <FlowsSkeleton />
-      ) : shown.length === 0 ? (
+      ) : rows.length === 0 && !more ? (
         <Empty>
           <p className="text-foreground">No store has a complete flow yet.</p>
           {incomplete > 0 && (
@@ -135,7 +205,7 @@ export function FlowsIndex() {
       ) : (
         <>
           <ul className="flex flex-col gap-2">
-            {shown.slice(0, n).map((summary, i, rows) => {
+            {rows.map((summary, i) => {
               // Complete flows sort first, so the incomplete ones start here.
               const firstIncomplete = all && !summary.flow.complete && (i === 0 || rows[i - 1].flow.complete);
               return (
@@ -152,7 +222,21 @@ export function FlowsIndex() {
               );
             })}
           </ul>
-          {n < shown.length && <div ref={sentinel} aria-hidden className="h-px" />}
+          {more && <div ref={sentinel} aria-hidden className="h-px" />}
+          {more && paged && next !== "failed" && (
+            <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Loading more flows">
+              <SkeletonRow />
+              <SkeletonRow />
+            </ul>
+          )}
+          {next === "failed" && (
+            <div className="flex flex-wrap items-center justify-center gap-3 rounded-lg border border-dashed p-4 text-[13px] text-muted-foreground" role="status">
+              The next flows could not be loaded.
+              <Button variant="outline" size="sm" onClick={loadNext}>
+                Try again
+              </Button>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -229,22 +313,29 @@ export function FlowsSkeleton() {
       <BlimpLoader overlay label="Loading flows…" />
       <ul className="flex flex-col gap-2" aria-busy="true" aria-label="Loading flows">
       {Array.from({ length: 6 }, (_, i) => (
-        <li key={i} className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center" aria-hidden>
-          <div className="flex items-center gap-3 sm:w-64">
-            <div className="shimmer size-9 rounded-[10px] bg-muted" />
-            <div className="flex flex-col gap-1.5">
-              <div className="shimmer h-3 w-28 rounded bg-muted" />
-              <div className="shimmer h-3 w-36 rounded bg-muted" />
-            </div>
-          </div>
-          <div className="grid flex-1 grid-cols-4 gap-1.5 sm:max-w-md sm:gap-2">
-            {Array.from({ length: 5 }, (_, j) => (
-              <div key={j} className="shimmer rounded-md bg-muted" style={{ aspectRatio: `1 / ${THUMB_RATIO}` }} />
-            ))}
-          </div>
-        </li>
+        <SkeletonRow key={i} />
       ))}
       </ul>
     </div>
+  );
+}
+
+/** One row's outline: while the index loads, and under the list while its next page does. */
+function SkeletonRow() {
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center" aria-hidden>
+      <div className="flex items-center gap-3 sm:w-64">
+        <div className="shimmer size-9 rounded-[10px] bg-muted" />
+        <div className="flex flex-col gap-1.5">
+          <div className="shimmer h-3 w-28 rounded bg-muted" />
+          <div className="shimmer h-3 w-36 rounded bg-muted" />
+        </div>
+      </div>
+      <div className="grid flex-1 grid-cols-4 gap-1.5 sm:max-w-md sm:gap-2">
+        {Array.from({ length: 5 }, (_, j) => (
+          <div key={j} className="shimmer rounded-md bg-muted" style={{ aspectRatio: `1 / ${THUMB_RATIO}` }} />
+        ))}
+      </div>
+    </li>
   );
 }
