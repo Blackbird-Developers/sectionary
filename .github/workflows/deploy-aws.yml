@@ -3,6 +3,13 @@ name: Deploy to AWS
 # Builds the web image (web/Dockerfile) on every push to main and pushes it to
 # ECR as :latest and :<commit>, then tells the ECS service sectionary-web to
 # roll out the new :latest (ECS does not watch the tag by itself).
+#
+# Nothing ships unless the tests pass first (the test job). The rollout is then
+# watched to the end: a new server refuses traffic while the database lacks a
+# migration it was built with (web/src/server/migrations.ts), ECS rolls back to
+# the old version, and this job fails saying so. Migrations stay manual: run
+# `npm run db:migrate` in platform/ before merging one, or after a failed
+# deploy, then run this workflow again (Actions -> Deploy to AWS -> Run workflow).
 # Off until the repository variable AWS_DEPLOY_ROLE_ARN is set (docs/AWS.md);
 # no AWS keys are stored in GitHub, it signs in through OIDC.
 on:
@@ -20,8 +27,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  test:
+    name: Tests (web unit, sign-in and boards acceptance, platform)
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            platform/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: platform
+      - run: npm test
+        working-directory: web
+      - run: npm run account:acceptance
+        working-directory: web
+      - run: npm run boards:acceptance
+        working-directory: web
+      - run: npm test
+        working-directory: platform
+
   deploy:
     name: Build and push the web image
+    needs: test
     if: vars.AWS_DEPLOY_ROLE_ARN != ''
     runs-on: ubuntu-latest
     env:
@@ -51,6 +85,28 @@ jobs:
           docker push "$IMAGE:${{ github.sha }}"
           docker push "$IMAGE:latest"
       - name: Roll out on ECS
+        id: rollout
         run: |
-          aws ecs update-service --cluster sectionary --service sectionary-web \
-            --force-new-deployment --query 'service.deployments[0].id' --output text
+          id=$(aws ecs update-service --cluster sectionary --service sectionary-web \
+            --force-new-deployment --query 'service.deployments[0].id' --output text)
+          echo "Started $id"
+          echo "deployment=$id" >> "$GITHUB_OUTPUT"
+      - name: Wait for the rollout to finish
+        env:
+          DEPLOYMENT: ${{ steps.rollout.outputs.deployment }}
+        run: |
+          # Canary, bake time and draining the old server take about ten minutes.
+          for i in $(seq 1 60); do
+            state=$(aws ecs describe-services --cluster sectionary --services sectionary-web \
+              --query "services[0].deployments[?id=='$DEPLOYMENT'].rolloutState | [0]" --output text)
+            echo "$(date -u +%H:%M:%S) $state"
+            case "$state" in
+              COMPLETED) echo "Live."; exit 0 ;;
+              IN_PROGRESS) sleep 30 ;;
+              *)
+                echo "::error::ECS rolled this deploy back ($state); the old version is still serving. The usual cause is a migration this version needs that the database does not have yet (/api/health on a new server lists it). Run npm run db:migrate in platform/, then run this workflow again."
+                exit 1 ;;
+            esac
+          done
+          echo "::error::Still rolling out after 30 minutes. Check the sectionary-web service in the ECS console."
+          exit 1

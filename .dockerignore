@@ -1,8 +1,11 @@
-# What the web image is built from (web/Dockerfile): web/ and platform/src/
-# only. Everything else stays out, secrets and local builds above all.
+# What the web image is built from (web/Dockerfile): web/ and platform/src/,
+# plus the migration files, whose names the build bakes in so a new server
+# waits until the database has them (web/src/server/migrations.ts).
+# Everything else stays out, secrets and local builds above all.
 *
 !web
 !platform/src
+!platform/drizzle/*.sql
 !platform/package.json
 !tsconfig.json
 

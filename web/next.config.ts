@@ -1,8 +1,25 @@
 import type { NextConfig } from "next";
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
 
 const dev = process.env.NODE_ENV === "development";
 
+/**
+ * The migrations this build expects the database to have (platform/drizzle),
+ * baked in so a new server can refuse traffic until they are applied
+ * (src/server/migrations.ts). Empty when platform/ is not beside web/, which
+ * turns the check off rather than failing the build.
+ */
+function migrationNames(): string {
+  try {
+    return readdirSync(join(__dirname, "../platform/drizzle")).filter((f) => f.endsWith(".sql")).sort().join(",");
+  } catch {
+    return "";
+  }
+}
+
 const nextConfig: NextConfig = {
+  env: { SECTIONARY_MIGRATIONS: migrationNames() },
   // A self-contained server in .next/standalone (server.js and only the
   // node_modules it uses), for the Docker image AWS ECS runs
   // (web/Dockerfile, docs/AWS.md). Vercel builds it the same as before.

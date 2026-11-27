@@ -1,5 +1,6 @@
 import { database, resetDatabase } from "@/server/db";
 import { poolWatch, type PoolHealth } from "@/server/pool-health";
+import { migrationState } from "@/server/migrations";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,9 +23,18 @@ declare global {
  * `database` reports the pool: ok, busy (the probe is waiting behind other
  * queries), down (the probe failed), reset (the pool was just dropped), or
  * unconfigured.
+ *
+ * The one exception to "200 while up": a server that has just started on a
+ * database missing migrations it was built with answers 503, so ECS keeps the
+ * old version and rolls the deploy back (server/migrations.ts).
  */
 export async function GET() {
   const check = (globalThis.sectionaryPoolWatch ??= poolWatch({ probe: () => database()`SELECT 1`, reset: resetDatabase }));
   const state = process.env.DATABASE_URL ? await check() : "unconfigured";
-  return Response.json({ ok: true, database: state }, { headers: { "cache-control": "no-store" } });
+  const migrations = await migrationState();
+  const blocked = migrations.status === "behind" && migrations.gate;
+  return Response.json(
+    { ok: !blocked, database: state, migrations: migrations.status === "behind" ? { status: "behind", missing: migrations.missing } : migrations.status },
+    { status: blocked ? 503 : 200, headers: { "cache-control": "no-store" } },
+  );
 }

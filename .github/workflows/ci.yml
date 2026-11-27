@@ -56,3 +56,28 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
       - run: npm run build
+
+  tests:
+    name: Tests (web unit, sign-in and boards acceptance, platform)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            platform/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm ci
+        working-directory: platform
+      - run: npm test
+        working-directory: web
+      - run: npm run account:acceptance
+        working-directory: web
+      - run: npm run boards:acceptance
+        working-directory: web
+      - run: npm test
+        working-directory: platform
