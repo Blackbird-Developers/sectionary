@@ -92,9 +92,17 @@ needs a new build: Actions → Deploy to AWS → Run workflow).
 
 ### Day to day
 
-- **Deploy**: merge to `main`. To roll out again without a new build (after a
-  secret change, say):
+- **Deploy**: merge to `main`. The workflow runs the tests first (web unit,
+  sign-in and boards acceptance, platform) and ships nothing if one fails, then
+  waits for ECS to finish the rollout (about ten minutes). To roll out again
+  without a new build (after a secret change, say):
   `aws ecs update-service --cluster sectionary --service sectionary-web --force-new-deployment`.
+- **A pull request with a new migration**: run `npm run db:migrate` in
+  `platform/` *before* merging it. If you forget, nothing breaks: a new server
+  answers 503 on `/api/health` while the database lacks a migration it was
+  built with (`web/src/server/migrations.ts`), ECS rolls back to the old
+  version, and the deploy fails naming the migration. Migrate, then run
+  Actions → Deploy to AWS → Run workflow.
 - **Status**: `aws ecs describe-services --cluster sectionary --services sectionary-web`
   (`runningCount`, `deployments`, `events`).
 - **Logs**: CloudWatch → `/ecs/sectionary-web`, or
