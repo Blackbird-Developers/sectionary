@@ -59,6 +59,16 @@ export const FIRST_SITES_SRC = SITES_SRC ? `${SITES_SRC}?limit=200` : null;
 export const LIBRARY_COUNTS_SRC = SITES_SRC && API_MODE ? `${BLOCKS_SRC}?limit=1` : null;
 
 /**
+ * The Flows index's first request from the API: its first 40 stores in Flows
+ * order, with the counts for its heading (api/sites/route.ts, `order=flow`).
+ * Later pages add `all` and `cursor` to this (loadFlowPage in
+ * lib/load-blocks.ts). The Flows page preloads it and the server's warm-up
+ * asks for it (instrumentation.ts), so all three must stay byte-for-byte the
+ * same. Null on the sample, where the index is built from the loaded blocks.
+ */
+export const FIRST_FLOWS_SRC = SITES_SRC ? `${SITES_SRC}?order=flow&limit=40` : null;
+
+/**
  * Scale fixture (SEC-46). Unset in normal use. Set NEXT_PUBLIC_MOCK_BLOCKS=30000
  * in web/.env.local to multiply the sample into a capture-sized set in the
  * browser, which is how the wall's virtualisation and the filters get tested

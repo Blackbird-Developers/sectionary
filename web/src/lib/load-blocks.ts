@@ -10,9 +10,9 @@ import { baseType, detailIndex, type DetailIndex } from "@/lib/block-detail";
 import { isUnnamed, type Shot } from "@/lib/blocks";
 import { expandBlocks } from "@/lib/mock-blocks";
 import { pagesFromBlocks, profileFromApi, profileFromIndex, siteCardFromApi, siteCards, storeFromBlocks, summaryPages, type ProfilePage, type SiteCard, type SiteSummary, type SiteView } from "@/lib/site-profile";
-import { flowSummaries, flowSummariesFromApi, type FlowSummary } from "@/lib/flows";
+import { flowOf, flowSummaries, flowSummariesFromApi, type FlowCounts, type FlowSummary } from "@/lib/flows";
 import type { SiteProfile } from "@/contracts/api";
-import { BLOCKS_SRC, STORES_SRC, SITES_SRC, MOCK_BLOCKS, API_MODE } from "@/lib/data-source";
+import { BLOCKS_SRC, STORES_SRC, SITES_SRC, FIRST_FLOWS_SRC, MOCK_BLOCKS, API_MODE } from "@/lib/data-source";
 
 async function getJson<T>(src: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(src, { signal });
@@ -332,6 +332,30 @@ function namedTypes(list: { value: string; count: number }[]) {
 /** Every captured store's flow: from /api/sites when it is configured, otherwise from the loaded blocks. */
 export async function loadFlowSummaries(): Promise<FlowSummary[]> {
   return SITES_SRC ? flowSummariesFromApi(await loadSiteSummaries()) : flowSummaries(await loadBlockIndex());
+}
+
+/** One page of the Flows index: its stores in order, the index's counts, and whether more follow. */
+export type FlowPage = { flows: FlowSummary[]; counts: FlowCounts; more: boolean };
+
+/**
+ * The Flows index a page at a time, already in order (GET /api/sites?order=flow):
+ * the stores after the first `loaded`, complete flows only unless `all`. The
+ * incomplete ones follow the complete ones, so a list begun without `all` can
+ * be carried on with it. Null where there is no such list to page through,
+ * the sample or a server from before `order=flow`: loadFlowSummaries then
+ * gives the whole index at once.
+ */
+export async function loadFlowPage(all: boolean, loaded: number): Promise<FlowPage | null> {
+  if (!FIRST_FLOWS_SRC) return null;
+  type Page = { items: SiteSummary[]; nextCursor: string | null; counts?: FlowCounts };
+  const page = await getJson<Page>(withQuery(FIRST_FLOWS_SRC, { all: all ? 1 : undefined, cursor: loaded || undefined }));
+  // An older server ignores `order` and answers with the Sites list, which has no counts.
+  if (!page.counts) return null;
+  return {
+    flows: page.items.map((site) => ({ store: site.store, listed: true, flow: flowOf(summaryPages(site)) })),
+    counts: page.counts,
+    more: page.nextCursor !== null && page.items.length > 0,
+  };
 }
 
 /** Another store's flow, offered as like the one open, with what the two share. */

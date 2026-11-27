@@ -44,6 +44,8 @@ async function warm(origin: string) {
     const body = (await page?.json().catch(() => null)) as { nextCursor?: string | null } | null;
     if (!body?.nextCursor) break;
   }
+  // The Flows index's first page (FIRST_FLOWS_SRC in lib/data-source.ts), which also makes the order its later pages are cut from.
+  await get("/api/sites?order=flow&limit=40");
 
   // The "similar" pools the block viewer reads (lib/load-blocks.ts), one
   // kind of block at a time so visitors' queries still get the connections.

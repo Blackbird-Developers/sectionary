@@ -84,15 +84,66 @@ export function flowSummariesFromApi(sites: SiteSummary[]): FlowSummary[] {
     .sort(byFlow);
 }
 
-/** Complete flows first, then the most steps, then traffic rank, then name. */
-function byFlow(a: FlowSummary, b: FlowSummary): number {
-  const rank = (s: FlowSummary) => s.store.rank ?? Number.POSITIVE_INFINITY;
+/** What a store's place in the Flows index depends on. */
+export type FlowPlace = { complete: boolean; captured: number; rank: number | null; brand: string; host: string };
+
+/**
+ * Complete flows first, then the most steps, then traffic rank, then name.
+ * Two stores can share all four ("bongusta" at .ca and .dk), and a list sent
+ * a page at a time must come out the same every time, so the host settles it.
+ */
+export function compareFlows(a: FlowPlace, b: FlowPlace): number {
   return (
-    Number(b.flow.complete) - Number(a.flow.complete) ||
-    b.flow.captured - a.flow.captured ||
-    rank(a) - rank(b) ||
-    a.store.brand.localeCompare(b.store.brand)
+    Number(b.complete) - Number(a.complete) ||
+    b.captured - a.captured ||
+    (a.rank ?? Number.POSITIVE_INFINITY) - (b.rank ?? Number.POSITIVE_INFINITY) ||
+    a.brand.localeCompare(b.brand) ||
+    (a.host < b.host ? -1 : a.host > b.host ? 1 : 0)
   );
+}
+
+function byFlow(a: FlowSummary, b: FlowSummary): number {
+  return compareFlows(
+    { complete: a.flow.complete, captured: a.flow.captured, rank: a.store.rank, brand: a.store.brand, host: a.store.host },
+    { complete: b.flow.complete, captured: b.flow.captured, rank: b.store.rank, brand: b.store.brand, host: b.store.host },
+  );
+}
+
+export type FlowCounts = { complete: number; withCart: number; captured: number };
+
+/** A captured store, as little of it as the order needs: the page types it has something to show for. */
+export type FlowOutline = { id: string; host: string; brand: string; rank: number | null; shown: string[] };
+
+/** Every captured store in the order the Flows index lists them, and the index's counts. */
+export type FlowOrder = { ids: string[]; counts: FlowCounts };
+
+/**
+ * The Flows index a page at a time (GET /api/sites?order=flow): the server
+ * puts every captured store in order from an outline of each, then sends only
+ * the stores on the page asked for. The same order and counts as
+ * flowSummariesFromApi and flowCounts give the whole list, and complete flows
+ * come first, so the first `counts.complete` ids are the complete ones.
+ */
+export function flowOrder(outlines: FlowOutline[]): FlowOrder {
+  const cart = FLOW_STEPS.indexOf("cart");
+  const placed = outlines.map((o) => {
+    const has = FLOW_STEPS.map((type) => o.shown.includes(type));
+    return {
+      id: o.id,
+      cart: has[cart],
+      complete: REQUIRED_STEPS.every((type) => has[FLOW_STEPS.indexOf(type)]),
+      captured: has.filter(Boolean).length,
+      rank: o.rank,
+      brand: o.brand,
+      host: o.host,
+    };
+  });
+  placed.sort(compareFlows);
+  const complete = placed.filter((p) => p.complete);
+  return {
+    ids: placed.map((p) => p.id),
+    counts: { complete: complete.length, withCart: complete.filter((p) => p.cart).length, captured: placed.length },
+  };
 }
 
 /**
@@ -119,7 +170,7 @@ export function cartStateOf(blocks: Block[]): CartState {
 }
 
 /** The numbers the SEC-20 Done when is read from. */
-export function flowCounts(summaries: FlowSummary[]): { complete: number; withCart: number; captured: number } {
+export function flowCounts(summaries: FlowSummary[]): FlowCounts {
   const complete = summaries.filter((s) => s.flow.complete);
   return {
     complete: complete.length,
