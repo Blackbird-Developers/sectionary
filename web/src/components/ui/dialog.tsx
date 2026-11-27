@@ -10,6 +10,11 @@ import { cn } from "@/lib/utils";
  * on Escape, with no library. `onClose` runs for Escape, the close button and
  * a click on the backdrop; set `dismissable={false}` for a popup that only
  * its own buttons may close.
+ *
+ * The browser can still close it on its own: Chrome lets a second Escape with
+ * no click in between close any modal, even one whose first Escape was
+ * refused. Then `onClose` runs too, dismissable or not, so `open` never says
+ * open while the screen shows nothing. The welcome questions take that as Skip.
  */
 export function Dialog({
   open,
@@ -33,7 +38,10 @@ export function Dialog({
     closeRef.current = onClose;
   });
 
+  // What React last asked for, so a close it did not ask for can be told apart.
+  const wanted = useRef(open);
   useEffect(() => {
+    wanted.current = open;
     const dialog = ref.current;
     if (!dialog) return;
     if (open && !dialog.open) dialog.showModal();
@@ -44,6 +52,12 @@ export function Dialog({
     <dialog
       ref={ref}
       aria-label={label}
+      onClose={() => {
+        // Closed while React still wants it open: the browser did it (see above).
+        if (!wanted.current) return;
+        wanted.current = false;
+        closeRef.current();
+      }}
       onCancel={(e) => {
         // Escape: React decides whether it closes, so `open` stays the truth.
         e.preventDefault();

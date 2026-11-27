@@ -27,6 +27,17 @@ export function onOpenSignIn(listener: (request: SignInRequest) => void): () => 
   return () => window.removeEventListener(OPEN_EVENT, handle);
 }
 
+/** A page of the sign-in itself (/auth/callback, /auth/confirm, /auth/two-step, /auth/google). */
+export const isAuthPage = (path: string) => /^\/auth(?:[/?#]|$)/.test(path);
+
+/**
+ * Where to go after signing in from `path`: there, unless it is a sign-in
+ * page. Those read a one-time token from their own address, so coming back to
+ * one after a fresh sign-in shows its error ("This link is missing its sign-in
+ * token") to someone who is signed in. Home instead.
+ */
+export const afterSignIn = (path: string) => (isAuthPage(path) ? "/" : path);
+
 // ---------------------------------------------------------------- after the first sign-in
 
 /** "What do you do?" Stored as the value; one answer. */

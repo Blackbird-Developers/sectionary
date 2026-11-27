@@ -5,15 +5,19 @@ import { Dialog } from "@/components/ui/dialog";
 import { Logo } from "@/components/logo";
 import { SignInForm, TermsNote } from "@/components/sign-in-form";
 import { useAccount } from "@/lib/account";
-import { onOpenSignIn, type SignInRequest } from "@/lib/sign-in";
+import { afterSignIn, onOpenSignIn, type SignInRequest } from "@/lib/sign-in";
 
 /**
  * The log-in popup over the page, mounted once in the app shell. Opens from
  * the header's Log in button (openSignIn), and from any link to /account
  * while signed out: the "Sign in" and "Start free trial" links all over the
  * app open it in place instead of leaving the page, and the person comes
- * back to where they were (or to the link's ?next=). A link opened in a new
- * tab, or any link once signed in, still goes to /account as before.
+ * back to where they were (or to the link's ?next=). Never to a sign-in page
+ * such as /auth/callback, where "Try again" after a used link opens it: home
+ * instead (afterSignIn). The server's safeNext keeps /auth paths, since a
+ * two-step sign-in goes on at /auth/two-step, so this is the place for it. A
+ * link opened in a new tab, or any link once signed in, still goes to
+ * /account as before.
  */
 export function SignInDialog() {
   const account = useAccount();
@@ -24,7 +28,7 @@ export function SignInDialog() {
     const here = () => window.location.pathname + window.location.search;
     const show = (r: SignInRequest) => {
       setJoining(false);
-      setRequest({ ...r, next: r.next ?? here() });
+      setRequest({ ...r, next: afterSignIn(r.next ?? here()) });
     };
     const stop = onOpenSignIn(show);
 

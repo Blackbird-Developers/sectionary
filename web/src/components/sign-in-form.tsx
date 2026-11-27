@@ -145,6 +145,8 @@ function CodeStep({
       </div>
       <form ref={form} action={check} className="flex flex-col gap-2" noValidate>
         <input type="hidden" name="email" value={email} />
+        {/* Where to go, sent with the code: it holds for the code's whole hour, whatever this device's cookies say. */}
+        <input type="hidden" name="next" value={next} />
         <label htmlFor={`${id}-code`} className="text-[13px] text-muted-foreground">
           Sign-in code
         </label>
