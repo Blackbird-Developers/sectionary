@@ -97,7 +97,9 @@ export async function signInWithCode(_prev: SignInState, form: FormData): Promis
   try {
     await hit(await codeLimits(email), "Too many tries for now. Wait a few minutes, or use the link in the email.");
     const verified = await verifyCode(email, String(form.get("code") ?? ""));
-    next = await takeNext();
+    // The form says where to go; the cookie only when it does not (an older page). Both are cleared.
+    const remembered = await takeNext();
+    next = safeNext(form.get("next"), remembered);
     if ((await startSession(verified, next)).twoStep) next = "/auth/two-step";
   } catch (error) {
     return { status: "error", message: message(error), email, step: "code" };

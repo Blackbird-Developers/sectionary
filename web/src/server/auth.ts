@@ -97,10 +97,20 @@ export const EMAIL_COOKIE = "sx_signin_email";
 /** Set by "Continue with Google" on this device, so its trip back to /auth/callback signs in without asking. */
 export const GOOGLE_COOKIE = "sx_signin_google";
 
-/** Remembered across the trip to the inbox, on this device only (10 minutes). */
+/**
+ * How long the email's code and link work: Supabase's Email OTP expiry
+ * (docs/AUTH-AND-BILLING.md). What rememberSignIn keeps lasts as long.
+ */
+const SIGN_IN_EMAIL_SECONDS = 3600;
+
+/**
+ * Remembered across the trip to the inbox, on this device only, for as long
+ * as the email works. The code form also sends `next` itself; this is what
+ * the email link, opened in a new tab, comes back to.
+ */
 export async function rememberSignIn(email: string, next: string) {
   const jar = await cookies();
-  const opts = { httpOnly: true, secure: secure(), sameSite: "lax" as const, path: "/", maxAge: 600 };
+  const opts = { httpOnly: true, secure: secure(), sameSite: "lax" as const, path: "/", maxAge: SIGN_IN_EMAIL_SECONDS };
   jar.set(EMAIL_COOKIE, email, opts);
   jar.set(NEXT_COOKIE, next, opts);
 }
