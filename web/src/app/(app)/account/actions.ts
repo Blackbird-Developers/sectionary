@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
-import { currentUser, EMAIL_COOKIE, endOtherSessions, finishTwoStep, rememberSignIn, safeNext, signOut, signOutEverywhere, startSession, takeNext } from "@/server/auth";
+import { currentUser, EMAIL_COOKIE, endOtherSessions, finishTwoStep, rememberSignIn, safeNext, signInStartedHere, signOut, signOutEverywhere, startSession, takeNext } from "@/server/auth";
 import { AuthError, sendMagicLink, userFromAccessToken, verifyCode, verifyTokenHash } from "@/server/supabase-auth";
 import { portalUrl } from "@/server/paddle";
 import { beginSetup, confirmSetup, disable, regenerateRecoveryCodes, TwoStepCodeError } from "@/server/two-step";
@@ -127,15 +127,25 @@ export async function confirmSignIn(_prev: ConfirmState, form: FormData): Promis
   return { status: "done", next };
 }
 
+/** /auth/callback can also stop and ask "Continue as …?" (signInWithAccessToken). */
+export type CallbackState = ConfirmState | { status: "confirm"; email: string };
+
 /**
- * Supabase's default email link, after Supabase verified it: the page hands
- * over the access token from the URL fragment, Supabase says whose it is.
+ * Supabase's default email link (or Google), after Supabase verified it: the
+ * page hands over the access token from the URL fragment, Supabase says whose
+ * it is. Signs in straight away only when this browser started that sign-in;
+ * otherwise answers "confirm" with the address, and signs in once the person
+ * presses Continue (confirmed=1). Without that, a link carrying someone
+ * else's token would quietly sign the visitor in to that other account.
  */
-export async function signInWithAccessToken(_prev: ConfirmState, form: FormData): Promise<ConfirmState> {
+export async function signInWithAccessToken(_prev: CallbackState, form: FormData): Promise<CallbackState> {
   let next: string;
   try {
     await hit(await linkLimits());
     const verified = await userFromAccessToken(String(form.get("access_token") ?? ""));
+    if (form.get("confirmed") !== "1" && !(await signInStartedHere(verified.email))) {
+      return { status: "confirm", email: verified.email };
+    }
     next = await takeNext();
     if ((await startSession(verified, next)).twoStep) next = "/auth/two-step";
   } catch (error) {
