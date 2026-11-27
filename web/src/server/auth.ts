@@ -89,13 +89,13 @@ export async function signOutEverywhere(userId: string) {
   await clearCookie(PENDING_COOKIE);
 }
 
-/** Where to go after signing in: a path on this site, never another origin. */
-export function safeNext(next: unknown, fallback = "/account"): string {
-  return typeof next === "string" && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next.slice(0, 500) : fallback;
-}
+import { safeNext } from "@/lib/safe-next";
+export { safeNext };
 
 export const NEXT_COOKIE = "sx_next";
 export const EMAIL_COOKIE = "sx_signin_email";
+/** Set by "Continue with Google" on this device, so its trip back to /auth/callback signs in without asking. */
+export const GOOGLE_COOKIE = "sx_signin_google";
 
 /** Remembered across the trip to the inbox, on this device only (10 minutes). */
 export async function rememberSignIn(email: string, next: string) {
@@ -107,7 +107,22 @@ export async function rememberSignIn(email: string, next: string) {
 
 /** Where to go after a sign-in that leaves this site and comes back (Google), on this device only (10 minutes). */
 export async function rememberNext(next: string) {
-  (await cookies()).set(NEXT_COOKIE, next, { httpOnly: true, secure: secure(), sameSite: "lax", path: "/", maxAge: 600 });
+  const jar = await cookies();
+  const opts = { httpOnly: true, secure: secure(), sameSite: "lax" as const, path: "/", maxAge: 600 };
+  jar.set(NEXT_COOKIE, next, opts);
+  jar.set(GOOGLE_COOKIE, "1", opts);
+}
+
+/**
+ * Whether this browser started the sign-in that a token at /auth/callback
+ * finishes: it asked for an email to this same address (rememberSignIn), or
+ * pressed Continue with Google (rememberNext). A link someone else made from
+ * their own token fails both, so the callback asks before signing in as them.
+ */
+export async function signInStartedHere(email: string): Promise<boolean> {
+  const jar = await cookies();
+  const asked = jar.get(EMAIL_COOKIE)?.value?.trim().toLowerCase();
+  return jar.get(GOOGLE_COOKIE)?.value === "1" || (!!asked && asked === email.trim().toLowerCase());
 }
 
 /** The path saved by rememberSignIn, cleared once used. */
@@ -116,5 +131,6 @@ export async function takeNext(): Promise<string> {
   const next = safeNext(jar.get(NEXT_COOKIE)?.value);
   await clearCookie(NEXT_COOKIE);
   await clearCookie(EMAIL_COOKIE);
+  await clearCookie(GOOGLE_COOKIE);
   return next;
 }
